@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+/* WonderTutor brand tokens, taken from the UI_v1 mockups */
+@theme {
+  --color-brand-25: #f6faff;
+  --color-brand-50: #eef5ff;
+  --color-brand-100: #dbe9ff;
+  --color-brand-200: #bcd6ff;
+  --color-brand-500: #1a6dff;
+  --color-brand-600: #0f5ae0;
+  --color-brand-700: #0b47b3;
+  --color-navy: #0b2a6f;
+  --color-accent: #ffc83d;
+  --color-accent-50: #fff8e6;
+  --color-accent-100: #fff1c7;
+  --color-accent-600: #f5b70f;
+  --color-ok: #16a34a;
+  --color-ok-50: #e9f9ef;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-hand: "Caveat", cursive;
+  --shadow-card: 0 6px 28px rgba(26, 109, 255, 0.08);
+}
+
+/* Light-blue page background with soft decorative blobs (the browse page is intentionally lighter than the mockup) */
+body {
+  @apply text-slate-700 antialiased;
+  background-color: #f1f7ff;
+  background-image:
+    radial-gradient(60rem 30rem at 85% -10%, rgba(120, 170, 255, 0.28), transparent 60%),
+    radial-gradient(45rem 26rem at -5% 40%, rgba(150, 195, 255, 0.22), transparent 60%),
+    linear-gradient(180deg, #eaf3ff 0%, #f4f9ff 45%, #f8fbff 100%);
+  background-attachment: fixed;
+}
+
+/* Reusable component classes. Declared with @utility so they work with @apply and with variants (hover:, md:) in Tailwind v4 */
+@utility card {
+  @apply rounded-2xl border border-white bg-white shadow-card;
+}
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60;
+}
+@utility btn-primary {
+  @apply btn bg-brand-500 text-white shadow-sm shadow-brand-500/30 hover:bg-brand-600;
+}
+@utility btn-outline {
+  @apply btn border border-brand-500 bg-white text-brand-500 hover:bg-brand-50;
+}
+@utility btn-accent {
+  @apply btn bg-accent text-navy hover:bg-accent-600;
+}
+@utility btn-danger {
+  @apply btn border border-red-400 bg-white text-red-500 hover:bg-red-50;
+}
+@utility input {
+  @apply w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100;
+}
+@utility pill {
+  @apply inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium;
+}
+@utility chip {
+  @apply inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-brand-500 hover:text-brand-500;
+}
+/* "on" state of a chip: the ! makes sure it wins over .chip */
+@utility chip-on {
+  @apply border-brand-500! bg-brand-500! text-white!;
+}
+
+/* Dual-handle budget slider: two range inputs stacked on one track */
+.range-dual input[type="range"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  margin: 0;
+  background: none;
+  pointer-events: none;
+  appearance: none;
+  height: 100%;
+}
+.range-dual input[type="range"]::-webkit-slider-thumb {
+  pointer-events: auto;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: #fff;
+  border: 2px solid #1a6dff;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(26, 109, 255, 0.35);
+}
+.range-dual input[type="range"]::-moz-range-thumb {
+  pointer-events: auto;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: #fff;
+  border: 2px solid #1a6dff;
+  cursor: pointer;
+}
+
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+.pop-in { animation: pop-in 0.18s ease-out; }
+@keyframes float-y {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+.float-y { animation: float-y 3.2s ease-in-out infinite; }
+
+@keyframes wave {
+  0%, 60%, 100% { transform: rotate(0); }
+  10%, 30% { transform: rotate(14deg); }
+  20%, 40% { transform: rotate(-8deg); }
+  50% { transform: rotate(10deg); }
+}
