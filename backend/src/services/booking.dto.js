@@ -4,7 +4,7 @@ import { toTutorCard } from './tutor.service.js'
 export const bookingInclude = {
   tutor: { include: { user: { select: { fullName: true, profilePhotoUrl: true, status: true } }, subjects: true, availability: true } },
   child: true,
-  payment: true,
+  payment: { include: { refunds: { orderBy: { createdAt: 'desc' } } } },
   review: true,
   attendance: true,
   summary: true,
@@ -41,6 +41,7 @@ export function toBookingDto(b) {
     payment: b.payment && {
       id: b.payment.id, status: b.payment.status, amount: num(b.payment.amount), method: b.payment.method,
       gatewayRef: b.payment.gatewayRef, paidAt: b.payment.paidAt,
+      refunds: (b.payment.refunds || []).map((r) => ({ id: r.id, amount: num(r.amount), type: r.type, status: r.status, reason: r.reason, createdAt: r.createdAt })),
     },
     review: b.review && { rating: b.review.rating, comment: b.review.comment },
     // Attendance + summary are written by the Tutor Portal; parents only read them

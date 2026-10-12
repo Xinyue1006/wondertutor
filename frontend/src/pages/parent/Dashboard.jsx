@@ -195,7 +195,7 @@ export default function ParentDashboard() {
         </div>
       </div>
 
-      <LessonDetails booking={detail} onClose={() => setDetail(null)} />
+      <LessonDetails booking={detail} onClose={() => setDetail(null)} onChanged={() => api.get('/parent/dashboard').then((r) => setData(r.data))} />
     </div>
   )
 }
