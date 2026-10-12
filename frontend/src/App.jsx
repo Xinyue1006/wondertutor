@@ -18,6 +18,11 @@ import BookLesson from './pages/parent/BookLesson'
 import MyBookings from './pages/parent/MyBookings'
 import MyChildren from './pages/parent/MyChildren'
 import Payments from './pages/parent/Payments'
+import Complaints from './pages/parent/Complaints'
+import Profile from './pages/parent/Profile'
+import AdminDashboard from './pages/admin/AdminDashboard'
+import AdminUsers from './pages/admin/AdminUsers'
+import AdminComplaints from './pages/admin/AdminComplaints'
 
 // Redirect logged-in users away from login/signup
 function GuestOnly({ children }) {
@@ -48,6 +53,8 @@ export default function App() {
           <Route path="bookings" element={<MyBookings />} />
           <Route path="children" element={<MyChildren />} />
           <Route path="payments" element={<Payments />} />
+          <Route path="complaints" element={<Complaints />} />
+          <Route path="profile" element={<Profile />} />
         </Route>
       </Route>
 
@@ -65,9 +72,9 @@ export default function App() {
       {/* Admin: shared */}
       <Route element={<ProtectedRoute roles={['ADMIN']} />}>
         <Route path="/admin" element={<AppLayout />}>
-          <Route index element={<Placeholder title="Admin Dashboard" />} />
-          <Route path="users" element={<Placeholder title="User Management" note="Xin Yue" />} />
-          <Route path="complaints" element={<Placeholder title="Complaints & Reports" note="Xin Yue" />} />
+          <Route index element={<AdminDashboard />} />
+          <Route path="users" element={<AdminUsers />} />
+          <Route path="complaints" element={<AdminComplaints />} />
           <Route path="bookings" element={<Placeholder title="Booking Oversight" note="Yan Hsi" />} />
           <Route path="finance" element={<Placeholder title="Financial Management" note="Yan Hsi" />} />
           <Route path="settings" element={<Placeholder title="System Configuration" note="Yan Hsi" />} />

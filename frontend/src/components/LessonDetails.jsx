@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import api, { errorMessage } from '../api/client'
 import Avatar from './ui/Avatar'
 import Icon from './ui/Icon'
-import { Modal, StatusPill, Stars, VerifiedTick } from './ui/Common'
+import { ErrorBox, Modal, StatusPill, Stars, VerifiedTick } from './ui/Common'
 import { fmtDateLong, fmtShortDate, fmtTime, fmtTimeRange, money } from '../lib/format'
 import { gradeLabel } from '../lib/education'
 
@@ -16,8 +18,32 @@ function Row({ icon, label, children }) {
 }
 
 // Read-only "View Lesson Details" popup shared by the dashboard and My Bookings
-export default function LessonDetails({ booking: b, onClose, footer }) {
+export default function LessonDetails({ booking: b, onClose, footer, onChanged }) {
+  const [asking, setAsking] = useState(false)
+  const [reason, setReason] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
   if (!b) return null
+
+  // Parent-initiated refunds are reviewed by Admin (never automatic)
+  const refunds = b.payment?.refunds || []
+  const canAsk = b.payment?.status === 'PAID' && ['CONFIRMED', 'COMPLETED'].includes(b.status) && !refunds.some((r) => ['PENDING', 'APPROVED'].includes(r.status))
+  const REFUND_LABEL = { PENDING: 'Pending Admin review', APPROVED: 'Approved', REJECTED: 'Not approved' }
+
+  async function sendRefund() {
+    setBusy(true); setError('')
+    try {
+      await api.post(`/parent/bookings/${b.id}/refund-request`, { reason })
+      setAsking(false); setReason('')
+      onChanged?.()
+      onClose()
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const online = b.teachingMode === 'ONLINE'
   return (
     <Modal open onClose={onClose} title={`${b.subject}${b.isTrial ? ' (Trial Lesson)' : ''}`} width="max-w-xl" footer={footer}>
@@ -76,7 +102,32 @@ export default function LessonDetails({ booking: b, onClose, footer }) {
           Your review: <Stars value={b.review.rating} /> {b.review.comment && <span className="truncate">“{b.review.comment}”</span>}
         </div>
       )}
+      {refunds.length > 0 && (
+        <div className="mt-3 rounded-xl border border-sky-100 bg-sky-50/60 p-3 text-sm">
+          <div className="mb-1 font-bold text-navy">Refund</div>
+          {refunds.map((r) => (
+            <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 text-slate-600">
+              <span>{money(r.amount)} · {r.reason}</span><span className="pill bg-white text-sky-700">{REFUND_LABEL[r.status]}</span>
+            </div>))}
+        </div>
+      )}
+      {canAsk && (asking ? (
+        <div className="mt-3 space-y-2 rounded-xl border border-slate-100 p-3">
+          <ErrorBox>{error}</ErrorBox>
+          <label className="block text-sm font-bold text-navy">Why are you asking for a refund?
+            <textarea rows={3} maxLength={300} className="input mt-1 resize-none" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. The tutor did not attend the lesson." /></label>
+          <p className="text-xs text-slate-500">Our team reviews every request and will let you know the outcome.</p>
+          <div className="flex gap-2"><button disabled={busy} onClick={sendRefund} className="btn-primary px-4 py-1.5">{busy ? 'Sending…' : 'Send Request'}</button><button onClick={() => setAsking(false)} className="btn-outline px-4 py-1.5">Cancel</button></div>
+        </div>
+      ) : (
+        <button onClick={() => setAsking(true)} className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-500 hover:underline"><Icon name="refresh" className="h-3.5 w-3.5" /> Request a refund</button>
+      ))}
       <div className="mt-3 text-xs text-slate-400">Requested on {fmtShortDate(b.createdAt)}</div>
+      {['CONFIRMED', 'COMPLETED', 'CANCELLED'].includes(b.status) && (
+        <Link to={`/parent/complaints?booking=${b.id}`} className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-red-500">
+          <Icon name="shield" className="h-3.5 w-3.5" /> Report a problem with this lesson
+        </Link>
+      )}
       {b.status === 'AWAITING_PAYMENT' && (
         <Link to="/parent/payments" className="btn-primary mt-3 w-full">Pay Now <Icon name="arrow-right" className="h-4 w-4" /></Link>
       )}

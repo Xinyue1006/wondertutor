@@ -114,8 +114,18 @@ function UserMenu() {
       {open && (
         <div className="pop-in absolute right-0 top-14 z-40 w-52 rounded-xl border border-brand-100 bg-white p-1.5 shadow-xl">
           {user.role === 'PARENT' && (
-            <Link to="/parent/children" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-navy hover:bg-brand-50">
-              <Icon name="user" className="h-4 w-4" /> My Children
+            <>
+              <Link to="/parent/profile" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-navy hover:bg-brand-50">
+                <Icon name="settings" className="h-4 w-4" /> My Profile
+              </Link>
+              <Link to="/parent/children" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-navy hover:bg-brand-50">
+                <Icon name="user" className="h-4 w-4" /> My Children
+              </Link>
+            </>
+          )}
+          {user.role === 'PARENT' && (
+            <Link to="/parent/complaints" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-navy hover:bg-brand-50">
+              <Icon name="shield" className="h-4 w-4" /> My Complaints
             </Link>
           )}
           <button

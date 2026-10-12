@@ -109,7 +109,7 @@ export default function Payments() {
       </div>
 
       <PayModal booking={payFor} banks={banks} defaultBank={bank} onClose={() => setPayFor(null)} onDone={() => { setPayFor(null); load() }} />
-      <LessonDetails booking={detail} onClose={() => setDetail(null)} />
+      <LessonDetails booking={detail} onClose={() => setDetail(null)} onChanged={load} />
       <Modal open={methodOpen} onClose={() => setMethodOpen(false)} title="Payment Method">
         <p className="mb-3 text-sm text-slate-500">Lessons are paid by FPX online banking. Choose the bank you'd like pre-selected at checkout.</p>
         <SelectBox icon="card" value={bank} onChange={(e) => { setBank(e.target.value); try { localStorage.setItem(BANK_KEY, e.target.value) } catch { /* private mode */ } }}>
