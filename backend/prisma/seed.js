@@ -469,6 +469,26 @@ async function seedDemoParent(tutors, hash) {
   }
   void pay; void rateOf
 
+  // Sample complaints so the Admin complaint screen has data
+  await prisma.complaint.createMany({
+    data: [
+      {
+        filedById: user.id, againstUserId: (await prisma.tutorProfile.findUnique({ where: { id: T('wong-zi-yang').id } })).userId,
+        category: 'No-show or lateness', description: 'The tutor arrived 25 minutes late and the lesson was cut short. I would like this reviewed.',
+        status: 'OPEN', createdAt: daysAgo(2, '11:00'),
+      },
+      {
+        filedById: user.id, category: 'Payment or refund', description: 'I was charged once but the payment page showed it as pending for a while.',
+        status: 'RESOLVED', adminResponse: 'We checked with the gateway: the payment was successful and shows as Paid. Sorry for the confusion.', createdAt: daysAgo(12, '09:00'),
+      },
+    ],
+  })
+
+  // One tutor with a pending qualification, to demonstrate the Admin approval flow
+  await prisma.qualification.create({
+    data: { tutorId: T('tee-jun-hao').id, title: 'Certificate in Teaching Mathematics', institution: 'Sunway College', year: 2024, documentUrl: 'seed://sample-certificate', status: 'PENDING' },
+  })
+
   // Recent activity feed on the dashboard
   const notes = [
     ['BOOKING_CONFIRMED', 'Booking confirmed with Daniel Tan', 'Mathematics · Primary 5', new Date(Date.now() - 2 * 3600000), false],
