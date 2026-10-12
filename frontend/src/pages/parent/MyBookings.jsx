@@ -119,7 +119,7 @@ export default function MyBookings() {
         ))}
       </div>
 
-      <LessonDetails booking={detail} onClose={() => setDetail(null)} />
+      <LessonDetails booking={detail} onClose={() => setDetail(null)} onChanged={load} />
       <CancelModal booking={cancelFor} onClose={() => setCancelFor(null)} onConfirm={async (reason) => { if (await act(`/parent/bookings/${cancelFor.id}/cancel`, { reason })) setCancelFor(null) }} />
       <ReviewModal booking={reviewFor} onClose={() => setReviewFor(null)} onDone={() => { setReviewFor(null); load() }} />
     </div>
