@@ -8,6 +8,7 @@ import * as matching from '../controllers/parent/matching.controller.js'
 import * as bookings from '../controllers/parent/bookings.controller.js'
 import * as payments from '../controllers/parent/payments.controller.js'
 import * as reviews from '../controllers/parent/reviews.controller.js'
+import * as complaints from '../controllers/parent/complaints.controller.js'
 import { dashboard } from '../controllers/parent/dashboard.controller.js'
 
 const router = Router()
@@ -37,6 +38,9 @@ router.post('/bookings/:id/accept-counter', bookings.acceptCounter)
 router.post('/bookings/:id/decline-counter', bookings.declineCounter)
 router.post('/bookings/:id/cancel', bookings.cancelBooking)
 router.post('/bookings/:id/review', reviews.createReview)
+
+router.get('/complaints', complaints.listComplaints)
+router.post('/complaints', complaints.createComplaint)
 
 router.get('/payments', payments.paymentsOverview)
 router.post('/payments/checkout', payments.checkout)

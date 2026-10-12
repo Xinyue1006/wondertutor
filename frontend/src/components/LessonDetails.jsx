@@ -77,6 +77,11 @@ export default function LessonDetails({ booking: b, onClose, footer }) {
         </div>
       )}
       <div className="mt-3 text-xs text-slate-400">Requested on {fmtShortDate(b.createdAt)}</div>
+      {['CONFIRMED', 'COMPLETED', 'CANCELLED'].includes(b.status) && (
+        <Link to={`/parent/complaints?booking=${b.id}`} className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-red-500">
+          <Icon name="shield" className="h-3.5 w-3.5" /> Report a problem with this lesson
+        </Link>
+      )}
       {b.status === 'AWAITING_PAYMENT' && (
         <Link to="/parent/payments" className="btn-primary mt-3 w-full">Pay Now <Icon name="arrow-right" className="h-4 w-4" /></Link>
       )}

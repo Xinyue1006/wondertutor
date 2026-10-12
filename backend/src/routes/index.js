@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import authRoutes from './auth.routes.js'
 import parentRoutes from './parent.routes.js'
+import adminRoutes from './admin.routes.js'
 import { requireAuth } from '../middleware/auth.js'
 import * as notifications from '../controllers/notifications.controller.js'
 
@@ -11,6 +12,9 @@ router.use('/auth', authRoutes)
 
 // [XY] Parent Portal: children, matching, bookings, payments, reviews
 router.use('/parent', parentRoutes)
+
+// [XY] Admin: user management + complaints ([YH] adds finance/settings inside admin.routes.js)
+router.use('/admin', adminRoutes)
 
 // [Shared] In-app notifications for every role (bell icon)
 router.get('/notifications', requireAuth, notifications.listNotifications)

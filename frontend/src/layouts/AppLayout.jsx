@@ -118,6 +118,11 @@ function UserMenu() {
               <Icon name="user" className="h-4 w-4" /> My Children
             </Link>
           )}
+          {user.role === 'PARENT' && (
+            <Link to="/parent/complaints" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-navy hover:bg-brand-50">
+              <Icon name="shield" className="h-4 w-4" /> My Complaints
+            </Link>
+          )}
           <button
             onClick={() => { logout(); navigate('/login') }}
             className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50"
