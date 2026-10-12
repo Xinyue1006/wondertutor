@@ -1,0 +1,444 @@
+// WonderTutor database schema (shared by Parent Portal + Tutor Portal + Admin)
+// Owner tags in comments: [XY] = Xin Yue, [YH] = Yan Hsi, [Shared] = both
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────── Enums ─────────────
+
+enum Role {
+  PARENT
+  TUTOR
+  ADMIN
+}
+
+enum AccountStatus {
+  ACTIVE
+  DEACTIVATED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  UNSPECIFIED
+}
+
+enum EducationLevel {
+  KINDERGARTEN
+  PRIMARY
+  SECONDARY
+}
+
+enum TeachingMode {
+  PHYSICAL
+  ONLINE // online = tutor only pastes a meeting link; no in-system video / no-show automation
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum BookingStatus {
+  PENDING          // parent sent request, waiting for tutor
+  COUNTER_OFFERED  // tutor proposed a different price
+  AWAITING_PAYMENT // both agreed on price, parent must pay
+  CONFIRMED        // paid
+  COMPLETED        // checked out + summary submitted
+  REJECTED
+  CANCELLED
+  DISPUTED         // escalated to Admin
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  ESCALATED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum RefundType {
+  AUTO          // tutor cancelled / failed check-in / mutual cancel before session
+  ADMIN_REVIEW  // parent-initiated, dissatisfaction, disputed attendance
+}
+
+enum ComplaintStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  DISMISSED
+}
+
+// ───────────── Users & auth [Shared] ─────────────
+
+model User {
+  id              Int           @id @default(autoincrement())
+  email           String        @unique
+  passwordHash    String?       // null for Google-only accounts
+  googleId        String?       @unique
+  role            Role
+  fullName        String
+  phone           String?
+  profilePhotoUrl String?
+  isEmailVerified Boolean       @default(false)
+  status          AccountStatus @default(ACTIVE)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  parent             ParentProfile?
+  tutor              TutorProfile?
+  notifications      Notification[]
+  complaintsFiled    Complaint[]    @relation("ComplaintBy")
+  complaintsAgainst  Complaint[]    @relation("ComplaintAgainst")
+  complaintsHandled  Complaint[]    @relation("ComplaintHandler")
+}
+
+model EmailOtp {
+  id        Int      @id @default(autoincrement())
+  email     String
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
+
+// ───────────── Parent side [XY] ─────────────
+
+model ParentProfile {
+  id        Int     @id @default(autoincrement())
+  userId    Int     @unique
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  address   String?
+  latitude  Float?
+  longitude Float?
+
+  children         Child[]
+  bookings         Booking[]
+  reviews          Review[]
+  matchingRequests MatchingRequest[]
+  favouriteTutors  FavouriteTutor[]
+}
+
+model Child {
+  id             Int            @id @default(autoincrement())
+  parentId       Int
+  parent         ParentProfile  @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  name           String
+  educationLevel EducationLevel
+  grade          Int            // e.g. Primary 5 -> 5, Form 2 -> 2
+  subject        String?        // main subject the child needs help with (shown on the dashboard card)
+  notes          String?        @db.Text
+  photoUrl       String?
+  createdAt      DateTime       @default(now())
+
+  bookings Booking[]
+}
+
+// Stores what the parent told the chatbot / matching wizard, for traceability
+model MatchingRequest {
+  id        Int           @id @default(autoincrement())
+  parentId  Int
+  parent    ParentProfile @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  childId   Int?
+  source    String        // "CHATBOT" or "WIZARD"
+  criteria  Json          // subject, level, days, time, location, budget, gender, characteristics...
+  results   Json?         // ranked tutor ids + scores + reasons
+  createdAt DateTime      @default(now())
+}
+
+model FavouriteTutor {
+  parentId Int
+  tutorId  Int
+  parent   ParentProfile @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  tutor    TutorProfile  @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+
+  @@id([parentId, tutorId])
+}
+
+// ───────────── Tutor side [YH] ─────────────
+
+model TutorProfile {
+  id                    Int       @id @default(autoincrement())
+  userId                Int       @unique
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gender                Gender
+  emergencyContactName  String
+  emergencyContactPhone String
+  bio                   String?   @db.Text
+  teachingApproach      String?   @db.Text
+  characteristics       Json?     // e.g. ["Patient & Encouraging", "Structured"]
+  languages             Json?     // e.g. ["English", "Mandarin"]
+  achievements          Json?     // e.g. ["Helped students improve from C to A"] — shown on the public profile
+  yearsExperience       Int       @default(0)
+  hourlyRate            Decimal   @default(0) @db.Decimal(10, 2)
+  location              String?
+  latitude              Float?
+  longitude             Float?
+  offersPhysical        Boolean   @default(true)
+  offersOnline          Boolean   @default(false)
+  commissionRate        Decimal?  @db.Decimal(5, 2) // per-tutor override; null = use platform base rate
+  isVerified            Boolean   @default(false)
+  ratingAvg             Float     @default(0)
+  ratingCount           Int       @default(0)
+
+  subjects       TutorSubject[]
+  qualifications Qualification[]
+  portfolio      PortfolioItem[]
+  availability   AvailabilitySlot[]
+  bookings       Booking[]
+  reviews        Review[]
+  bankAccounts   BankAccount[]
+  withdrawals    Withdrawal[]
+  favouritedBy   FavouriteTutor[]
+}
+
+model TutorSubject {
+  id             Int            @id @default(autoincrement())
+  tutorId        Int
+  tutor          TutorProfile   @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  subject        String         // e.g. "Mathematics"
+  educationLevel EducationLevel
+  minGrade       Int
+  maxGrade       Int
+
+  @@index([subject, educationLevel])
+}
+
+model Qualification {
+  id          Int                @id @default(autoincrement())
+  tutorId     Int
+  tutor       TutorProfile       @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  title       String
+  institution String?
+  year        Int?
+  documentUrl String
+  status      VerificationStatus @default(PENDING)
+  reviewNote  String?
+  createdAt   DateTime           @default(now())
+}
+
+model PortfolioItem {
+  id          Int          @id @default(autoincrement())
+  tutorId     Int
+  tutor       TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  title       String
+  description String?      @db.Text
+  fileUrl     String
+}
+
+model AvailabilitySlot {
+  id        Int          @id @default(autoincrement())
+  tutorId   Int
+  tutor     TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  dayOfWeek Int          // 0 = Sunday ... 6 = Saturday
+  startTime String       // "HH:mm"
+  endTime   String       // "HH:mm"
+}
+
+model BankAccount {
+  id            Int          @id @default(autoincrement())
+  tutorId       Int
+  tutor         TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  bankName      String
+  accountName   String
+  accountNumber String
+  isDefault     Boolean      @default(false)
+
+  withdrawals Withdrawal[]
+}
+
+model Withdrawal {
+  id            Int           @id @default(autoincrement())
+  tutorId       Int
+  tutor         TutorProfile  @relation(fields: [tutorId], references: [id])
+  bankAccountId Int
+  bankAccount   BankAccount   @relation(fields: [bankAccountId], references: [id])
+  amount        Decimal       @db.Decimal(10, 2)
+  status        RequestStatus @default(PENDING)
+  rejectReason  String?
+  reviewedById  Int?
+  createdAt     DateTime      @default(now())
+  reviewedAt    DateTime?
+}
+
+// ───────────── Booking flow [Shared] ─────────────
+
+model Booking {
+  id              Int           @id @default(autoincrement())
+  parentId        Int
+  parent          ParentProfile @relation(fields: [parentId], references: [id])
+  childId         Int
+  child           Child         @relation(fields: [childId], references: [id])
+  tutorId         Int
+  tutor           TutorProfile  @relation(fields: [tutorId], references: [id])
+  subject         String
+  startAt         DateTime
+  endAt           DateTime
+  teachingMode    TeachingMode  @default(PHYSICAL)
+  location        String?       // physical sessions
+  latitude        Float?
+  longitude       Float?
+  meetingLink     String?       // online sessions: tutor pastes Zoom/Meet link
+  isTrial         Boolean       @default(false)
+  messageToTutor  String?       @db.Text
+  proposedPrice   Decimal       @db.Decimal(10, 2) // parent's offer
+  counterPrice    Decimal?      @db.Decimal(10, 2) // tutor's counter-offer
+  agreedPrice     Decimal?      @db.Decimal(10, 2)
+  status          BookingStatus @default(PENDING)
+  rejectionReason String?
+  cancelReason    String?
+  cancelledById   Int?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  payment     Payment?
+  attendance  Attendance?
+  summary     SessionSummary?
+  review      Review?
+  reschedules RescheduleRequest[]
+  complaints  Complaint[]
+
+  @@index([tutorId, startAt])
+  @@index([childId, startAt])
+}
+
+model RescheduleRequest {
+  id            Int           @id @default(autoincrement())
+  bookingId     Int
+  booking       Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  requestedById Int
+  newStartAt    DateTime
+  newEndAt      DateTime
+  reason        String?
+  status        RequestStatus @default(PENDING)
+  createdAt     DateTime      @default(now())
+}
+
+model Payment {
+  id               Int           @id @default(autoincrement())
+  bookingId        Int           @unique
+  booking          Booking       @relation(fields: [bookingId], references: [id])
+  amount           Decimal       @db.Decimal(10, 2)
+  commissionRate   Decimal       @db.Decimal(5, 2) // snapshot at time of payment
+  commissionAmount Decimal       @db.Decimal(10, 2)
+  method           String        @default("FPX")
+  gatewayRef       String?
+  status           PaymentStatus @default(PENDING)
+  paidAt           DateTime?
+  createdAt        DateTime      @default(now())
+
+  refunds Refund[]
+}
+
+model Refund {
+  id           Int           @id @default(autoincrement())
+  paymentId    Int
+  payment      Payment       @relation(fields: [paymentId], references: [id])
+  amount       Decimal       @db.Decimal(10, 2)
+  type         RefundType
+  reason       String
+  status       RequestStatus @default(PENDING)
+  reviewedById Int?
+  createdAt    DateTime      @default(now())
+  reviewedAt   DateTime?
+}
+
+// ───────────── Session verification [YH writes, XY displays] ─────────────
+
+model Attendance {
+  id              Int       @id @default(autoincrement())
+  bookingId       Int       @unique
+  booking         Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  checkInAt       DateTime?
+  checkInLat      Float?
+  checkInLng      Float?
+  checkInDistance Float?    // metres from booking location (server-calculated)
+  checkInPhotoUrl String?
+  checkOutAt      DateTime?
+  checkOutLat     Float?
+  checkOutLng     Float?
+}
+
+model SessionSummary {
+  id           Int      @id @default(autoincrement())
+  bookingId    Int      @unique
+  booking      Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  content      String   @db.Text
+  progressNote String?  @db.Text
+  createdAt    DateTime @default(now())
+}
+
+// ───────────── Reviews & complaints [XY] ─────────────
+
+model Review {
+  id        Int           @id @default(autoincrement())
+  bookingId Int           @unique
+  booking   Booking       @relation(fields: [bookingId], references: [id])
+  parentId  Int
+  parent    ParentProfile @relation(fields: [parentId], references: [id])
+  tutorId   Int
+  tutor     TutorProfile  @relation(fields: [tutorId], references: [id])
+  rating    Int           // 1-5
+  comment   String?       @db.Text
+  photoUrl  String?
+  createdAt DateTime      @default(now())
+}
+
+model Complaint {
+  id            Int             @id @default(autoincrement())
+  filedById     Int
+  filedBy       User            @relation("ComplaintBy", fields: [filedById], references: [id])
+  againstUserId Int?
+  againstUser   User?           @relation("ComplaintAgainst", fields: [againstUserId], references: [id])
+  bookingId     Int?
+  booking       Booking?        @relation(fields: [bookingId], references: [id])
+  category      String
+  description   String          @db.Text
+  evidenceUrl   String?
+  status        ComplaintStatus @default(OPEN)
+  adminResponse String?         @db.Text
+  handledById   Int?
+  handledBy     User?           @relation("ComplaintHandler", fields: [handledById], references: [id])
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+}
+
+// ───────────── Notifications & settings [Shared] ─────────────
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // e.g. BOOKING_CONFIRMED, PAYMENT_SUCCESS
+  title     String
+  message   String   @db.Text
+  link      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRead])
+}
+
+// Admin-configurable values: GPS_RADIUS_METRES, RATING_THRESHOLD, BASE_COMMISSION_RATE, ...
+model SystemSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}

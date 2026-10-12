@@ -1,0 +1,180 @@
+import { z } from 'zod'
+import { prisma } from '../../config/prisma.js'
+import { AppError } from '../../utils/AppError.js'
+import { assertChildFree, assertSlotBookable } from '../../services/booking.service.js'
+import { bookingInclude, toBookingDto } from '../../services/booking.dto.js'
+import { notify } from '../../services/notification.service.js'
+import { fromMinutes, mytToDate, toMinutes } from '../../utils/time.js'
+
+const createSchema = z.object({
+  tutorId: z.number().int(),
+  childId: z.number().int(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Choose a date'),
+  startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Choose a time'),
+  teachingMode: z.enum(['ONLINE', 'PHYSICAL']),
+  proposedPrice: z.number({ message: 'Enter your proposed price' }).positive('Proposed price must be more than 0').max(1000, 'Proposed price is too high'),
+  subject: z.string().optional(),
+  messageToTutor: z.string().trim().max(200, 'Message must be 200 characters or fewer').optional(),
+  isTrial: z.boolean().optional(),
+})
+
+// Loads a booking only if it belongs to the logged-in parent
+async function ownBooking(req) {
+  const booking = await prisma.booking.findFirst({
+    where: { id: Number(req.params.id), parentId: req.parent.id },
+    include: bookingInclude,
+  })
+  if (!booking) throw new AppError(404, 'Booking not found')
+  return booking
+}
+
+// POST /parent/bookings: send a booking request (PENDING)
+export async function createBooking(req, res) {
+  const data = createSchema.parse(req.body)
+
+  const child = await prisma.child.findFirst({ where: { id: data.childId, parentId: req.parent.id } })
+  if (!child) throw new AppError(404, 'Child not found')
+
+  const tutor = await prisma.tutorProfile.findFirst({
+    where: { id: data.tutorId, user: { status: 'ACTIVE' } },
+    include: { subjects: true, user: true },
+  })
+  if (!tutor) throw new AppError(404, 'Tutor not found')
+  if (data.teachingMode === 'ONLINE' && !tutor.offersOnline) throw new AppError(400, 'This tutor does not offer online lessons')
+  if (data.teachingMode === 'PHYSICAL' && !tutor.offersPhysical) throw new AppError(400, 'This tutor does not offer physical lessons')
+
+  const subject = data.subject || child.subject || tutor.subjects.find((s) => s.educationLevel === child.educationLevel)?.subject
+  const teachesIt = tutor.subjects.some(
+    (s) => s.subject === subject && s.educationLevel === child.educationLevel && child.grade >= s.minGrade && child.grade <= s.maxGrade,
+  )
+  if (!teachesIt) throw new AppError(400, `This tutor does not teach ${subject ?? 'that subject'} at your child's level`)
+
+  // Lessons are 1 hour long (one cell of the availability grid)
+  const startAt = mytToDate(data.date, data.startTime)
+  const endAt = mytToDate(data.date, fromMinutes(toMinutes(data.startTime) + 60))
+  await assertSlotBookable({ tutorId: tutor.id, startAt, endAt })
+  await assertChildFree({ childId: child.id, startAt, endAt })
+
+  const booking = await prisma.booking.create({
+    data: {
+      parentId: req.parent.id,
+      childId: child.id,
+      tutorId: tutor.id,
+      subject,
+      startAt,
+      endAt,
+      teachingMode: data.teachingMode,
+      location: data.teachingMode === 'PHYSICAL' ? req.parent.address || tutor.location : null,
+      latitude: data.teachingMode === 'PHYSICAL' ? req.parent.latitude : null,
+      longitude: data.teachingMode === 'PHYSICAL' ? req.parent.longitude : null,
+      isTrial: data.isTrial ?? false,
+      messageToTutor: data.messageToTutor || null,
+      proposedPrice: data.proposedPrice,
+    },
+    include: bookingInclude,
+  })
+
+  await notify(tutor.userId, {
+    type: 'BOOKING_REQUEST',
+    title: 'New booking request',
+    message: `${req.user.fullName} requested a ${subject} lesson for ${child.name}.`,
+    link: '/tutor/bookings',
+  })
+  await notify(req.user.id, {
+    type: 'BOOKING_SENT',
+    title: `Booking request sent to ${tutor.user.fullName}`,
+    message: `${subject} · ${child.educationLevel === 'SECONDARY' ? 'Form' : child.educationLevel === 'PRIMARY' ? 'Primary' : 'Kindergarten'} ${child.grade}`,
+    link: '/parent/bookings',
+  })
+
+  res.status(201).json({ booking: toBookingDto(booking) })
+}
+
+// GET /parent/bookings
+export async function listBookings(req, res) {
+  const bookings = await prisma.booking.findMany({
+    where: { parentId: req.parent.id },
+    include: bookingInclude,
+    orderBy: { startAt: 'desc' },
+  })
+  res.json({ bookings: bookings.map(toBookingDto) })
+}
+
+// GET /parent/bookings/:id
+export async function getBooking(req, res) {
+  res.json({ booking: toBookingDto(await ownBooking(req)) })
+}
+
+// POST /parent/bookings/:id/accept-counter: parent agrees to the tutor's price, then must pay
+export async function acceptCounter(req, res) {
+  const b = await ownBooking(req)
+  if (b.status !== 'COUNTER_OFFERED' || b.counterPrice == null) throw new AppError(400, 'There is no counter offer to accept')
+  await assertSlotBookable({ tutorId: b.tutorId, startAt: b.startAt, endAt: b.endAt })
+  const updated = await prisma.booking.update({
+    where: { id: b.id },
+    data: { status: 'AWAITING_PAYMENT', agreedPrice: b.counterPrice },
+    include: bookingInclude,
+  })
+  await notify(b.tutor.userId, {
+    type: 'COUNTER_ACCEPTED',
+    title: 'Counter offer accepted',
+    message: `${req.user.fullName} accepted your counter offer. Waiting for payment.`,
+    link: '/tutor/bookings',
+  })
+  res.json({ booking: toBookingDto(updated) })
+}
+
+// POST /parent/bookings/:id/decline-counter
+export async function declineCounter(req, res) {
+  const b = await ownBooking(req)
+  if (b.status !== 'COUNTER_OFFERED') throw new AppError(400, 'There is no counter offer to decline')
+  const updated = await prisma.booking.update({
+    where: { id: b.id },
+    data: { status: 'CANCELLED', cancelReason: 'Parent declined the counter offer', cancelledById: req.user.id },
+    include: bookingInclude,
+  })
+  await notify(b.tutor.userId, {
+    type: 'COUNTER_DECLINED',
+    title: 'Counter offer declined',
+    message: `${req.user.fullName} declined your counter offer.`,
+    link: '/tutor/bookings',
+  })
+  res.json({ booking: toBookingDto(updated) })
+}
+
+// POST /parent/bookings/:id/cancel
+//  - before payment: just cancels the request (nothing to refund)
+//  - after payment: parent-initiated cancellation => refund goes to Admin for review (never automatic)
+export async function cancelBooking(req, res) {
+  const { reason } = z.object({ reason: z.string().trim().max(200).optional() }).parse(req.body ?? {})
+  const b = await ownBooking(req)
+  if (!['PENDING', 'COUNTER_OFFERED', 'AWAITING_PAYMENT', 'CONFIRMED'].includes(b.status))
+    throw new AppError(400, 'This booking can no longer be cancelled')
+  if (b.status === 'CONFIRMED' && b.startAt <= new Date()) throw new AppError(400, 'This lesson has already started')
+
+  const updated = await prisma.$transaction(async (tx) => {
+    if (b.status === 'CONFIRMED' && b.payment?.status === 'PAID') {
+      await tx.refund.create({
+        data: {
+          paymentId: b.payment.id,
+          amount: b.payment.amount,
+          type: 'ADMIN_REVIEW',
+          reason: reason || 'Parent cancelled the booking',
+        },
+      })
+    }
+    return tx.booking.update({
+      where: { id: b.id },
+      data: { status: 'CANCELLED', cancelReason: reason || 'Cancelled by parent', cancelledById: req.user.id },
+      include: bookingInclude,
+    })
+  })
+
+  await notify(b.tutor.userId, {
+    type: 'BOOKING_CANCELLED',
+    title: 'Booking cancelled',
+    message: `${req.user.fullName} cancelled the ${b.subject} lesson.`,
+    link: '/tutor/bookings',
+  })
+  res.json({ booking: toBookingDto(updated) })
+}
