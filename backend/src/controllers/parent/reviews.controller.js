@@ -19,6 +19,7 @@ export async function createReview(req, res) {
   if (booking.status !== 'COMPLETED') throw new AppError(400, 'You can only review a completed lesson')
   if (booking.review) throw new AppError(409, 'You have already reviewed this lesson')
 
+  const before = { avg: booking.tutor.ratingAvg, count: booking.tutor.ratingCount }
   const review = await prisma.$transaction(async (tx) => {
     const created = await tx.review.create({
       data: { bookingId: booking.id, parentId: req.parent.id, tutorId: booking.tutorId, rating: data.rating, comment: data.comment || null },
@@ -30,6 +31,10 @@ export async function createReview(req, res) {
       data: { ratingAvg: agg._avg.rating ?? 0, ratingCount: agg._count._all },
     })
     return { created, avg: agg._avg.rating ?? 0, count: agg._count._all }
+  }).catch((err) => {
+    // Two submits at the same moment: the database allows one review per booking, so the second one lands here
+    if (err.code === 'P2002') throw new AppError(409, 'You have already reviewed this lesson')
+    throw err
   })
 
   await notify(booking.tutor.userId, {
@@ -39,9 +44,12 @@ export async function createReview(req, res) {
     link: '/tutor',
   })
 
-  // Rating-threshold rule: a tutor whose average drops below the Admin-set threshold is flagged for review
+  // Rating-threshold rule: a tutor whose average drops below the Admin-set threshold is flagged for review.
+  // Admin is told once, when the tutor crosses the line, not again for every later low review.
   const setting = await prisma.systemSetting.findUnique({ where: { key: 'RATING_THRESHOLD' } })
-  if (review.count >= 3 && review.avg < Number(setting?.value ?? 3)) {
+  const threshold = Number(setting?.value ?? 3)
+  const flagged = (r) => r.count >= 3 && r.avg < threshold
+  if (flagged(review) && !flagged(before)) {
     const admins = await prisma.user.findMany({ where: { role: 'ADMIN', status: 'ACTIVE' }, select: { id: true } })
     await Promise.all(
       admins.map((a) =>

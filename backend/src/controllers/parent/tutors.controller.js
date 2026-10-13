@@ -4,7 +4,7 @@ import { AppError } from '../../utils/AppError.js'
 import { CHARACTERISTICS, LOCATIONS, MAX_GRADE, SUBJECTS, findLocation } from '../../data/catalog.js'
 import { rankTutors, distanceKm } from '../../services/matching.service.js'
 import { tutorInclude, toTutorCard, toTutorProfile } from '../../services/tutor.service.js'
-import { getTutorSlots } from '../../services/booking.service.js'
+import { SLOT_BLOCKING, getTutorSlots } from '../../services/booking.service.js'
 import { addDays, mondayOf, mytParts, mytToDate, toMinutes, todayMyt } from '../../utils/time.js'
 import { preferencesToCriteria } from '../../utils/preferences.js'
 import { hhmm, ymd } from '../../utils/validators.js'
@@ -57,19 +57,22 @@ export async function activeTutors(subject, level) {
   })
 }
 
-// Is the tutor free for a 1-hour lesson at date+time? (date & time filter on the search bar)
-async function isFreeAt(tutor, date, time) {
+// Which of these tutors are free for a 1-hour lesson at date+time? (date & time filter on the search bar)
+// One query for the clashing bookings of all candidates, instead of one query per tutor.
+async function freeAt(tutors, date, time) {
   const start = mytToDate(date, time)
   const end = new Date(start.getTime() + 3600000)
+  if (start <= new Date()) return new Set()
   const { dow } = mytParts(start)
-  const covers = tutor.availability.some(
-    (a) => a.dayOfWeek === dow && toMinutes(a.startTime) <= toMinutes(time) && toMinutes(a.endTime) >= toMinutes(time) + 60,
+  const covering = tutors.filter((t) =>
+    t.availability.some((a) => a.dayOfWeek === dow && toMinutes(a.startTime) <= toMinutes(time) && toMinutes(a.endTime) >= toMinutes(time) + 60),
   )
-  if (!covers) return false
-  const clash = await prisma.booking.findFirst({
-    where: { tutorId: tutor.id, status: { in: ['AWAITING_PAYMENT', 'CONFIRMED'] }, startAt: { lt: end }, endAt: { gt: start } },
+  const busy = await prisma.booking.findMany({
+    where: { tutorId: { in: covering.map((t) => t.id) }, status: { in: SLOT_BLOCKING }, startAt: { lt: end }, endAt: { gt: start } },
+    select: { tutorId: true },
   })
-  return !clash
+  const busyIds = new Set(busy.map((b) => b.tutorId))
+  return new Set(covering.filter((t) => !busyIds.has(t.id)).map((t) => t.id))
 }
 
 // GET /parent/tutors: browse + filter + sort + page
@@ -123,8 +126,8 @@ export async function browseTutors(req, res) {
   })
 
   if (q.date && q.time) {
-    const free = await Promise.all(ranked.map(({ tutor }) => isFreeAt(tutor, q.date, q.time)))
-    ranked = ranked.filter((_, i) => free[i])
+    const free = await freeAt(ranked.map((r) => r.tutor), q.date, q.time)
+    ranked = ranked.filter(({ tutor }) => free.has(tutor.id))
   }
 
   // "Recommended" keeps the score order; the other sorts re-order the same list (ties fall back to the score)
@@ -250,13 +253,12 @@ export async function listFavourites(req, res) {
 export async function toggleFavourite(req, res) {
   const tutorId = Number(req.params.tutorId)
   const key = { parentId_tutorId: { parentId: req.parent.id, tutorId } }
-  const existing = await prisma.favouriteTutor.findUnique({ where: key })
-  if (existing) {
-    await prisma.favouriteTutor.delete({ where: key })
-    return res.json({ isFavourite: false })
-  }
-  const tutor = await prisma.tutorProfile.findUnique({ where: { id: tutorId } })
+  // deleteMany (not delete) so a double click that already removed it is not an error
+  const removed = await prisma.favouriteTutor.deleteMany({ where: { parentId: req.parent.id, tutorId } })
+  if (removed.count) return res.json({ isFavourite: false })
+  const tutor = await prisma.tutorProfile.findFirst({ where: { id: tutorId, user: { status: 'ACTIVE' } }, select: { id: true } })
   if (!tutor) throw new AppError(404, 'Tutor not found')
-  await prisma.favouriteTutor.create({ data: { parentId: req.parent.id, tutorId } })
+  // upsert: if a second click saved it a moment ago, it simply stays saved
+  await prisma.favouriteTutor.upsert({ where: key, update: {}, create: { parentId: req.parent.id, tutorId } })
   res.json({ isFavourite: true })
 }

@@ -18,6 +18,11 @@ export function errorHandler(err, req, res, next) {
     console.error(err.message)
     return res.status(400).json({ message: 'Invalid input' })
   }
+  // Two requests raced (e.g. a double click) and the second hit a unique rule, or the row was removed meanwhile
+  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    if (err.code === 'P2002') return res.status(409).json({ message: 'This has already been saved. Please refresh the page.' })
+    if (err.code === 'P2025') return res.status(404).json({ message: 'This record no longer exists. Please refresh the page.' })
+  }
   // A JSON body that is not valid JSON (express.json() parse error)
   if (err.type === 'entity.parse.failed') return res.status(400).json({ message: 'The request body is not valid JSON' })
   if (err.type === 'entity.too.large') return res.status(413).json({ message: 'The request is too large' })

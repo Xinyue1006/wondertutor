@@ -9,6 +9,8 @@ import { AppError } from '../../utils/AppError.js'
 import { bookingInclude, toBookingDto } from '../../services/booking.dto.js'
 import { notify, notifyWithEmail } from '../../services/notification.service.js'
 import { id } from '../../utils/validators.js'
+import { PAYMENT_DEADLINE_MINUTES } from '../../services/lifecycle.service.js'
+import { mytParts, mytToDate } from '../../utils/time.js'
 
 export const SANDBOX_BANKS = ['Maybank2u', 'CIMB Clicks', 'Public Bank', 'RHB Now', 'Hong Leong Connect', 'Bank Islam']
 
@@ -35,17 +37,19 @@ export async function paymentsOverview(req, res) {
     }),
   ])
 
-  const startOfMonth = new Date()
-  startOfMonth.setDate(1)
-  startOfMonth.setHours(0, 0, 0, 0)
+  // "This month" is the Malaysian calendar month, whatever time zone the server runs in
+  const today = mytParts(new Date()).date
+  const startOfMonth = mytToDate(`${today.slice(0, 8)}01`, '00:00')
   const paid = payments.filter((p) => p.status === 'PAID' || p.status === 'PARTIALLY_REFUNDED')
+  // Totals are added up as Decimals and only turned into numbers at the end (no floating-point drift)
+  const sum = (items, amountOf) => money(items.reduce((t, x) => t.add(amountOf(x)), new Prisma.Decimal(0)))
 
   res.json({
     required: awaiting.map((b) => ({ ...toBookingDto(b), totalAmount: money(lessonAmount(b)) })),
     summary: {
-      totalPaid: paid.reduce((s, p) => s + money(p.amount), 0),
-      pendingPayment: awaiting.reduce((s, b) => s + money(lessonAmount(b)), 0),
-      paidThisMonth: paid.filter((p) => p.paidAt && p.paidAt >= startOfMonth).reduce((s, p) => s + money(p.amount), 0),
+      totalPaid: sum(paid, (p) => p.amount),
+      pendingPayment: sum(awaiting, lessonAmount),
+      paidThisMonth: sum(paid.filter((p) => p.paidAt && p.paidAt >= startOfMonth), (p) => p.amount),
     },
     transactions: payments.map((p) => ({
       id: p.id,
@@ -69,6 +73,9 @@ export async function checkout(req, res) {
   if (!booking) throw new AppError(404, 'Booking not found')
   if (booking.status !== 'AWAITING_PAYMENT' || booking.agreedPrice == null)
     throw new AppError(400, 'This booking is not waiting for payment')
+  // Same deadline as the expiry scheduler: an unpaid booking is released 1 hour before the lesson
+  if (booking.startAt.getTime() - Date.now() < PAYMENT_DEADLINE_MINUTES * 60_000)
+    throw new AppError(400, `Payment closes ${PAYMENT_DEADLINE_MINUTES} minutes before the lesson starts. Please book another time.`)
 
   const amount = lessonAmount(booking)
   const gatewayRef = `SBX-${randomBytes(5).toString('hex').toUpperCase()}`
@@ -95,9 +102,14 @@ export async function confirmPayment(req, res) {
   })
   if (!payment) throw new AppError(404, 'Payment not found')
   if (payment.status !== 'PENDING') throw new AppError(400, 'This payment has already been processed')
+  // The booking may have been cancelled or expired after checkout started: it must not come back to life
+  if (payment.booking.status !== 'AWAITING_PAYMENT')
+    throw new AppError(400, 'This booking is no longer waiting for payment. You have not been charged.')
 
+  const processedAlready = () => new AppError(409, 'This payment has already been processed')
   if (outcome === 'FAILED') {
-    await prisma.payment.update({ where: { id: payment.id }, data: { status: 'FAILED' } })
+    const { count } = await prisma.payment.updateMany({ where: { id: payment.id, status: 'PENDING' }, data: { status: 'FAILED' } })
+    if (!count) throw processedAlready()
     return res.json({ status: 'FAILED', message: 'The payment was not completed. You have not been charged.' })
   }
 
@@ -107,13 +119,17 @@ export async function confirmPayment(req, res) {
   const rate = payment.booking.tutor.commissionRate ?? new Prisma.Decimal(base?.value ?? 0)
   const commissionAmount = new Prisma.Decimal(payment.amount).mul(rate).div(100).toDecimalPlaces(2)
 
-  await prisma.$transaction([
-    prisma.payment.update({
-      where: { id: payment.id },
+  // Both changes are conditional, so a double click (or the scheduler expiring the booking at the same moment)
+  // cannot confirm twice or confirm a booking that was released: either both happen or neither does
+  await prisma.$transaction(async (tx) => {
+    const paid = await tx.payment.updateMany({
+      where: { id: payment.id, status: 'PENDING' },
       data: { status: 'PAID', paidAt: new Date(), method: `FPX (${bank})`, commissionRate: rate, commissionAmount },
-    }),
-    prisma.booking.update({ where: { id: payment.bookingId }, data: { status: 'CONFIRMED' } }),
-  ])
+    })
+    if (!paid.count) throw processedAlready()
+    const confirmed = await tx.booking.updateMany({ where: { id: payment.bookingId, status: 'AWAITING_PAYMENT' }, data: { status: 'CONFIRMED' } })
+    if (!confirmed.count) throw new AppError(400, 'This booking is no longer waiting for payment. You have not been charged.')
+  })
 
   const b = payment.booking
   const when = b.startAt.toLocaleString('en-MY', { timeZone: 'Asia/Kuala_Lumpur', dateStyle: 'medium', timeStyle: 'short' })
