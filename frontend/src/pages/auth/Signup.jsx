@@ -192,8 +192,10 @@ export default function Signup() {
       )}
 
       {step === 1 && (
-        <div className="mx-auto mt-6 grid max-w-[68.75rem] gap-6 md:grid-cols-[230px_1fr]">
-          <aside className="space-y-1.5">
+        <div className="mx-auto mt-6 grid max-w-[68.75rem] gap-6 md:grid-cols-[260px_1fr]">
+          {/* The side panel is as tall as the form next to it: the menu stays on top and the picture fills the rest, anchored to the bottom */}
+          <aside className="flex flex-col overflow-hidden rounded-2xl border border-brand-100 bg-white/70 p-3 shadow-card">
+           <div className="space-y-1.5">
             {sections.map((s) => (
               <button
                 key={s.id}
@@ -209,10 +211,15 @@ export default function Signup() {
                 {s.locked && <Icon name="lock" className="ml-auto h-3.5 w-3.5" />}
               </button>
             ))}
-            <img
-              src={role === 'PARENT' ? '/img/art/signup-parent.jpg' : '/img/art/signup-tutor.jpg'}
-              alt="" className="mt-6 hidden w-full rounded-2xl object-cover opacity-90 [mask-image:linear-gradient(to_top,black_55%,transparent)] md:block"
-            />
+           </div>
+            {/* the whole illustration at its natural shape, sitting at the bottom of the panel (menu on top, picture below) */}
+            <div className="mt-auto hidden pt-4 md:block">
+              <img
+                src={role === 'PARENT' ? '/img/art/signup-parent.jpg' : '/img/art/signup-tutor.jpg'}
+                alt="" aria-hidden="true"
+                className="-mx-3 -mb-3 block w-[calc(100%+1.5rem)] max-w-none rounded-b-2xl [mask-image:linear-gradient(to_top,black_72%,transparent)]"
+              />
+            </div>
           </aside>
 
           <form onSubmit={next} noValidate className="rounded-2xl border border-brand-100 bg-white p-6 shadow-card md:p-8">
