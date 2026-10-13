@@ -144,3 +144,11 @@ body {
   html { scroll-behavior: auto; }
   * { transition-duration: 0.01ms !important; }
 }
+
+/* Responsive safety net (base layer, so any explicit utility class still wins):
+   a grid column or flex item may shrink below its content width instead of pushing the page wider than the screen. */
+@layer base {
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .grid > *, .flex > * { min-width: 0; }
+  img, svg, video { max-width: 100%; }
+}
