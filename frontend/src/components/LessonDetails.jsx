@@ -32,7 +32,10 @@ export default function LessonDetails({ booking: b, onClose, footer, onChanged }
   const REFUND_LABEL = { PENDING: 'Pending Admin review', APPROVED: 'Approved', REJECTED: 'Not approved' }
 
   async function sendRefund() {
-    setBusy(true); setError('')
+    setError('')
+    // Admin needs a real explanation to decide a refund, so a one-word reason is not enough
+    if (reason.trim().length < 10) return setError('Please explain why you are asking for a refund (at least 10 characters).')
+    setBusy(true)
     try {
       await api.post(`/parent/bookings/${b.id}/refund-request`, { reason, ...(dispute && { attendanceDispute: true }) })
       setAsking(false); setReason('')

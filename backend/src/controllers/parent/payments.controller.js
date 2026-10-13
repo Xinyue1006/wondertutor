@@ -8,6 +8,7 @@ import { prisma } from '../../config/prisma.js'
 import { AppError } from '../../utils/AppError.js'
 import { bookingInclude, toBookingDto } from '../../services/booking.dto.js'
 import { notify, notifyWithEmail } from '../../services/notification.service.js'
+import { id } from '../../utils/validators.js'
 
 export const SANDBOX_BANKS = ['Maybank2u', 'CIMB Clicks', 'Public Bank', 'RHB Now', 'Hong Leong Connect', 'Bank Islam']
 
@@ -63,7 +64,7 @@ export async function paymentsOverview(req, res) {
 
 // POST /parent/payments/checkout { bookingId }: start a sandbox FPX payment
 export async function checkout(req, res) {
-  const { bookingId } = z.object({ bookingId: z.number().int() }).parse(req.body)
+  const { bookingId } = z.object({ bookingId: id('Booking') }).parse(req.body)
   const booking = await prisma.booking.findFirst({ where: { id: bookingId, parentId: req.parent.id }, include: { payment: true } })
   if (!booking) throw new AppError(404, 'Booking not found')
   if (booking.status !== 'AWAITING_PAYMENT' || booking.agreedPrice == null)
@@ -85,7 +86,7 @@ export async function checkout(req, res) {
 // POST /parent/payments/:id/confirm { bank, outcome }: stands in for the gateway callback
 export async function confirmPayment(req, res) {
   const { bank, outcome } = z
-    .object({ bank: z.string().min(1, 'Choose a bank'), outcome: z.enum(['SUCCESS', 'FAILED']) })
+    .object({ bank: z.enum(SANDBOX_BANKS, { message: 'Choose a bank from the list' }), outcome: z.enum(['SUCCESS', 'FAILED']) })
     .parse(req.body)
 
   const payment = await prisma.payment.findFirst({

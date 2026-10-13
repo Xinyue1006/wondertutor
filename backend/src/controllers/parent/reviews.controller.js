@@ -4,7 +4,7 @@ import { AppError } from '../../utils/AppError.js'
 import { notify } from '../../services/notification.service.js'
 
 const reviewSchema = z.object({
-  rating: z.number().int().min(1, 'Choose a rating').max(5),
+  rating: z.number({ message: 'Choose a rating' }).int('Choose a rating').min(1, 'Choose a rating').max(5, 'Rating is 1 to 5 stars'),
   comment: z.string().trim().max(500, 'Comment must be 500 characters or fewer').optional(),
 })
 

@@ -21,7 +21,9 @@ function GoogleG() {
 // "Continue with Google". Uses Google's own button when VITE_GOOGLE_CLIENT_ID is set; the credential is verified
 // by the backend (POST /api/auth/google). Without a client id it shows the same-looking button with a friendly message.
 // `role` is only needed when Google creates a brand-new account (signup page).
-export default function GoogleButton({ role, onError }) {
+// `onNeedsRole(credential)`: on the login page a new Google user has no role yet, so the page can ask for one
+// and finish sign-up with the same Google credential instead of showing a dead-end error.
+export default function GoogleButton({ role, onError, onNeedsRole }) {
   const { googleLogin } = useAuth()
   const navigate = useNavigate()
   const box = useRef(null)
@@ -40,6 +42,7 @@ export default function GoogleButton({ role, onError }) {
             navigate(homeFor(user.role))
           } catch (err) {
             const m = errorMessage(err)
+            if (m.includes('choose Parent or Tutor') && onNeedsRole) return onNeedsRole(credential)
             onError?.(m.includes('choose Parent or Tutor') ? 'No WonderTutor account uses this Google email yet. Please sign up first.' : m)
           }
         },

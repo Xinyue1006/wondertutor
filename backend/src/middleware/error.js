@@ -1,4 +1,5 @@
 import { ZodError } from 'zod'
+import { Prisma } from '@prisma/client'
 import { isDev } from '../config/env.js'
 
 export function notFound(req, res) {
@@ -11,6 +12,15 @@ export function errorHandler(err, req, res, next) {
   if (err instanceof ZodError) {
     return res.status(400).json({ message: err.issues[0]?.message || 'Invalid input', issues: err.issues })
   }
+  // Safety net: input that slipped past validation and was rejected by Prisma is the caller's mistake (400),
+  // and the message would expose table and column names, so it is logged but never sent
+  if (err instanceof Prisma.PrismaClientValidationError) {
+    console.error(err.message)
+    return res.status(400).json({ message: 'Invalid input' })
+  }
+  // A JSON body that is not valid JSON (express.json() parse error)
+  if (err.type === 'entity.parse.failed') return res.status(400).json({ message: 'The request body is not valid JSON' })
+  if (err.type === 'entity.too.large') return res.status(413).json({ message: 'The request is too large' })
   const status = err.status || 500
   if (status === 500) console.error(err)
   res.status(status).json({

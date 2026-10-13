@@ -6,15 +6,17 @@ import { bookingInclude, toBookingDto } from '../../services/booking.dto.js'
 import { notify } from '../../services/notification.service.js'
 import { requestReschedule as askReschedule, respondReschedule, withdrawReschedule } from '../../services/reschedule.service.js'
 import { fromMinutes, mytToDate, toMinutes } from '../../utils/time.js'
+import { hhmm, id, ringgit, ymd } from '../../utils/validators.js'
+import { SUBJECTS } from '../../data/catalog.js'
 
 const createSchema = z.object({
-  tutorId: z.number().int(),
-  childId: z.number().int(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Choose a date'),
-  startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Choose a time'),
-  teachingMode: z.enum(['ONLINE', 'PHYSICAL']),
-  proposedPrice: z.number({ message: 'Enter your proposed price' }).positive('Proposed price must be more than 0').max(1000, 'Proposed price is too high'),
-  subject: z.string().optional(),
+  tutorId: id('Tutor'),
+  childId: id('Child'),
+  date: ymd('Choose a date'),
+  startTime: hhmm('Choose a time'),
+  teachingMode: z.enum(['ONLINE', 'PHYSICAL'], { message: 'Choose online or physical' }),
+  proposedPrice: ringgit('Proposed price'),
+  subject: z.enum(SUBJECTS, { message: 'Choose a subject from the list' }).optional(),
   messageToTutor: z.string().trim().max(200, 'Message must be 200 characters or fewer').optional(),
   isTrial: z.boolean().optional(),
 })
@@ -231,8 +233,8 @@ const reloadDto = async (id) => toBookingDto(await prisma.booking.findUnique({ w
 export async function requestReschedule(req, res) {
   const data = z
     .object({
-      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Choose a date'),
-      startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Choose a time'),
+      date: ymd('Choose a date'),
+      startTime: hhmm('Choose a time'),
       reason: z.string().trim().max(200, 'Reason must be 200 characters or fewer').optional(),
     })
     .parse(req.body)

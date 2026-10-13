@@ -2,14 +2,15 @@ import { z } from 'zod'
 import { prisma } from '../../config/prisma.js'
 import { AppError } from '../../utils/AppError.js'
 import { MAX_GRADE, SUBJECTS } from '../../data/catalog.js'
+import { optionalText, personName } from '../../utils/validators.js'
 
 const childSchema = z
   .object({
-    name: z.string().trim().min(1, 'Child name is required').max(60),
+    name: personName("Child's name", 60),
     educationLevel: z.enum(['KINDERGARTEN', 'PRIMARY', 'SECONDARY'], { message: 'Choose an education level' }),
-    grade: z.coerce.number().int().min(1, 'Choose a grade'),
+    grade: z.coerce.number({ message: 'Choose a grade' }).int('Choose a grade').min(1, 'Choose a grade'),
     subject: z.enum(SUBJECTS).optional().nullable(),
-    notes: z.string().trim().max(500, 'Notes must be 500 characters or fewer').optional().nullable(),
+    notes: optionalText(500, 'Notes'),
     photoUrl: z.string().url().startsWith('https://res.cloudinary.com/', 'Invalid photo').optional().nullable(),
   })
   .refine((d) => d.grade <= MAX_GRADE[d.educationLevel], { message: 'That grade does not exist for the chosen level', path: ['grade'] })

@@ -1,10 +1,11 @@
 // Admin API. Xin Yue: user management + complaints. Yan Hsi adds booking oversight, finance and settings below.
 import { Router } from 'express'
+import { validateIdParams } from '../middleware/params.js'
 import { requireAuth, requireRole } from '../middleware/auth.js'
 import * as users from '../controllers/admin/users.controller.js'
 import * as complaints from '../controllers/admin/complaints.controller.js'
 
-const router = Router()
+const router = validateIdParams(Router()) // every :id in these URLs must be a positive whole number
 router.use(requireAuth, requireRole('ADMIN'))
 
 router.get('/dashboard', users.dashboard)

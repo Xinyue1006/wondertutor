@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import api, { errorMessage } from '../../api/client'
 import Icon from '../../components/ui/Icon'
 import { ErrorBox } from '../../components/ui/Common'
+import { checkEmail, checkPassword } from '../../lib/validation'
 
 // Two steps: 1) email -> a 6-digit code is emailed, 2) code + new password.
 // The first answer is the same whether or not the email has an account, so the page cannot be used to probe emails.
@@ -21,7 +22,8 @@ export default function ForgotPassword() {
   async function sendCode(e) {
     e?.preventDefault()
     setError('')
-    if (!/^\S+@\S+\.\S+$/.test(email.trim())) return setError('Enter a valid email address.')
+    const bad = checkEmail(email)
+    if (bad) return setError(bad)
     setBusy(true)
     try {
       const r = await api.post('/auth/forgot-password', { email: email.trim() })
@@ -38,8 +40,8 @@ export default function ForgotPassword() {
     e.preventDefault()
     setError('')
     if (!/^\d{6}$/.test(code)) return setError('Enter the 6-digit code from the email.')
-    if (pw.password.length < 8 || !/[A-Za-z]/.test(pw.password) || !/\d/.test(pw.password))
-      return setError('Password must be at least 8 characters and contain a letter and a number.')
+    const weak = checkPassword(pw.password)
+    if (weak) return setError(weak)
     if (pw.password !== pw.confirm) return setError('Passwords do not match.')
     setBusy(true)
     try {

@@ -7,6 +7,7 @@ import PhotoPicker from '../../components/PhotoPicker'
 import Icon from '../../components/ui/Icon'
 import { EmptyState, ErrorBox, Modal, PageTitle, SelectBox, Spinner } from '../../components/ui/Common'
 import { GRADE_GROUPS, gradeLabel, parseGrade } from '../../lib/education'
+import { checkName, checkText } from '../../lib/validation'
 
 const blank = { name: '', grade: 'PRIMARY:1', subject: '', notes: '', photoUrl: null }
 
@@ -49,7 +50,8 @@ export default function MyChildren() {
   async function save(e) {
     e.preventDefault()
     setError('')
-    if (!form.name.trim()) return setError('Child name is required')
+    const problem = checkName(form.name, "Child's name", 60) || (!form.grade && 'Choose the education level and grade') || checkText(form.notes, { label: 'Notes', max: 500 })
+    if (problem) return setError(problem)
     const { level, grade } = parseGrade(form.grade)
     const body = { name: form.name, educationLevel: level, grade, subject: form.subject || null, notes: form.notes || null, photoUrl: form.photoUrl }
     setBusy(true)

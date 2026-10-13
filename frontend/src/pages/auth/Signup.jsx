@@ -10,6 +10,7 @@ import { ErrorBox } from '../../components/ui/Common'
 import { GRADE_GROUPS, parseGrade } from '../../lib/education'
 import PreferencesFields from '../../components/PreferencesFields'
 import { emptyPreferences, isEmptyPreferences, toApiPreferences } from '../../lib/preferences'
+import { checkEmail, checkName, checkPassword, checkPhone, checkText, normalizePhone } from '../../lib/validation'
 
 // 3-step signup (UI_v1): Choose Role -> Account Details (side menu of sections) -> Complete (email OTP)
 const STEPS = ['Choose Role', 'Account Details', 'Complete']
@@ -81,22 +82,30 @@ export default function Signup() {
 
   function validate(id) {
     if (id === 'basic') {
-      if (!form.fullName.trim()) return 'Full name is required'
-      if (!/^\S+@\S+\.\S+$/.test(form.email)) return 'Enter a valid email address'
-      if (form.password.length < 8 || !/[A-Za-z]/.test(form.password) || !/\d/.test(form.password))
-        return 'Password must be at least 8 characters and contain a letter and a number'
+      const problem = checkName(form.fullName) || checkEmail(form.email) || checkPassword(form.password)
+      if (problem) return problem
       if (form.password !== form.confirmPassword) return 'Passwords do not match'
       if (role === 'TUTOR') {
-        if (!form.emergencyContactName.trim() || form.emergencyContactPhone.replace(/\D/g, '').length < 8) return 'Emergency contact name and number are required'
+        const contact = checkName(form.emergencyContactName, 'Emergency contact name') || checkPhone(form.emergencyContactPhone, 'Emergency contact number')
+        if (contact) return contact
         if (!form.gender) return 'Please select your gender'
       }
     }
     if (id === 'contact') {
-      if (form.phone.replace(/\D/g, '').length < 8) return 'Enter a valid phone number'
+      const problem = checkPhone(form.phone)
+      if (problem) return problem
+      // An emergency contact is someone else, so it cannot be the tutor's own number
+      if (role === 'TUTOR' && normalizePhone(form.phone) === normalizePhone(form.emergencyContactPhone))
+        return 'Your phone number must be different from your emergency contact number'
+      if (form.address.length > 200) return 'Address must be 200 characters or fewer'
     }
     if (id === 'children') {
       // A child is only useful for matching with a level and a subject, so both are required for every row that is added
       if (kids.some((k) => !k.name.trim() || !k.grade)) return 'Please complete each child (name and level) or remove the row'
+      for (const k of kids) {
+        const problem = checkName(k.name, "Child's name", 60) || checkText(k.notes, { label: 'Learning goals', max: 500 })
+        if (problem) return problem
+      }
       if (kids.some((k) => !k.subject)) return 'Choose the subject each child needs help with, or remove the row'
     }
     return ''
@@ -134,7 +143,7 @@ export default function Signup() {
         recaptchaToken: captcha || undefined,
         fullName: form.fullName,
         email: form.email,
-        phone: `+60${form.phone.replace(/\D/g, '').replace(/^0|^60/, '')}`,
+        phone: normalizePhone(form.phone),
         password: form.password,
         ...(role === 'PARENT' && {
           address: form.address || undefined,
@@ -144,7 +153,7 @@ export default function Signup() {
         ...(role === 'TUTOR' && {
           gender: form.gender,
           emergencyContactName: form.emergencyContactName,
-          emergencyContactPhone: `+60${form.emergencyContactPhone.replace(/\D/g, '').replace(/^0|^60/, '')}`,
+          emergencyContactPhone: normalizePhone(form.emergencyContactPhone),
         }),
       })
       setStep(2)

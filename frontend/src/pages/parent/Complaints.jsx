@@ -4,6 +4,7 @@ import api, { errorMessage } from '../../api/client'
 import Icon from '../../components/ui/Icon'
 import { EmptyState, ErrorBox, Modal, PageTitle, SelectBox, Spinner } from '../../components/ui/Common'
 import { fmtDate, fmtShortDate } from '../../lib/format'
+import { checkText } from '../../lib/validation'
 
 export const COMPLAINT_STATUS = {
   OPEN: ['Open', 'bg-accent-100 text-amber-700'],
@@ -50,6 +51,9 @@ export default function Complaints() {
   async function submit(e) {
     e.preventDefault()
     setError('')
+    if (!form.category) return setError('Choose a category')
+    const problem = checkText(form.description, { label: 'The description', min: 10, max: 1000 })
+    if (problem) return setError(problem)
     setBusy(true)
     try {
       await api.post('/parent/complaints', {

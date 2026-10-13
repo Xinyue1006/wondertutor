@@ -5,6 +5,7 @@ import { prisma } from '../../config/prisma.js'
 import { AppError } from '../../utils/AppError.js'
 import { findLocation } from '../../data/catalog.js'
 import { cleanPreferences, preferencesSchema } from '../../utils/preferences.js'
+import { optionalText, password, personName, phoneMY } from '../../utils/validators.js'
 
 const toDto = (user, parent) => ({
   fullName: user.fullName,
@@ -22,9 +23,9 @@ export function getProfile(req, res) {
 }
 
 const profileSchema = z.object({
-  fullName: z.string().trim().min(2, 'Full name is required').max(80),
-  phone: z.string().trim().min(8, 'Enter a valid phone number').max(20),
-  address: z.string().trim().max(200).optional().nullable(),
+  fullName: personName('Full name'),
+  phone: phoneMY('Phone number'),
+  address: optionalText(200, 'Address'),
   preferences: preferencesSchema.optional().nullable(), // omitted = leave as is; null = clear
   // Only images uploaded to our own Cloudinary account are accepted as profile photos
   profilePhotoUrl: z.string().url().startsWith('https://res.cloudinary.com/', 'Invalid photo').optional().nullable(),
@@ -54,12 +55,8 @@ export async function updateProfile(req, res) {
 export async function changePassword(req, res) {
   const { currentPassword, newPassword } = z
     .object({
-      currentPassword: z.string().min(1, 'Enter your current password'),
-      newPassword: z
-        .string()
-        .min(8, 'Password must be at least 8 characters')
-        .regex(/[A-Za-z]/, 'Password must contain a letter')
-        .regex(/\d/, 'Password must contain a number'),
+      currentPassword: z.string().min(1, 'Enter your current password').max(200, 'Current password is incorrect'),
+      newPassword: password,
     })
     .parse(req.body)
 

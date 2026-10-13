@@ -7,6 +7,7 @@ import { tutorInclude, toTutorCard, toTutorProfile } from '../../services/tutor.
 import { getTutorSlots } from '../../services/booking.service.js'
 import { addDays, mondayOf, mytParts, mytToDate, toMinutes, todayMyt } from '../../utils/time.js'
 import { preferencesToCriteria } from '../../utils/preferences.js'
+import { hhmm, ymd } from '../../utils/validators.js'
 
 // GET /parent/catalog: option lists for the filter bar, wizard and chatbot
 export function catalog(req, res) {
@@ -24,23 +25,26 @@ export function catalog(req, res) {
 
 // Query params -> matching criteria (also the browse filter set)
 const browseSchema = z.object({
-  subject: z.string().min(1, 'Subject is required'),
+  subject: z.string().trim().min(1, 'Subject is required').max(60),
   level: z.enum(['KINDERGARTEN', 'PRIMARY', 'SECONDARY'], { message: 'Education level is required' }),
-  grade: z.coerce.number().int().optional(),
-  location: z.string().optional(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  time: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  grade: z.coerce.number().int().min(1).optional(),
+  location: z.string().trim().max(100).optional(),
+  date: ymd().optional(),
+  time: hhmm().optional(),
   mode: z.enum(['ONLINE', 'PHYSICAL']).optional(),
-  minPrice: z.coerce.number().optional(),
-  maxPrice: z.coerce.number().optional(),
-  minRating: z.coerce.number().optional(),
-  days: z.string().optional(), // "1,3,5" (0 = Sunday)
-  maxDistance: z.coerce.number().optional(), // km
-  characteristics: z.string().optional(), // "Structured,Interactive"
+  minPrice: z.coerce.number().min(0).max(1000).optional(),
+  maxPrice: z.coerce.number().min(0).max(1000).optional(),
+  minRating: z.coerce.number().min(0).max(5).optional(),
+  days: z.string().regex(/^[0-6](,[0-6])*$/, 'Invalid days').optional(), // "1,3,5" (0 = Sunday)
+  maxDistance: z.coerce.number().positive().max(500).optional(), // km
+  characteristics: z.string().max(200).optional() // "Structured,Interactive"
+    .refine((s) => !s || s.split(',').every((c) => CHARACTERISTICS.includes(c)), 'Unknown teaching style'),
   sort: z.enum(['recommended', 'price_asc', 'price_desc', 'rating', 'experience', 'nearest']).default('recommended'),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(30).default(9),
 })
+  .refine((q) => !q.grade || q.grade <= MAX_GRADE[q.level], { message: 'That grade does not exist for the chosen level', path: ['grade'] })
+  .refine((q) => q.minPrice == null || q.maxPrice == null || q.minPrice <= q.maxPrice, { message: 'The minimum price cannot be more than the maximum', path: ['maxPrice'] })
 
 // Tutors whose account is active and who teach the subject at the level (the DB-side part of the mandatory filter)
 export async function activeTutors(subject, level) {
@@ -228,7 +232,7 @@ export async function tutorSlots(req, res) {
   const id = Number(req.params.id)
   const exists = await prisma.tutorProfile.findFirst({ where: { id, user: { status: 'ACTIVE' } }, select: { id: true } })
   if (!exists) throw new AppError(404, 'Tutor not found')
-  const from = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).default(mondayOf(todayMyt())).parse(req.query.from)
+  const from = ymd().default(mondayOf(todayMyt())).parse(req.query.from)
   res.json({ from, to: addDays(from, 6), days: await getTutorSlots(id, from, 7) })
 }
 

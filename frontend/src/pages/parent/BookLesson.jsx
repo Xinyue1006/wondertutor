@@ -8,6 +8,7 @@ import Robot from '../../components/ui/Robot'
 import { ErrorBox, Modal, PageTitle, SelectBox, Spinner, VerifiedTick } from '../../components/ui/Common'
 import { addDaysYmd, dateLabel, dayMonth, hhmmLabel, mondayOfYmd, todayYmd, weekdayName } from '../../lib/format'
 import { gradeLabel } from '../../lib/education'
+import { checkRinggit, checkText } from '../../lib/validation'
 
 const hourOf = (hhmm) => Number(hhmm.split(':')[0])
 const shortLabel = (s, e) => `${hhmmLabel(s).replace(' AM', '').replace(' PM', '')} - ${hhmmLabel(e).replace(' AM', '').replace(' PM', '')}`
@@ -75,7 +76,8 @@ export default function BookLesson() {
     setError('')
     if (!child) return setError('Please choose a child (add one under My Children first).')
     if (!sel) return setError('Please select an available time on the calendar.')
-    if (!(Number(price) > 0)) return setError('Enter your proposed price per hour.')
+    const problem = checkRinggit(price, 'Proposed price') || checkText(msg, { label: 'Message', max: 200 })
+    if (problem) return setError(problem)
     setBusy(true)
     try {
       await api.post('/parent/bookings', {

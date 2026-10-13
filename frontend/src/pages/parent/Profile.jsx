@@ -7,6 +7,7 @@ import PreferencesFields from '../../components/PreferencesFields'
 import { fromApiPreferences, toApiPreferences } from '../../lib/preferences'
 import Icon from '../../components/ui/Icon'
 import { ErrorBox, PageTitle, Spinner } from '../../components/ui/Common'
+import { checkName, checkPassword, checkPhone, checkText, normalizePhone } from '../../lib/validation'
 
 // My Profile: edit contact details + address (used for tutor distance), change password
 export default function Profile() {
@@ -38,9 +39,12 @@ export default function Profile() {
 
   async function save(e) {
     e.preventDefault()
-    setMsg(''); setError(''); setBusy(true)
+    setMsg(''); setError('')
+    const problem = checkName(form.fullName) || checkPhone(form.phone) || checkText(form.address, { label: 'Address', max: 200 })
+    if (problem) return setError(problem)
+    setBusy(true)
     try {
-      const r = await api.put('/parent/profile', form)
+      const r = await api.put('/parent/profile', { ...form, phone: normalizePhone(form.phone) })
       setUser({ ...user, fullName: r.data.profile.fullName, phone: r.data.profile.phone, profilePhotoUrl: r.data.profile.profilePhotoUrl })
       setMsg('Profile saved.')
     } catch (err) {
@@ -67,7 +71,11 @@ export default function Profile() {
   async function changePw(e) {
     e.preventDefault()
     setPwMsg(''); setPwError('')
+    if (!pw.currentPassword) return setPwError('Enter your current password')
+    const weak = checkPassword(pw.newPassword)
+    if (weak) return setPwError(weak)
     if (pw.newPassword !== pw.confirm) return setPwError('New passwords do not match')
+    if (pw.newPassword === pw.currentPassword) return setPwError('Choose a password different from the current one')
     try {
       await api.post('/parent/profile/password', { currentPassword: pw.currentPassword, newPassword: pw.newPassword })
       setPw({ currentPassword: '', newPassword: '', confirm: '' })

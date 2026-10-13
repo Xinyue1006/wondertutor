@@ -31,8 +31,8 @@ export async function listUsers(req, res) {
     .object({
       role: z.enum(['PARENT', 'TUTOR', 'ADMIN']).optional(),
       status: z.enum(['ACTIVE', 'DEACTIVATED']).optional(),
-      q: z.string().trim().optional(),
-      flagged: z.string().optional(),
+      q: z.string().trim().max(100, 'Search text is too long').optional(),
+      flagged: z.enum(['1', 'true']).optional(),
     })
     .parse(Object.fromEntries(Object.entries(req.query).filter(([, v]) => v !== '')))
 
