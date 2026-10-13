@@ -142,6 +142,12 @@ export default function Signup() {
   return (
     // Same light-blue band as the landing hero and the login page
     <section className="relative left-1/2 -mb-12 w-screen -translate-x-1/2 overflow-x-clip bg-gradient-to-r from-brand-50 via-brand-50 to-brand-25 pb-12 pt-6">
+      {/* quiet decoration like the mockup: pale circles on the left, leaves in the bottom-right corner */}
+      <div className="pointer-events-none absolute inset-0 hidden overflow-hidden md:block" aria-hidden="true">
+        <span className="absolute -left-24 top-16 h-72 w-72 rounded-full bg-brand-100/40" />
+        <span className="absolute -left-10 bottom-10 h-40 w-40 rounded-full bg-brand-100/30" />
+        <img src="/img/art/leaf-corner.jpg" alt="" className="absolute bottom-0 right-0 h-56 w-auto opacity-90" style={{ maskImage: 'linear-gradient(to top, #000 50%, transparent), linear-gradient(to left, #000 50%, transparent)', maskComposite: 'intersect', WebkitMaskImage: 'linear-gradient(to top, #000 50%, transparent), linear-gradient(to left, #000 50%, transparent)', WebkitMaskComposite: 'source-in' }} />
+      </div>
     <div className="relative mx-auto max-w-[81.25rem] px-4 md:px-8">
       <div className="relative">
         {step < 2 && (
@@ -157,7 +163,7 @@ export default function Signup() {
           <h1 className="font-display text-3xl font-bold text-navy md:text-4xl">
             Join WonderTutor <Icon name="sparkle" fill className="mb-2 inline h-5 w-5 text-accent" />
           </h1>
-          <p className="mt-1 text-base text-slate-700">Create an account and be part of a brighter learning community.</p>
+          <p className="mt-1 text-base text-slate-700">Choose how you will use WonderTutor.</p>
           <p className="text-sm text-slate-700">
             Already have an account? <Link to="/login" className="inline-flex min-h-11 items-center font-semibold text-brand-600 hover:underline">Log In</Link>
           </p>
@@ -328,7 +334,7 @@ function RoleCard({ active, onClick, title, desc, points, img, tone }) {
       aria-checked={active}
       onClick={onClick}
       className={`relative flex flex-col overflow-hidden rounded-2xl border-2 p-3 text-left transition ${
-        active ? (blue ? 'border-brand-500 bg-white shadow-lg' : 'border-accent bg-accent-50 shadow-lg') : 'border-white bg-white shadow-card hover:border-brand-100'
+        active ? (blue ? 'border-brand-500 bg-brand-50 shadow-lg' : 'border-accent bg-accent-50 shadow-lg') : (blue ? 'border-white bg-brand-50/60 shadow-card hover:border-brand-200' : 'border-white bg-accent-50/70 shadow-card hover:border-accent/60')
       }`}
     >
       <span className={`absolute right-5 top-5 z-10 flex h-7 w-7 items-center justify-center rounded-full border-2 bg-white ${active ? (blue ? 'border-brand-500' : 'border-accent') : 'border-slate-300'}`} aria-hidden="true">
