@@ -67,8 +67,9 @@ describe('payments', () => {
 })
 
 describe('refund requests and cancelling', () => {
-  async function paidLesson(t, start) {
-    const b = await makeBooking({ parent: parent.parent, child: parent.child, tutor: t.tutor, date: monday, start, status: 'CONFIRMED', price: 60 })
+  // A confirmed lesson that has already started (e.g. the tutor did not turn up): refund requests are allowed
+  async function paidLesson(t, start, date = '2026-01-07') {
+    const b = await makeBooking({ parent: parent.parent, child: parent.child, tutor: t.tutor, date, start, status: 'CONFIRMED', price: 60 })
     await prisma.payment.create({ data: { bookingId: b.id, amount: 60, commissionRate: 10, commissionAmount: 6, status: 'PAID', paidAt: new Date() } })
     return b
   }
@@ -83,12 +84,21 @@ describe('refund requests and cancelling', () => {
     expect(await prisma.refund.count({ where: { payment: { bookingId: b.id } } })).toBe(1)
   })
 
-  test('cancelling after already asking for a refund does not create a second refund', async () => {
+  test('cancelling a lesson whose refund is already being handled does not create a second refund', async () => {
     const t = await makeTutor()
-    const b = await paidLesson(t, '18:00')
-    await api(parent.token).post(`/parent/bookings/${b.id}/refund-request`, { reason: 'Our plans changed for that week.' })
+    const b = await paidLesson(t, '18:00', monday) // still in the future, so it can be cancelled
+    const payment = await prisma.payment.findUnique({ where: { bookingId: b.id } })
+    await prisma.refund.create({ data: { paymentId: payment.id, amount: 60, type: 'ADMIN_REVIEW', reason: 'Asked by phone' } })
     expect((await api(parent.token).post(`/parent/bookings/${b.id}/cancel`, {})).status).toBe(200)
     expect(await prisma.refund.count({ where: { payment: { bookingId: b.id } } })).toBe(1)
+  })
+
+  test('a refund for a lesson that has not started is done by cancelling, not by a refund request', async () => {
+    const t = await makeTutor()
+    const b = await paidLesson(t, '20:00', monday)
+    const res = await api(parent.token).post(`/parent/bookings/${b.id}/refund-request`, { reason: 'Our plans changed for that week.' })
+    expect(res.status).toBe(400)
+    expect(res.message).toContain('cancel the booking instead')
   })
 
   test('a booking that changed in the meantime is not changed again (stale page)', async () => {

@@ -177,6 +177,10 @@ export async function requestRefund(req, res) {
   const b = await ownBooking(req)
   if (!b.payment || b.payment.status !== 'PAID') throw new AppError(400, 'Only paid lessons can be refunded')
   if (!['CONFIRMED', 'COMPLETED'].includes(b.status)) throw new AppError(400, 'This booking is not eligible for a refund request')
+  // Money back for a lesson that has not started yet goes through Cancel (which also sends the refund to Admin),
+  // so a lesson can never stay booked while its refund is being processed
+  if (b.status === 'CONFIRMED' && b.startAt > new Date())
+    throw new AppError(400, 'This lesson has not started yet. To get your money back, cancel the booking instead.')
   const alreadyAsked = () => new AppError(409, 'A refund request for this lesson is already being handled')
   if (b.payment.refunds.some((r) => r.status === 'PENDING' || r.status === 'APPROVED')) throw alreadyAsked()
 

@@ -28,7 +28,11 @@ export default function LessonDetails({ booking: b, onClose, footer, onChanged }
 
   // Parent-initiated refunds are reviewed by Admin (never automatic)
   const refunds = b.payment?.refunds || []
-  const canAsk = b.payment?.status === 'PAID' && ['CONFIRMED', 'COMPLETED'].includes(b.status) && !refunds.some((r) => ['PENDING', 'APPROVED'].includes(r.status))
+  // Only once the lesson has started or finished; before that, Cancel is the way to get the money back
+  const started = new Date(b.startAt).getTime() <= Date.now()
+  const canAsk = b.payment?.status === 'PAID' && (b.status === 'COMPLETED' || (b.status === 'CONFIRMED' && started)) && !refunds.some((r) => ['PENDING', 'APPROVED'].includes(r.status))
+  // The meeting link is typed by the tutor, so only a normal web address is made clickable
+  const safeLink = /^https?:\/\//i.test(b.meetingLink || '')
   const REFUND_LABEL = { PENDING: 'Pending Admin review', APPROVED: 'Approved', REJECTED: 'Not approved' }
 
   async function sendRefund() {
@@ -67,7 +71,7 @@ export default function LessonDetails({ booking: b, onClose, footer, onChanged }
         <Row icon={online ? 'monitor' : 'home'} label="Teaching mode">{online ? 'Online' : 'Physical'}</Row>
         {!online && b.location && <Row icon="pin" label="Location">{b.location}</Row>}
         {online && b.meetingLink && (
-          <Row icon="globe" label="Meeting link"><a href={b.meetingLink} target="_blank" rel="noreferrer" className="break-all text-brand-500 hover:underline">{b.meetingLink}</a></Row>
+          <Row icon="globe" label="Meeting link">{safeLink ? <a href={b.meetingLink} target="_blank" rel="noopener noreferrer" className="break-all text-brand-600 hover:underline">{b.meetingLink}</a> : <span className="break-all">{b.meetingLink}</span>}</Row>
         )}
         <Row icon="tag" label="Price">
           {b.hourlyPrice != null ? `RM ${b.hourlyPrice} / hour` : '—'}
@@ -91,7 +95,7 @@ export default function LessonDetails({ booking: b, onClose, footer, onChanged }
           <div className="text-slate-600">
             Checked in {fmtTime(b.attendance.checkInAt)}{b.attendance.checkOutAt && <> · Checked out {fmtTime(b.attendance.checkOutAt)}</>}
           </div>
-          {b.attendance.checkInPhotoUrl && <img src={b.attendance.checkInPhotoUrl} alt="Check-in" className="mt-2 h-28 rounded-lg object-cover" />}
+          {b.attendance.checkInPhotoUrl && <img src={b.attendance.checkInPhotoUrl} alt="The tutor's check-in photo at the lesson location" className="mt-2 h-28 rounded-lg object-cover" />}
         </div>
       )}
       {b.summary && (
