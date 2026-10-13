@@ -5,7 +5,7 @@ import { useMatching } from '../../assistant/MatchingContext'
 import Avatar from '../../components/ui/Avatar'
 import Icon from '../../components/ui/Icon'
 import Robot from '../../components/ui/Robot'
-import { ErrorBox, Modal, PageTitle, SelectBox, Spinner, VerifiedTick } from '../../components/ui/Common'
+import { ErrorBox, LoadError, Modal, PageTitle, SelectBox, Spinner, VerifiedTick } from '../../components/ui/Common'
 import { addDaysYmd, dateLabel, dayMonth, hhmmLabel, mondayOfYmd, todayYmd, weekdayName } from '../../lib/format'
 import { gradeLabel } from '../../lib/education'
 import { checkRinggit, checkText } from '../../lib/validation'
@@ -19,7 +19,7 @@ export default function BookLesson() {
   const { id } = useParams()
   const navigate = useNavigate()
   const prefill = useLocation().state || {}
-  const { kids, kidsLoaded } = useMatching()
+  const { kids, kidsLoaded, loadError, reloadShared } = useMatching()
 
   const [tutor, setTutor] = useState(null)
   const [week, setWeek] = useState(mondayOfYmd(prefill.date || todayYmd()))
@@ -67,6 +67,7 @@ export default function BookLesson() {
   }, [grid])
 
   if (error && !tutor) return <div className="card p-8 text-center text-red-600">{error}</div>
+  if (!kidsLoaded && loadError) return <LoadError message={loadError} onRetry={reloadShared} />
   if (!tutor || !kidsLoaded) return <Spinner />
 
   const isThisWeek = week <= mondayOfYmd(todayYmd())

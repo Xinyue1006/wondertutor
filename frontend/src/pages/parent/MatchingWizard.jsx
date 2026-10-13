@@ -4,7 +4,7 @@ import { errorMessage } from '../../api/client'
 import { useMatching } from '../../assistant/MatchingContext'
 import Icon from '../../components/ui/Icon'
 import Robot from '../../components/ui/Robot'
-import { ErrorBox, PageTitle, SelectBox, Spinner } from '../../components/ui/Common'
+import { ErrorBox, LoadError, PageTitle, SelectBox, Spinner } from '../../components/ui/Common'
 import { CHARACTERISTICS, GRADE_GROUPS, gradeLabel, parseGrade } from '../../lib/education'
 import { DAY_SHORT } from '../../lib/format'
 import { TIME_PRESETS, defaultRange, rangeKey, rangeLabel } from '../../lib/times'
@@ -16,7 +16,7 @@ const MAX_RATE = 150
 // 3-step matching wizard: Learning Needs -> Schedule & Location -> Preferences -> Results
 export default function MatchingWizard() {
   const navigate = useNavigate()
-  const { catalog, kids, criteria: c, patchCriteria, applyChild, runMatching, setChatOpen } = useMatching()
+  const { catalog, kids, criteria: c, patchCriteria, applyChild, runMatching, setChatOpen, loadError, reloadShared } = useMatching()
   const [step, setStep] = useState(0)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -43,7 +43,7 @@ export default function MatchingWizard() {
     if (Object.keys(patch).length) patchCriteria(patch)
   }, [catalog, patchCriteria])
 
-  if (!catalog) return <Spinner />
+  if (!catalog) return loadError ? <LoadError message={loadError} onRetry={reloadShared} /> : <Spinner />
 
   function next() {
     if (step === 0 && (!c.subject || !c.level || (!c.grade && c.level !== 'KINDERGARTEN'))) return setError('Subject and education level are required to find eligible tutors.')

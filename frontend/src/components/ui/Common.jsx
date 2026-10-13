@@ -152,9 +152,12 @@ export function FilterDropdown({ label, active, children, width = 'w-64' }) {
   const ref = useRef(null)
   useClickOutside(ref, () => setOpen(false))
   return (
-    <div className="relative" ref={ref}>
+    // Escape closes the panel, and screen readers are told whether it is open
+    <div className="relative" ref={ref} onKeyDown={(e) => { if (e.key === 'Escape' && open) { e.stopPropagation(); setOpen(false) } }}>
       <button
         type="button"
+        aria-expanded={open}
+        aria-haspopup="true"
         onClick={() => setOpen((o) => !o)}
         className={`flex h-10 items-center gap-2 rounded-lg border bg-white px-4 text-sm font-medium transition hover:border-brand-500 ${
           active ? 'border-brand-500 text-brand-500' : 'border-slate-200 text-navy'

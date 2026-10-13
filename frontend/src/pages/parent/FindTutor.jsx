@@ -7,7 +7,7 @@ import Robot from '../../components/ui/Robot'
 import TutorCard from '../../components/TutorCard'
 import Pagination from '../../components/ui/Pagination'
 import FilterChips, { NO_EXTRA } from '../../components/FilterChips'
-import { ErrorBox, FilterDropdown, PageTitle, SelectBox, Spinner, EmptyState } from '../../components/ui/Common'
+import { ErrorBox, FilterDropdown, LoadError, PageTitle, SelectBox, Spinner, EmptyState } from '../../components/ui/Common'
 import { GRADE_GROUPS, parseGrade } from '../../lib/education'
 import { hhmmLabel, todayYmd } from '../../lib/format'
 
@@ -24,7 +24,7 @@ const HOURS = Array.from({ length: 15 }, (_, i) => `${String(i + 8).padStart(2, 
 
 export default function FindTutor() {
   const navigate = useNavigate()
-  const { catalog, kids, kidsLoaded, patchCriteria } = useMatching()
+  const { catalog, kids, kidsLoaded, patchCriteria, loadError, reloadShared } = useMatching()
 
   // Top search bar (draft values, applied when "Search Tutors" is pressed)
   const [bar, setBar] = useState(null)
@@ -38,6 +38,8 @@ export default function FindTutor() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const initialised = useRef(false)
+  // Tutors whose heart was just clicked: a second click waits until the first save/unsave has finished
+  const [saving, setSaving] = useState(() => new Set())
 
   // First visit: pre-fill from the parent's first child and saved area, so results show immediately
   useEffect(() => {
@@ -85,20 +87,30 @@ export default function FindTutor() {
     return () => { cancelled = true }
   }, [query])
 
-  if (!bar || !catalog) return <Spinner />
+  if (!bar || !catalog) return loadError ? <LoadError message={loadError} onRetry={reloadShared} /> : <Spinner />
 
   const set = (k) => (e) => setBar({ ...bar, [k]: e.target.value })
   // Save / unsave straight from the results; the heart updates at once
   async function toggleSave(t) {
+    if (saving.has(t.id)) return
+    setSaving((s) => new Set(s).add(t.id))
     try {
       const r = await api.post(`/parent/favourites/${t.id}`)
       setData((d) => ({ ...d, tutors: d.tutors.map((x) => (x.id === t.id ? { ...x, isFavourite: r.data.isFavourite } : x)) }))
     } catch (err) {
       setError(errorMessage(err))
+    } finally {
+      setSaving((s) => { const n = new Set(s); n.delete(t.id); return n })
     }
   }
 
-  const search = () => { if (!bar.subject || !bar.grade) return setError('Subject and education level are required'); setError(''); setApplied(bar) }
+  const search = () => {
+    if (!bar.subject || !bar.grade) return setError('Subject and education level are required')
+    // The availability filter needs both parts; half of it would be silently ignored
+    if (Boolean(bar.date) !== Boolean(bar.time)) return setError('Choose both a date and a start time, or clear the availability filter.')
+    setError('')
+    setApplied(bar)
+  }
 
   function tryAiMatching() {
     const { level, grade } = parseGrade(bar.grade)
@@ -156,7 +168,7 @@ export default function FindTutor() {
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <div ref={resultsTop} className="scroll-mt-24">
           {/* "Showing 1–9 of 11 tutors": what is on screen out of everything that matches */}
-          <h2 className="text-xl font-bold text-navy" aria-live="polite">{resultsHeading(data)}</h2>
+          <h2 className="text-xl font-bold text-navy" aria-live="polite">{error && !data ? 'Tutors could not be loaded' : resultsHeading(data)}</h2>
           {data?.total > 0 && sort === 'recommended' && (
             <p className="text-sm text-slate-600">
               Best match first{data.rankedBy?.length ? `, based on ${data.rankedBy.join(' and ')}` : ''}. Every card shows its match score and why.
