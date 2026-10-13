@@ -3,7 +3,6 @@ import Logo from '../components/Logo'
 
 // Public nav (matches the login / signup mockups). "Find a Tutor" needs an account, so it leads to Log In.
 const LINKS = [
-  ['Home', '/'],
   ['Find a Tutor', '/login'],
   ['How It Works', '/#how-it-works'],
   ['For Parents', '/#for-parents'],
@@ -14,11 +13,12 @@ const LINKS = [
 export default function PublicLayout() {
   const { pathname } = useLocation()
   return (
-    <div className="min-h-screen px-3 pb-10 pt-3 md:px-6">
-      <header className="mx-auto max-w-[1300px] rounded-2xl bg-white/90 shadow-card backdrop-blur">
-        <div className="flex items-center justify-between gap-4 px-4 py-3 md:px-6">
+    <div className="min-h-screen pb-10">
+      {/* Plain full-width bar (no box or border), like the landing mockup */}
+      <header className="w-full bg-white">
+        <div className="mx-auto flex max-w-[1300px] items-center justify-between gap-4 px-4 py-3 md:px-8">
           <Link to="/"><Logo className="h-9" /></Link>
-          <nav className="hidden items-center gap-7 text-[13px] font-medium text-navy lg:flex">
+          <nav className="hidden items-center gap-8 text-[13px] font-medium text-navy lg:flex">
             {LINKS.map(([label, to]) => (
               <a key={label} href={to} className="hover:text-brand-500">{label}</a>
             ))}
@@ -29,10 +29,10 @@ export default function PublicLayout() {
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-[1300px]">
+      <main className="mx-auto max-w-[1300px] px-3 md:px-6">
         <Outlet />
       </main>
-      <footer id="about" className="mx-auto mt-14 max-w-[1300px] scroll-mt-24 border-t border-brand-100 pt-8 text-xs text-slate-500">
+      <footer id="about" className="mx-auto mt-14 max-w-[1300px] px-3 md:px-6 scroll-mt-24 border-t border-brand-100 pt-8 text-xs text-slate-500">
         <div className="grid gap-8 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
           <div>
             <Logo className="h-8" />

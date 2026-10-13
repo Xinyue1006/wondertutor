@@ -78,32 +78,27 @@ export default function Home() {
               <Icon name="book" className="h-5 w-5 shrink-0 text-brand-500" />
               <span className="flex-1">
                 <span className={labelCls}>Subject</span>
-                <select className={selectCls} value={search.subject} onChange={(e) => setSearch({ ...search, subject: e.target.value })}>
-                  <option value="">e.g. Mathematics</option>
-                  {home.subjects.map((s) => <option key={s}>{s}</option>)}
-                </select>
+                <input className={selectCls} list="home-subjects" placeholder="e.g. Mathematics" value={search.subject} onChange={(e) => setSearch({ ...search, subject: e.target.value })} />
               </span>
             </label>
             <label className="flex flex-1 items-center gap-2 border-slate-100 px-2 md:border-l">
               <Icon name="cap" className="h-5 w-5 shrink-0 text-brand-500" />
               <span className="flex-1">
                 <span className={labelCls}>Education Level</span>
-                <select className={selectCls} value={search.level} onChange={(e) => setSearch({ ...search, level: e.target.value })}>
-                  <option value="">e.g. Primary</option>
-                  {LEVELS.map((l) => <option key={l}>{l}</option>)}
-                </select>
+                <input className={selectCls} list="home-levels" placeholder="e.g. Primary" value={search.level} onChange={(e) => setSearch({ ...search, level: e.target.value })} />
               </span>
             </label>
             <label className="flex flex-1 items-center gap-2 border-slate-100 px-2 md:border-l">
               <Icon name="pin" className="h-5 w-5 shrink-0 text-brand-500" />
               <span className="flex-1">
                 <span className={labelCls}>Location</span>
-                <select className={selectCls} value={search.location} onChange={(e) => setSearch({ ...search, location: e.target.value })}>
-                  <option value="">e.g. Kepong, KL</option>
-                  {home.locations.map((l) => <option key={l}>{l}</option>)}
-                </select>
+                <input className={selectCls} list="home-locations" placeholder="e.g. Kepong, KL" value={search.location} onChange={(e) => setSearch({ ...search, location: e.target.value })} />
               </span>
             </label>
+            {/* Typing is allowed; the datalists suggest matching keywords as the parent types */}
+            <datalist id="home-subjects">{home.subjects.map((x) => <option key={x} value={x} />)}</datalist>
+            <datalist id="home-levels">{LEVELS.map((x) => <option key={x} value={x} />)}</datalist>
+            <datalist id="home-locations">{home.locations.map((x) => <option key={x} value={x} />)}</datalist>
             <button className="btn-accent h-11 px-5">Search Tutors <Icon name="arrow-right" className="h-4 w-4" /></button>
           </form>
 
