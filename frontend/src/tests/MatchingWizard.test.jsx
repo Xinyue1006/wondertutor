@@ -21,8 +21,8 @@ const catalog = {
 }
 const sarah = { id: 1, name: 'Sarah Tan', educationLevel: 'PRIMARY', grade: 5, subject: 'Mathematics' }
 
-function setup({ kids = [] } = {}) {
-  api.get.mockImplementation((url) => Promise.resolve({ data: url.includes('catalog') ? catalog : { children: kids } }))
+function setup({ kids = [], preferences = null } = {}) {
+  api.get.mockImplementation((url) => Promise.resolve({ data: url.includes('catalog') ? { ...catalog, preferences } : { children: kids } }))
   api.post.mockResolvedValue({ data: { id: 1, total: 0, tutors: [], criteria: {} } })
   return render(
     <MemoryRouter initialEntries={['/parent/find-tutor/match']}>
@@ -111,5 +111,21 @@ describe('3-step matching wizard', () => {
     await userEvent.click(await screen.findByRole('button', { name: /Next/ }))
     await userEvent.click(await screen.findByRole('button', { name: /Find My Matches/ }))
     expect(await screen.findByText('Subject is required')).toBeInTheDocument()
+  })
+
+  test('starts from the saved preferences (days, time of day, budget, style)', async () => {
+    setup({
+      kids: [sarah],
+      preferences: { mode: 'PHYSICAL', gender: 'FEMALE', characteristics: ['Structured'], days: [1, 5], timePreset: 'EVENING', budgetMax: 60 },
+    })
+    await waitFor(() => expect(dropdown(0)).toHaveValue('Mathematics'))
+    await userEvent.click(screen.getByRole('button', { name: /Next/ }))
+    expect(await screen.findByRole('button', { name: 'Mon' })).toHaveClass('chip-on')
+    expect(screen.getByRole('button', { name: 'Fri' })).toHaveClass('chip-on')
+    expect(screen.getByRole('button', { name: 'Tue' })).not.toHaveClass('chip-on')
+    expect(screen.getByRole('button', { name: 'Evening' })).toHaveClass('chip-on')
+    await userEvent.click(screen.getByRole('button', { name: /Next/ }))
+    expect(await screen.findByText(/RM\s*20 – RM\s*60|RM20 – RM60/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Structured' })).toHaveClass('border-brand-500')
   })
 })

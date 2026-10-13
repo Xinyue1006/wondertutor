@@ -32,7 +32,7 @@ export default function PublicLayout() {
   const isActive = (to) => to.startsWith('/#') && pathname === '/' && hash === to.slice(1)
   // The landing page body is a whiter blue than the app pages (the hero keeps the stronger blue)
   return (
-    <div className={`flex min-h-screen flex-col overflow-x-clip ${isHome ? 'bg-gradient-to-b from-[#f9fbff] to-white' : ''}`}>
+    <div className={`flex min-h-screen flex-col overflow-x-clip ${isHome || pathname === '/signup' ? 'bg-gradient-to-b from-[#f9fbff] to-white' : ''}`}>
       {/* Plain full-width bar (no box or border), like the landing mockup */}
       <header className="sticky top-0 z-30 w-full bg-white">
         <div className="mx-auto flex max-w-[81.25rem] items-center justify-between gap-3 px-4 py-2 md:px-8">

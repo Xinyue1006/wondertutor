@@ -35,7 +35,7 @@ Edit `.env`: set `DATABASE_URL` to your MySQL user/password and `JWT_SECRET` to 
 npm install
 npm run db:migrate          # creates all tables from prisma/schema.prisma (name it e.g. "init")
 npm run db:seed             # settings, admin, 16 sample tutors + reviews, and a demo parent (about 5 s)
-npm run dev                 # http://localhost:5000/api/health
+npm run dev                 # http://localhost:5000/api/health   (from the project's top folder you can use: npm run dev:backend)
 npm test                    # unit tests for the tutor-matching scoring (Jest)
 ```
 
@@ -68,7 +68,7 @@ In development, leave `SMTP_USER` empty — OTP codes are **printed in the backe
 cd frontend
 copy .env.example .env
 npm install
-npm run dev                 # http://localhost:5173
+npm run dev                 # http://localhost:5173   (from the top folder: npm run dev:frontend)
 ```
 
 Vite forwards `/api/*` to the backend on port 5000, so run both at the same time.
@@ -127,7 +127,7 @@ frontend/src/
 
 | What | Command | Notes |
 |---|---|---|
-| Backend (Jest): matching scoring, booking rules, payments + commission snapshot, refunds, reviews, admin, complaints, security | `cd backend && npm test` | Uses a **separate** database `wondertutor_test`, created and migrated automatically (`pretest`). Your dev data is never touched. MySQL must be running. |
+| Backend (Jest): matching scoring, booking rules, payments + commission snapshot, refunds, reviews, admin, complaints, security, parent signup and saved preferences | `cd backend && npm test` | Uses a **separate** database `wondertutor_test`, created and migrated automatically (`pretest`). Your dev data is never touched. MySQL must be running. |
 | Frontend (Vitest + React Testing Library): login, route protection, matching wizard, tutor card, chatbot text reader, date helpers | `cd frontend && npm test` | Runs in a simulated browser, no servers needed. |
 | API demo (Postman) | Import `docs/WonderTutor.postman_collection.json` | Run *Login (parent)* and *Login (admin)* first; they store the tokens. |
 

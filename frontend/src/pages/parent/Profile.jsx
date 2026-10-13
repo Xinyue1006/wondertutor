@@ -3,6 +3,8 @@ import api, { errorMessage } from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
 import { useMatching } from '../../assistant/MatchingContext'
 import PhotoPicker from '../../components/PhotoPicker'
+import PreferencesFields from '../../components/PreferencesFields'
+import { fromApiPreferences, toApiPreferences } from '../../lib/preferences'
 import Icon from '../../components/ui/Icon'
 import { ErrorBox, PageTitle, Spinner } from '../../components/ui/Common'
 
@@ -11,6 +13,10 @@ export default function Profile() {
   const { user, setUser } = useAuth()
   const { catalog } = useMatching()
   const [form, setForm] = useState(null)
+  const [prefs, setPrefs] = useState(null)
+  const [prefMsg, setPrefMsg] = useState('')
+  const [prefError, setPrefError] = useState('')
+  const [prefBusy, setPrefBusy] = useState(false)
   const [hasPassword, setHasPassword] = useState(true)
   const [msg, setMsg] = useState('')
   const [error, setError] = useState('')
@@ -24,10 +30,11 @@ export default function Profile() {
       const p = r.data.profile
       setForm({ fullName: p.fullName, phone: p.phone || '', address: p.address || '', profilePhotoUrl: p.profilePhotoUrl })
       setHasPassword(p.hasPassword)
+      setPrefs(fromApiPreferences(p.preferences))
     })
   }, [])
 
-  if (!form) return <Spinner />
+  if (!form || !prefs) return <Spinner />
 
   async function save(e) {
     e.preventDefault()
@@ -40,6 +47,20 @@ export default function Profile() {
       setError(errorMessage(err))
     } finally {
       setBusy(false)
+    }
+  }
+
+  // Preferences are saved with the same endpoint; nothing chosen clears them
+  async function savePrefs(e) {
+    e.preventDefault()
+    setPrefMsg(''); setPrefError(''); setPrefBusy(true)
+    try {
+      await api.put('/parent/profile', { ...form, preferences: toApiPreferences(prefs) })
+      setPrefMsg('Preferences saved. Your next search will start from these.')
+    } catch (err) {
+      setPrefError(errorMessage(err))
+    } finally {
+      setPrefBusy(false)
     }
   }
 
@@ -96,6 +117,17 @@ export default function Profile() {
           )}
         </form>
       </div>
+
+      <form onSubmit={savePrefs} className="card mt-6 space-y-4 p-6">
+        <div>
+          <h2 className="flex items-center gap-2 text-xl font-extrabold text-navy"><Icon name="sliders" className="h-5 w-5 text-brand-500" /> Tutor Preferences</h2>
+          <p className="mt-1 text-sm text-slate-600">Optional. These rank tutors for you and pre-fill the matching wizard. They never hide tutors from you.</p>
+        </div>
+        <ErrorBox>{prefError}</ErrorBox>
+        {prefMsg && <div role="status" className="rounded-lg bg-ok-50 px-3 py-2.5 text-sm text-ok">{prefMsg}</div>}
+        <PreferencesFields value={prefs} onChange={setPrefs} />
+        <button disabled={prefBusy} className="btn-primary h-11 w-full sm:w-56">{prefBusy ? 'Saving…' : 'Save Preferences'}</button>
+      </form>
     </div>
   )
 }

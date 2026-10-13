@@ -1,8 +1,10 @@
 import bcrypt from 'bcrypt'
 import { z } from 'zod'
+import { Prisma } from '@prisma/client'
 import { prisma } from '../../config/prisma.js'
 import { AppError } from '../../utils/AppError.js'
 import { findLocation } from '../../data/catalog.js'
+import { cleanPreferences, preferencesSchema } from '../../utils/preferences.js'
 
 const toDto = (user, parent) => ({
   fullName: user.fullName,
@@ -10,6 +12,7 @@ const toDto = (user, parent) => ({
   phone: user.phone,
   profilePhotoUrl: user.profilePhotoUrl,
   address: parent.address,
+  preferences: parent.preferences ?? null,
   hasPassword: Boolean(user.passwordHash), // Google-only accounts have no password to change
 })
 
@@ -22,6 +25,7 @@ const profileSchema = z.object({
   fullName: z.string().trim().min(2, 'Full name is required').max(80),
   phone: z.string().trim().min(8, 'Enter a valid phone number').max(20),
   address: z.string().trim().max(200).optional().nullable(),
+  preferences: preferencesSchema.optional().nullable(), // omitted = leave as is; null = clear
   // Only images uploaded to our own Cloudinary account are accepted as profile photos
   profilePhotoUrl: z.string().url().startsWith('https://res.cloudinary.com/', 'Invalid photo').optional().nullable(),
 })
@@ -35,7 +39,12 @@ export async function updateProfile(req, res) {
     // Known areas also store coordinates, which the matching distance score uses
     prisma.parentProfile.update({
       where: { id: req.parent.id },
-      data: { address: data.address || null, latitude: loc?.lat ?? null, longitude: loc?.lng ?? null },
+      data: {
+        address: data.address || null,
+        latitude: loc?.lat ?? null,
+        longitude: loc?.lng ?? null,
+        ...(data.preferences !== undefined && { preferences: cleanPreferences(data.preferences) ?? Prisma.DbNull }),
+      },
     }),
   ])
   res.json({ profile: toDto(user, parent) })
