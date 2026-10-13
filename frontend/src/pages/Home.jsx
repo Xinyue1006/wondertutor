@@ -131,14 +131,16 @@ export default function Home() {
 
       {/* ── Assistant + How it works ── */}
       <section id="how-it-works" className="grid scroll-mt-24 gap-5 lg:grid-cols-2">
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-accent-50 via-white to-brand-50 p-7 shadow-card">
-          <h2 className="text-2xl font-extrabold text-navy">Meet Your<br />AI Matching Assistant</h2>
-          <p className="mt-3 max-w-[15rem] text-sm text-slate-600">
-            Just tell us what your child needs, and we'll recommend suitable tutors with clear reasons.
-          </p>
-          <button onClick={tryAssistant} className="btn-primary mt-5 h-11 px-6">Try AI Matching <Icon name="arrow-right" className="h-4 w-4" /></button>
-          <div className="mt-6 flex items-end gap-4 sm:absolute sm:right-6 sm:top-6 sm:mt-0 sm:flex-col sm:items-stretch">
-            <div className="rounded-2xl bg-white/90 p-3 text-xs shadow-card sm:w-52">
+        <div className="grid gap-6 overflow-hidden rounded-3xl bg-gradient-to-br from-accent-50 via-white to-brand-50 p-7 shadow-card sm:grid-cols-[1fr_13rem]">
+          <div>
+            <h2 className="text-2xl font-extrabold text-navy">Meet Your<br />AI Matching Assistant</h2>
+            <p className="mt-3 max-w-[16rem] text-sm text-slate-600">
+              Just tell us what your child needs, and we'll recommend suitable tutors with clear reasons.
+            </p>
+            <button onClick={tryAssistant} className="btn-primary mt-5 h-11 px-6">Try AI Matching <Icon name="arrow-right" className="h-4 w-4" /></button>
+          </div>
+          <div className="flex flex-col items-center">
+            <div className="w-full rounded-2xl bg-white/90 p-3 text-xs shadow-card">
               <div className="rounded-xl bg-brand-50 px-3 py-2 font-medium text-navy">Hi! Tell me what you're looking for?</div>
               <div className="mt-2 space-y-1.5">
                 {['What subject?', 'What education level?', 'Preferred location?', 'Any other preferences?'].map((q) => (
@@ -146,9 +148,8 @@ export default function Home() {
                 ))}
               </div>
             </div>
-            <Robot className="float-y h-28 w-28 sm:-mb-2 sm:self-start" />
+            <Robot className="float-y mt-3 h-28 w-28" />
           </div>
-          <div className="hidden h-44 sm:block" />
         </div>
 
         <div className="rounded-3xl bg-brand-50/70 p-7 shadow-card">
