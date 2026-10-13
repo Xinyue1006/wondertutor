@@ -141,7 +141,7 @@ export default function Signup() {
 
   return (
     // Sits on the same nearly-white body colour as the landing page (set in PublicLayout)
-    <section className="relative left-1/2 -mb-12 w-screen -translate-x-1/2 overflow-x-clip pb-12 pt-6">
+    <section className="relative left-1/2 -mb-10 w-screen -translate-x-1/2 overflow-x-clip pb-4 pt-6">
       {/* quiet decoration like the mockup: pale circles on the left, leaves in the bottom-right corner */}
       <div className="pointer-events-none absolute inset-0 hidden overflow-hidden md:block" aria-hidden="true">
         <span className="absolute -left-24 top-16 h-72 w-72 rounded-full bg-brand-100/40" />
@@ -340,7 +340,8 @@ function RoleCard({ active, onClick, title, desc, points, img, tone }) {
       <span className={`absolute right-5 top-5 z-10 flex h-7 w-7 items-center justify-center rounded-full border-2 bg-white ${active ? (blue ? 'border-brand-500' : 'border-accent') : 'border-slate-300'}`} aria-hidden="true">
         {active && <span className={`h-3.5 w-3.5 rounded-full ${blue ? 'bg-brand-500' : 'bg-accent'}`} />}
       </span>
-      <img src={img} alt="" aria-hidden="true" className="h-44 w-full rounded-xl object-cover" />
+      {/* Same shape for both pictures at every width (not a fixed height), cropped toward the top so the faces stay in frame */}
+      <img src={img} alt="" aria-hidden="true" className="aspect-[2/1] w-full rounded-xl object-cover object-[center_30%]" />
       <div className="px-3 pb-3 pt-4">
         <div className="text-center font-display text-xl font-bold text-navy">{title}</div>
         <div className="mb-3 text-center text-sm text-slate-700">{desc}</div>
