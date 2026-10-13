@@ -10,7 +10,8 @@
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
-    "dev:respond": "node scripts/simulate-tutor.js"
+    "dev:respond": "node scripts/simulate-tutor.js",
+    "pretest": "node scripts/setup-test-db.js"
   },
   "keywords": [],
   "author": "",
@@ -39,7 +40,12 @@
     "transform": {},
     "testMatch": [
       "**/tests/**/*.test.js"
-    ]
+    ],
+    "setupFiles": [
+      "<rootDir>/src/tests/setupEnv.js"
+    ],
+    "maxWorkers": 1,
+    "silent": true
   },
   "prisma": {
     "seed": "node prisma/seed.js"
