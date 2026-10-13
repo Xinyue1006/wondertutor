@@ -4,6 +4,8 @@ import api, { errorMessage } from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
 import { homeFor } from '../../components/ProtectedRoute'
 import Icon from '../../components/ui/Icon'
+import GoogleButton from '../../components/GoogleButton'
+import Recaptcha, { RECAPTCHA_SITE_KEY } from '../../components/Recaptcha'
 import { ErrorBox } from '../../components/ui/Common'
 import { GRADE_GROUPS, parseGrade } from '../../lib/education'
 
@@ -43,6 +45,7 @@ export default function Signup() {
   const [form, setForm] = useState(emptyForm)
   const [kids, setKids] = useState([])
   const [photo, setPhoto] = useState(null)
+  const [captcha, setCaptcha] = useState('')
   const [otp, setOtp] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -88,10 +91,12 @@ export default function Signup() {
       const problem = validate(s.id)
       if (problem) { setSection(s.id); return setError(problem) }
     }
+    if (RECAPTCHA_SITE_KEY && !captcha) return setError('Please tick “I’m not a robot” to continue.')
     setBusy(true)
     try {
       await api.post('/auth/register', {
         role,
+        recaptchaToken: captcha || undefined,
         fullName: form.fullName,
         email: form.email,
         phone: `+60${form.phone.replace(/\D/g, '').replace(/^0|^60/, '')}`,
@@ -166,6 +171,11 @@ export default function Signup() {
           <button onClick={() => { setSection('basic'); setStep(1) }} className="btn-primary mx-auto mt-5 h-12 w-full max-w-[560px] text-base">
             Next <Icon name="arrow-right" className="h-4 w-4" />
           </button>
+          <div className="mx-auto mt-4 max-w-[560px]">
+            <div className="mb-3 flex items-center gap-3 text-xs text-slate-400"><span className="h-px flex-1 bg-slate-200" /> or sign up with <span className="h-px flex-1 bg-slate-200" /></div>
+            <GoogleButton role={role} onError={setError} />
+            {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+          </div>
           <p className="mt-4 text-sm text-slate-500">
             Already have an account? <Link to="/login" className="font-semibold text-brand-500 hover:underline">Log In</Link>
           </p>
@@ -256,6 +266,7 @@ export default function Signup() {
               )}
 
               {section === 'children' && <Kids kids={kids} setKids={setKids} />}
+              {idx === active.length - 1 && <div className="mt-4"><Recaptcha onToken={setCaptcha} /></div>}
             </div>
 
             <button disabled={busy} className="btn-primary mt-5 h-12 w-full text-base">

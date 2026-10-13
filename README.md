@@ -123,9 +123,18 @@ frontend/src/
 - **Schema changes:** edit `schema.prisma`, run `npm run db:migrate`, and commit the generated `prisma/migrations/` folder. Tell your teammate to pull and run `npm run db:migrate`.
 - Never commit `.env`.
 
+## Optional integrations (leave empty in development)
+
+Each one switches on only when its keys are filled in. Without keys the app still works.
+
+| Feature | Backend `.env` | Frontend `.env` | Where to get it |
+|---|---|---|---|
+| Google sign-in | `GOOGLE_CLIENT_ID` | `VITE_GOOGLE_CLIENT_ID` (same value) | Google Cloud Console > APIs & Services > Credentials > OAuth client ID (Web). Add `http://localhost:5173` under *Authorised JavaScript origins*. |
+| reCAPTCHA v2 checkbox | `RECAPTCHA_SECRET` | `VITE_RECAPTCHA_SITE_KEY` | google.com/recaptcha/admin > create a **v2 "I'm not a robot"** key for `localhost`. |
+| Photo upload | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | none | cloudinary.com dashboard (free plan). Photos upload straight from the browser using a signature from `POST /api/uploads/signature`. |
+| Real email | `SMTP_USER`, `SMTP_PASS` | none | Gmail App Password. |
+
+Restart both servers after changing `.env` files.
+
 ## Still to configure later
-- Google login: `GOOGLE_CLIENT_ID` (backend) + `VITE_GOOGLE_CLIENT_ID` (frontend)
-- reCAPTCHA: `RECAPTCHA_SECRET` + `VITE_RECAPTCHA_SITE_KEY`
-- Real email: Gmail App Password in `SMTP_USER` / `SMTP_PASS`
-- Cloudinary for photo uploads
-- Payment gateway sandbox (Billplz / ToyyibPay / Stripe FPX)
+- Payment gateway sandbox (Billplz / ToyyibPay / Stripe test mode). The pay dialog currently simulates the gateway.

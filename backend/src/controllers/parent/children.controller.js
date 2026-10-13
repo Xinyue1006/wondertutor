@@ -10,6 +10,7 @@ const childSchema = z
     grade: z.coerce.number().int().min(1, 'Choose a grade'),
     subject: z.enum(SUBJECTS).optional().nullable(),
     notes: z.string().trim().max(500, 'Notes must be 500 characters or fewer').optional().nullable(),
+    photoUrl: z.string().url().startsWith('https://res.cloudinary.com/', 'Invalid photo').optional().nullable(),
   })
   .refine((d) => d.grade <= MAX_GRADE[d.educationLevel], { message: 'That grade does not exist for the chosen level', path: ['grade'] })
 
