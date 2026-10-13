@@ -1,5 +1,5 @@
 import { useId, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { errorMessage } from '../../api/client'
 import { homeFor } from '../../components/ProtectedRoute'
@@ -31,7 +31,8 @@ function LoginField({ label, icon, error, children }) {
 export default function Login() {
   const { login } = useAuth()
   const navigate = useNavigate()
-  const [form, setForm] = useState({ email: '', password: '', remember: true })
+  const { state } = useLocation()
+  const [form, setForm] = useState({ email: state?.email || '', password: '', remember: true })
   const [show, setShow] = useState(false)
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
@@ -144,10 +145,9 @@ export default function Login() {
                 onChange={(e) => setForm({ ...form, remember: e.target.checked })} />
               Remember me
             </label>
-            <button type="button" className="min-h-11 font-semibold text-brand-600 hover:underline"
-              onClick={() => setError('Password reset is not available yet. Please contact Admin if you are locked out.')}>
+            <Link to="/forgot-password" state={{ email: form.email }} className="inline-flex min-h-11 items-center font-semibold text-brand-600 hover:underline">
               Forgot password?
-            </button>
+            </Link>
           </div>
 
           {/* Server answers (wrong password, deactivated account...) sit right above the button that caused them */}

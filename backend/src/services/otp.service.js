@@ -8,7 +8,12 @@ const OTP_TTL_MINUTES = 10
 const MAX_ATTEMPTS = 5
 const RESEND_COOLDOWN_SECONDS = 60
 
-export async function issueOtp(email) {
+const PURPOSE_TEXT = {
+  verify: { subject: 'Your WonderTutor verification code', note: "If you didn't sign up, ignore this email." },
+  reset: { subject: 'Reset your WonderTutor password', note: "If you didn't ask to reset your password, ignore this email. Your password stays the same." },
+}
+
+export async function issueOtp(email, purpose = 'verify') {
   const latest = await prisma.emailOtp.findFirst({ where: { email }, orderBy: { createdAt: 'desc' } })
   if (latest && Date.now() - latest.createdAt.getTime() < RESEND_COOLDOWN_SECONDS * 1000) {
     throw new AppError(429, `Please wait ${RESEND_COOLDOWN_SECONDS} seconds before requesting another code`)
@@ -24,11 +29,12 @@ export async function issueOtp(email) {
     },
   })
 
+  const text = PURPOSE_TEXT[purpose] || PURPOSE_TEXT.verify
   await sendEmail({
     to: email,
-    subject: 'Your WonderTutor verification code',
-    html: `<p>Your verification code is <b style="font-size:20px">${code}</b>.</p>
-           <p>It expires in ${OTP_TTL_MINUTES} minutes. If you didn't sign up, ignore this email.</p>`,
+    subject: text.subject,
+    html: `<p>Your code is <b style="font-size:20px">${code}</b>.</p>
+           <p>It expires in ${OTP_TTL_MINUTES} minutes. ${text.note}</p>`,
   })
 }
 

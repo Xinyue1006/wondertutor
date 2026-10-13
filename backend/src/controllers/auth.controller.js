@@ -135,6 +135,45 @@ export async function resendOtp(req, res) {
   res.json({ message: 'A new code has been sent' })
 }
 
+// ───────────── Forgot / reset password ─────────────
+const newPasswordSchema = z
+  .string()
+  .min(8, 'Password must be at least 8 characters')
+  .regex(/[A-Za-z]/, 'Password must contain a letter')
+  .regex(/\d/, 'Password must contain a number')
+
+// POST /api/auth/forgot-password { email }
+// Always gives the same answer, so nobody can use this form to find out which emails have an account.
+export async function forgotPassword(req, res) {
+  const { email } = z.object({ email: z.string().trim().toLowerCase().email('Enter a valid email address') }).parse(req.body)
+  const user = await prisma.user.findUnique({ where: { email } })
+  if (user && user.status !== 'DEACTIVATED') {
+    try {
+      await issueOtp(email, 'reset')
+    } catch (err) {
+      if (err.status !== 429) throw err // "wait 60 s" is not shown either: it would reveal that the account exists
+    }
+  }
+  res.json({ message: 'If an account uses this email, we have sent a 6-digit code to it.' })
+}
+
+// POST /api/auth/reset-password { email, code, newPassword }
+export async function resetPassword(req, res) {
+  const { email, code, newPassword } = z
+    .object({
+      email: z.string().trim().toLowerCase().email('Enter a valid email address'),
+      code: z.string().length(6, 'Code must be 6 digits'),
+      newPassword: newPasswordSchema,
+    })
+    .parse(req.body)
+  const user = await prisma.user.findUnique({ where: { email } })
+  if (!user || user.status === 'DEACTIVATED') throw new AppError(400, 'Code expired, please request a new one')
+  await checkOtp(email, code)
+  // Proving access to the inbox also verifies the email (useful for an account that never finished signup)
+  await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await bcrypt.hash(newPassword, 12), isEmailVerified: true } })
+  res.json({ message: 'Your password has been reset. You can now log in.' })
+}
+
 // POST /api/auth/login
 export async function login(req, res) {
   const { email, password } = z
