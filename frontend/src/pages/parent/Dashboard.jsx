@@ -57,7 +57,7 @@ export default function ParentDashboard() {
         <div className="space-y-6">
           <section className="card relative overflow-hidden border-accent/30 bg-gradient-to-r from-accent-50 to-white p-6">
             <Icon name="sparkle" fill className="absolute left-5 top-5 h-7 w-7 text-accent" />
-            <div className="pl-12 pr-44">
+            <div className="pl-12 sm:pr-44">
               <h2 className="text-2xl font-extrabold text-navy">Find the Right Tutor for Your Child</h2>
               <p className="mt-1 text-sm text-slate-600">Tell us what your child needs and we'll recommend suitable tutors.</p>
               <div className="mt-4 flex flex-wrap gap-3">
@@ -121,7 +121,7 @@ export default function ParentDashboard() {
         {/* ───── right column ───── */}
         <div className="space-y-6">
           <SectionCard title="Booking Summary" action={<Link to="/parent/bookings" className="flex items-center gap-1 text-sm font-semibold text-brand-500 hover:underline">View All Bookings <Icon name="arrow-right" className="h-4 w-4" /></Link>}>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid gap-3 sm:grid-cols-3">
               {[
                 ['calendar', counts.upcoming, 'Upcoming', 'bg-brand-50', 'bg-brand-100 text-brand-500', 'upcoming'],
                 ['clock', counts.pending, 'Pending', 'bg-accent-50', 'bg-accent-100 text-accent-600', 'pending'],

@@ -44,7 +44,7 @@ export default function AppLayout() {
   const shell = (
     <div className="min-h-screen pb-24">
       <header className="sticky top-0 z-30 px-3 pt-3 md:px-6">
-        <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-4 rounded-2xl bg-white px-4 shadow-card md:px-6">
+        <div className="mx-auto flex max-w-[87.5rem] items-center justify-between gap-4 rounded-2xl bg-white px-4 shadow-card md:px-6">
           <Link to={items[0]?.[0] || '/'} className="shrink-0 py-3"><Logo className="h-8" /></Link>
           <nav className="hidden items-stretch gap-1 self-stretch md:flex">
             {items.map(([to, label]) => (
@@ -68,7 +68,7 @@ export default function AppLayout() {
           </div>
         </div>
         {/* Phone: nav moves to a horizontal scroller */}
-        <nav className="mx-auto mt-2 flex max-w-[1400px] gap-2 overflow-x-auto md:hidden">
+        <nav className="mx-auto mt-2 flex max-w-[87.5rem] gap-2 overflow-x-auto md:hidden">
           {items.map(([to, label]) => (
             <NavLink
               key={to}
@@ -83,7 +83,7 @@ export default function AppLayout() {
           ))}
         </nav>
       </header>
-      <main className="mx-auto max-w-[1400px] px-3 py-6 md:px-6">
+      <main className="mx-auto max-w-[87.5rem] px-3 py-6 md:px-6">
         <Outlet />
       </main>
       {isParent && <AssistantWidget />}

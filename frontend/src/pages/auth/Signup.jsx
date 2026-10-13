@@ -183,7 +183,7 @@ export default function Signup() {
       )}
 
       {step === 1 && (
-        <div className="mx-auto mt-6 grid max-w-[1100px] gap-6 md:grid-cols-[230px_1fr]">
+        <div className="mx-auto mt-6 grid max-w-[68.75rem] gap-6 md:grid-cols-[230px_1fr]">
           <aside className="space-y-1.5">
             {sections.map((s) => (
               <button

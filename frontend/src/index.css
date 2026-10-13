@@ -18,6 +18,7 @@
   --color-ok-50: #e9f9ef;
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-hand: "Caveat", cursive;
+  --font-display: "Lora", Georgia, serif;
   --shadow-card: 0 6px 28px rgba(26, 109, 255, 0.08);
 }
 
@@ -37,7 +38,7 @@ body {
   @apply rounded-2xl border border-white bg-white shadow-card;
 }
 @utility btn {
-  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60;
+  @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60;
 }
 @utility btn-primary {
   @apply btn bg-brand-500 text-white shadow-sm shadow-brand-500/30 hover:bg-brand-600;
@@ -114,3 +115,44 @@ body {
   20%, 40% { transform: rotate(-8deg); }
   50% { transform: rotate(10deg); }
 }
+
+
+/* ── Typography tokens (one scale for headings, so pages stay consistent) ── */
+@utility eyebrow {
+  @apply text-xs font-bold uppercase tracking-[0.18em] text-navy;
+}
+@utility section-title {
+  @apply font-display text-2xl font-bold leading-tight text-navy md:text-3xl;
+}
+@utility card-title {
+  @apply text-base font-bold leading-snug text-navy;
+}
+@utility caption {
+  @apply text-sm text-slate-600;
+}
+
+/* Visible keyboard focus on every control (WCAG 2.4.7); mouse clicks do not show it */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid var(--color-brand-500);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* Respect "reduce motion" settings: no floating mascot, no smooth scrolling */
+@media (prefers-reduced-motion: reduce) {
+  .float-y { animation: none; }
+  html { scroll-behavior: auto; }
+  * { transition-duration: 0.01ms !important; }
+}
+
+/* Responsive safety net (base layer, so any explicit utility class still wins):
+   a grid column or flex item may shrink below its content width instead of pushing the page wider than the screen. */
+@layer base {
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .grid > *, .flex > * { min-width: 0; }
+  img, svg, video { max-width: 100%; }
+}
+
+/* Fluid scale for big monitors: the root size stays 16px up to a 1440px-wide window, then grows gently (about 20px at 1900px).
+   Tailwind sizes and the page container are in rem, so the whole layout scales with it instead of sitting small in the middle. */
+html { font-size: clamp(16px, 0.833vw + 4px, 22px); }
