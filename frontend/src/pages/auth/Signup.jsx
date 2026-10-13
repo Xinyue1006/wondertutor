@@ -140,9 +140,8 @@ export default function Signup() {
   }
 
   return (
-    // Same band as the landing hero and the login page: light blue, blue decoration down the left edge
-    <section className="relative left-1/2 -mb-12 w-screen -translate-x-1/2 overflow-x-clip bg-gradient-to-r from-brand-50 via-brand-50 to-brand-25 pb-12 pt-6">
-      <img src="/img/art/hero-blob.png" alt="" aria-hidden="true" className="pointer-events-none absolute left-0 top-0 hidden h-full max-h-[40rem] w-auto max-w-[110px] object-cover object-left md:block" style={{ maskImage: 'linear-gradient(to right, #000 60%, transparent)', WebkitMaskImage: 'linear-gradient(to right, #000 60%, transparent)' }} />
+    // Same light-blue band as the landing hero and the login page
+    <section className="relative left-1/2 -mb-12 w-screen -translate-x-1/2 overflow-x-clip bg-gradient-to-r from-brand-50 via-brand-50 to-brand-25 pb-12 pt-4">
     <div className="relative mx-auto max-w-[81.25rem] px-4 md:px-8">
       <div className="relative">
         {step < 2 && (
@@ -154,12 +153,12 @@ export default function Signup() {
       </div>
 
       {step === 0 && (
-        <div className="mx-auto mt-6 max-w-[860px] text-center">
+        <div className="mx-auto mt-3 max-w-[860px] text-center">
           <h1 className="font-display text-3xl font-bold text-navy md:text-4xl">
             Join WonderTutor <Icon name="sparkle" fill className="mb-2 inline h-5 w-5 text-accent" />
           </h1>
           <p className="mt-1 text-base text-slate-700">Create an account and be part of a brighter learning community.</p>
-          <div role="radiogroup" aria-label="I am joining as" className="mt-6 grid gap-5 text-left md:grid-cols-2">
+          <div role="radiogroup" aria-label="I am joining as" className="mt-4 grid gap-4 text-left md:grid-cols-2">
             <RoleCard
               active={role === 'PARENT'} onClick={() => setRole('PARENT')} img="/img/art/role-parent.jpg" tone="blue"
               title="I'm a Parent" desc="Find and book suitable tutors for your child."
@@ -171,16 +170,16 @@ export default function Signup() {
               points={['Set your availability', 'Manage your bookings', 'Track your earnings', 'Build your teaching profile']}
             />
           </div>
-          <button onClick={() => { setSection('basic'); setStep(1) }} className="btn-accent mx-auto mt-5 h-12 w-full max-w-[560px] text-base">
-            Next <Icon name="arrow-right" className="h-4 w-4" />
-          </button>
-          <div className="mx-auto mt-4 max-w-[560px]">
-            <div className="mb-3 flex items-center gap-3 text-xs text-slate-400"><span className="h-px flex-1 bg-slate-200" /> or sign up with <span className="h-px flex-1 bg-slate-200" /></div>
+          {/* Next and Google side by side, so the whole first step (including "Log In") fits on one screen */}
+          <div className="mx-auto mt-4 grid max-w-[560px] gap-3 sm:grid-cols-2">
+            <button onClick={() => { setSection('basic'); setStep(1) }} className="btn-accent h-12 w-full text-base">
+              Next <Icon name="arrow-right" className="h-4 w-4" />
+            </button>
             <GoogleButton role={role} onError={setError} />
-            {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
           </div>
-          <p className="mt-4 text-sm text-slate-500">
-            Already have an account? <Link to="/login" className="font-semibold text-brand-500 hover:underline">Log In</Link>
+          {error && <p role="alert" className="mt-2 text-sm font-medium text-red-700">{error}</p>}
+          <p className="mt-2 text-sm text-slate-700">
+            Already have an account? <Link to="/login" className="inline-flex min-h-11 items-center font-semibold text-brand-600 hover:underline">Log In</Link>
           </p>
         </div>
       )}
@@ -335,11 +334,11 @@ function RoleCard({ active, onClick, title, desc, points, img, tone }) {
       <span className={`absolute right-5 top-5 z-10 flex h-7 w-7 items-center justify-center rounded-full border-2 bg-white ${active ? (blue ? 'border-brand-500' : 'border-accent') : 'border-slate-300'}`} aria-hidden="true">
         {active && <span className={`h-3.5 w-3.5 rounded-full ${blue ? 'bg-brand-500' : 'bg-accent'}`} />}
       </span>
-      <img src={img} alt="" aria-hidden="true" className="h-44 w-full rounded-xl object-cover" />
-      <div className="px-3 pb-3 pt-4">
+      <img src={img} alt="" aria-hidden="true" className="h-28 w-full rounded-xl object-cover [@media(min-height:860px)]:h-40" />
+      <div className="px-3 pb-2 pt-3">
         <div className="text-center font-display text-xl font-bold text-navy">{title}</div>
         <div className="mb-3 text-center text-sm text-slate-700">{desc}</div>
-        <ul className="mx-auto w-fit space-y-2 text-sm text-navy">
+        <ul className="mx-auto w-fit space-y-1.5 text-sm text-navy">
           {points.map((p) => (
             <li key={p} className="flex items-center gap-2">
               <span className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-white ${blue ? 'bg-brand-500' : 'bg-accent-600'}`}>
