@@ -219,12 +219,14 @@ async function seedBasics() {
   for (const [key, value] of Object.entries(settings)) {
     await prisma.systemSetting.upsert({ where: { key }, update: {}, create: { key, value } })
   }
+  // On a live site set ADMIN_EMAIL and ADMIN_PASSWORD so the admin does not use the published demo login
+  const adminEmail = process.env.ADMIN_EMAIL || 'admin@wondertutor.local'
   await prisma.user.upsert({
-    where: { email: 'admin@wondertutor.local' },
+    where: { email: adminEmail },
     update: {},
     create: {
-      email: 'admin@wondertutor.local',
-      passwordHash: await bcrypt.hash(process.env.ADMIN_PASSWORD || 'Admin1234', 12) // set ADMIN_PASSWORD on a live site,
+      email: adminEmail,
+      passwordHash: await bcrypt.hash(process.env.ADMIN_PASSWORD || 'Admin1234', 12),
       role: 'ADMIN',
       fullName: 'WonderTutor Admin',
       isEmailVerified: true,
@@ -511,6 +513,12 @@ async function recomputeRatings() {
 
 async function main() {
   await seedBasics()
+
+  // A live site holds real families' data: only the admin account and settings, never the fake tutors and parents
+  if (process.env.NODE_ENV === 'production') {
+    console.log('Production: seeded the settings and the admin account only.')
+    return
+  }
 
   if (await prisma.user.findUnique({ where: { email: DEMO_PARENT.email } })) {
     console.log('Demo data already seeded. Use `npx prisma migrate reset` to start from scratch.')

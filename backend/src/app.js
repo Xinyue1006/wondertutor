@@ -23,8 +23,10 @@ app.use('/api', routes)
 
 // In production one Node app serves both the API and the built React site (frontend/dist),
 // so the whole project lives on a single domain and needs no CORS or second hosting plan.
-const dist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../frontend/dist')
-if (env.nodeEnv === 'production' && fs.existsSync(dist)) {
+// The site is in frontend/dist in the repo, or in ./public when the backend is uploaded on its own (flat host layout).
+const here = path.dirname(fileURLToPath(import.meta.url))
+const dist = [path.resolve(here, '../../frontend/dist'), path.resolve(here, '../public')].find((d) => fs.existsSync(d))
+if (env.nodeEnv === 'production' && dist) {
   app.use(express.static(dist))
   // React Router handles page URLs in the browser, so any non-API path returns index.html
   app.get(/^\/(?!api\/).*/, (req, res) => res.sendFile(path.join(dist, 'index.html')))
