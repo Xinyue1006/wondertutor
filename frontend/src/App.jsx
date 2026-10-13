@@ -8,6 +8,7 @@ import { useAuth } from './context/AuthContext'
 import Home from './pages/Home'
 import Login from './pages/auth/Login'
 import Signup from './pages/auth/Signup'
+import ForgotPassword from './pages/auth/ForgotPassword'
 import NotFound from './pages/NotFound'
 import ParentDashboard from './pages/parent/Dashboard'
 import FindTutor from './pages/parent/FindTutor'
@@ -20,6 +21,8 @@ import MyChildren from './pages/parent/MyChildren'
 import Payments from './pages/parent/Payments'
 import Complaints from './pages/parent/Complaints'
 import Profile from './pages/parent/Profile'
+import SavedTutors from './pages/parent/SavedTutors'
+import ChildProgress from './pages/parent/ChildProgress'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import AdminUsers from './pages/admin/AdminUsers'
 import AdminComplaints from './pages/admin/AdminComplaints'
@@ -39,6 +42,7 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<GuestOnly><Login /></GuestOnly>} />
         <Route path="/signup" element={<GuestOnly><Signup /></GuestOnly>} />
+        <Route path="/forgot-password" element={<GuestOnly><ForgotPassword /></GuestOnly>} />
       </Route>
 
       {/* Parent Portal: Xin Yue */}
@@ -55,6 +59,8 @@ export default function App() {
           <Route path="payments" element={<Payments />} />
           <Route path="complaints" element={<Complaints />} />
           <Route path="profile" element={<Profile />} />
+          <Route path="favourites" element={<SavedTutors />} />
+          <Route path="children/:id/progress" element={<ChildProgress />} />
         </Route>
       </Route>
 

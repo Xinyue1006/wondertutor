@@ -47,14 +47,14 @@ export default function AppLayout() {
       <header className="sticky top-0 z-30 w-full bg-white">
         <div className="mx-auto flex max-w-[81.25rem] items-center justify-between gap-3 px-4 py-2 md:px-8">
           <Link to={items[0]?.[0] || '/'} aria-label="WonderTutor dashboard" className="flex min-h-11 shrink-0 items-center"><Logo className="h-9" /></Link>
-          <nav aria-label="Main" className="hidden items-center gap-7 text-sm font-medium text-navy md:flex">
+          <nav aria-label="Main" className="hidden items-center gap-4 text-sm font-medium text-navy lg:flex xl:gap-7">
             {items.map(([to, label]) => (
               <NavLink
                 key={to}
                 to={to}
                 end={to.split('/').length === 2}
                 className={({ isActive }) =>
-                  `flex min-h-11 items-center border-b-[3px] transition ${
+                  `flex min-h-11 items-center whitespace-nowrap border-b-[3px] transition ${
                     isActive ? 'border-accent text-brand-500' : 'border-transparent hover:text-brand-500'
                   }`
                 }
@@ -69,7 +69,7 @@ export default function AppLayout() {
           </div>
         </div>
         {/* Phone: nav moves to a horizontal scroller */}
-        <nav aria-label="Main" className="mx-auto flex max-w-[81.25rem] gap-2 overflow-x-auto px-4 pb-2 md:hidden">
+        <nav aria-label="Main" className="mx-auto flex max-w-[81.25rem] gap-2 overflow-x-auto px-4 pb-2 lg:hidden">
           {items.map(([to, label]) => (
             <NavLink
               key={to}
@@ -107,7 +107,7 @@ function UserMenu() {
     <div className="relative" ref={ref}>
       <button onClick={() => setOpen((o) => !o)} className="flex items-center gap-3 rounded-xl px-1 py-1 hover:bg-brand-50">
         <Avatar src={user.profilePhotoUrl} name={user.fullName} className="h-10 w-10" />
-        <span className="hidden text-left leading-tight sm:block">
+        <span className="hidden text-left leading-tight sm:block lg:hidden xl:block">
           <span className="block text-sm font-semibold text-navy">{user.fullName}</span>
           <span className="block text-xs capitalize text-slate-500">{user.role.toLowerCase()}</span>
         </span>
@@ -122,6 +122,9 @@ function UserMenu() {
               </Link>
               <Link to="/parent/children" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-navy hover:bg-brand-50">
                 <Icon name="user" className="h-4 w-4" /> My Children
+              </Link>
+              <Link to="/parent/favourites" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-navy hover:bg-brand-50">
+                <Icon name="heart" className="h-4 w-4" /> Saved Tutors
               </Link>
             </>
           )}
@@ -213,7 +216,7 @@ function NotificationBell() {
 // Footer for the signed-in portals. Different from the public footer: it is about using the portal
 // (shortcuts, account, where to get help), not about marketing the platform.
 const ACCOUNT_LINKS = {
-  PARENT: [['/parent/profile', 'My Profile'], ['/parent/children', 'My Children'], ['/parent/complaints', 'My Complaints']],
+  PARENT: [['/parent/profile', 'My Profile'], ['/parent/children', 'My Children'], ['/parent/favourites', 'Saved Tutors'], ['/parent/complaints', 'My Complaints']],
   TUTOR: [],
   ADMIN: [],
 }

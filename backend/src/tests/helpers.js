@@ -16,6 +16,9 @@ export async function startServer() {
   baseUrl = `http://127.0.0.1:${server.address().port}/api`
 }
 
+// Base URL of the running test server, for requests that are not JSON (e.g. CSV downloads)
+export const apiBase = () => baseUrl
+
 export async function stopServer() {
   await new Promise((resolve) => server.close(resolve))
   await prisma.$disconnect()

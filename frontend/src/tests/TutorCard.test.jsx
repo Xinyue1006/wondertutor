@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
+import { vi } from 'vitest'
 import TutorCard from '../components/TutorCard'
 
 const tutor = {
@@ -61,5 +62,24 @@ describe('TutorCard (matching result)', () => {
     await userEvent.click(screen.getByRole('button', { name: /View more/ }))
     expect(screen.getByText('Within your budget')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /View less/ })).toBeInTheDocument()
+  })
+})
+
+describe('TutorCard (save button)', () => {
+  test('only appears when the page supports saving, and reports the saved state', async () => {
+    const { unmount } = renderCard()
+    expect(screen.queryByRole('button', { name: /Save Daniel Tan/ })).not.toBeInTheDocument()
+    unmount()
+    const onToggleSave = vi.fn()
+    renderCard({ saved: false, onToggleSave })
+    const heart = screen.getByRole('button', { name: 'Save Daniel Tan' })
+    expect(heart).toHaveAttribute('aria-pressed', 'false')
+    await userEvent.click(heart)
+    expect(onToggleSave).toHaveBeenCalledWith(expect.objectContaining({ id: 7 }))
+  })
+
+  test('a saved tutor offers to remove it', () => {
+    renderCard({ saved: true, onToggleSave: () => {} })
+    expect(screen.getByRole('button', { name: 'Remove Daniel Tan from saved tutors' })).toHaveAttribute('aria-pressed', 'true')
   })
 })

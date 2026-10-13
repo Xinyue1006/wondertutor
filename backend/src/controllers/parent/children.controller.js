@@ -62,3 +62,61 @@ export async function deleteChild(req, res) {
   await prisma.child.delete({ where: { id: existing.id } })
   res.json({ message: 'Child removed' })
 }
+
+// GET /parent/children/:id/progress : the child's learning journey, built from completed lessons.
+// Attendance (check-in photo, times) and session summaries are written by the Tutor Portal; parents only read them.
+// Online lessons have no attendance tracking (project scope), so the attendance figure only counts physical lessons.
+export async function childProgress(req, res) {
+  const child = await ownChild(req)
+  const tutorSelect = { include: { user: { select: { fullName: true, profilePhotoUrl: true } } } }
+  const [lessons, next] = await Promise.all([
+    prisma.booking.findMany({
+      where: { childId: child.id, status: 'COMPLETED' },
+      include: { tutor: tutorSelect, attendance: true, summary: true, review: true },
+      orderBy: { startAt: 'desc' },
+    }),
+    prisma.booking.findFirst({
+      where: { childId: child.id, status: 'CONFIRMED', startAt: { gt: new Date() } },
+      include: { tutor: tutorSelect },
+      orderBy: { startAt: 'asc' },
+    }),
+  ])
+
+  const hours = (b) => (b.endAt - b.startAt) / 3_600_000
+  const bySubject = {}
+  for (const b of lessons) {
+    const s = (bySubject[b.subject] ||= { subject: b.subject, lessons: 0, hours: 0, tutors: new Set(), lastLessonAt: b.startAt })
+    s.lessons++
+    s.hours += hours(b)
+    s.tutors.add(b.tutor.user.fullName)
+  }
+  const physical = lessons.filter((b) => b.teachingMode === 'PHYSICAL')
+  const checkedIn = physical.filter((b) => b.attendance?.checkInAt)
+
+  res.json({
+    child: toChildDto(child),
+    stats: {
+      completedLessons: lessons.length,
+      totalHours: Math.round(lessons.reduce((t, b) => t + hours(b), 0) * 10) / 10,
+      physicalLessons: physical.length,
+      checkedInLessons: checkedIn.length,
+      summariesReceived: lessons.filter((b) => b.summary).length,
+      firstLessonAt: lessons.length ? lessons[lessons.length - 1].startAt : null,
+    },
+    subjects: Object.values(bySubject)
+      .map((s) => ({ ...s, hours: Math.round(s.hours * 10) / 10, tutors: [...s.tutors] }))
+      .sort((a, b) => b.lessons - a.lessons),
+    nextLesson: next && { id: next.id, subject: next.subject, startAt: next.startAt, endAt: next.endAt, tutorName: next.tutor.user.fullName, teachingMode: next.teachingMode },
+    timeline: lessons.map((b) => ({
+      bookingId: b.id,
+      subject: b.subject,
+      startAt: b.startAt,
+      endAt: b.endAt,
+      teachingMode: b.teachingMode,
+      tutor: { id: b.tutorId, name: b.tutor.user.fullName, photoUrl: b.tutor.user.profilePhotoUrl },
+      attendance: b.attendance && { checkInAt: b.attendance.checkInAt, checkOutAt: b.attendance.checkOutAt, checkInPhotoUrl: b.attendance.checkInPhotoUrl },
+      summary: b.summary && { content: b.summary.content, progressNote: b.summary.progressNote },
+      rating: b.review?.rating ?? null,
+    })),
+  })
+}

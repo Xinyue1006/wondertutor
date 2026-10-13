@@ -12,6 +12,8 @@ import { errorHandler, notFound } from './middleware/error.js'
 const app = express()
 
 // CSP is relaxed because the pages load Google sign-in, reCAPTCHA and Cloudinary scripts/images
+// Behind the hosting provider's proxy the real visitor IP is in X-Forwarded-For; rate limiting needs it
+if (env.nodeEnv === 'production') app.set('trust proxy', 1)
 app.use(helmet({ contentSecurityPolicy: false }))
 app.use(cors({ origin: env.clientUrl, credentials: true }))
 app.use(express.json({ limit: '1mb' }))

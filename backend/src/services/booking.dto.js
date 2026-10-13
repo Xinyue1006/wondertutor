@@ -8,6 +8,8 @@ export const bookingInclude = {
   review: true,
   attendance: true,
   summary: true,
+  parent: { select: { userId: true } },
+  reschedules: { orderBy: { createdAt: 'desc' }, take: 1 },
 }
 
 const num = (d) => (d == null ? null : Number(d))
@@ -49,5 +51,15 @@ export function toBookingDto(b) {
       checkInAt: b.attendance.checkInAt, checkOutAt: b.attendance.checkOutAt, checkInPhotoUrl: b.attendance.checkInPhotoUrl,
     },
     summary: b.summary && { content: b.summary.content, progressNote: b.summary.progressNote },
+    // Latest reschedule request (if any) and which side asked, so the page knows whether to show Accept/Decline or Withdraw
+    reschedule: b.reschedules?.[0] && {
+      id: b.reschedules[0].id,
+      status: b.reschedules[0].status,
+      newStartAt: b.reschedules[0].newStartAt,
+      newEndAt: b.reschedules[0].newEndAt,
+      reason: b.reschedules[0].reason,
+      requestedBy: b.parent && b.reschedules[0].requestedById === b.parent.userId ? 'PARENT' : 'TUTOR',
+      createdAt: b.reschedules[0].createdAt,
+    },
   }
 }

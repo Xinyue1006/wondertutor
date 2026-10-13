@@ -4,6 +4,7 @@ import Icon from '../../components/ui/Icon'
 import { EmptyState, ErrorBox, Modal, PageTitle, Spinner } from '../../components/ui/Common'
 import { ComplaintPill } from '../parent/Complaints'
 import { fmtDate, fmtShortDate } from '../../lib/format'
+import ComplaintsReport from '../../components/ComplaintsReport'
 
 const TABS = [['', 'All'], ['OPEN', 'Open'], ['IN_PROGRESS', 'In Progress'], ['RESOLVED', 'Resolved'], ['DISMISSED', 'Dismissed']]
 
@@ -21,6 +22,7 @@ export default function AdminComplaints() {
   return (
     <div>
       <PageTitle title="Complaints & Reports" subtitle="Review complaints from parents and respond to them." />
+      <ComplaintsReport />
       <div className="card mb-4 flex flex-wrap gap-2 p-3">
         {TABS.map(([v, l]) => (
           <button key={l} onClick={() => setStatus(v)} className={`rounded-lg border px-4 py-2 text-sm font-semibold ${status === v ? 'border-brand-500 bg-brand-500 text-white' : 'border-brand-200 bg-white text-navy hover:border-brand-500'}`}>

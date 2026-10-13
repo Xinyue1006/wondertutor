@@ -56,6 +56,9 @@ npm run dev:respond -- <bookingId> accept            # -> parent must pay
 npm run dev:respond -- <bookingId> counter 55        # tutor counter offer, RM55/hour
 npm run dev:respond -- <bookingId> reject "Not available"
 npm run dev:respond -- <bookingId> complete          # lesson done -> parent can review
+npm run dev:respond -- <bookingId> reschedule 2026-10-22 18:00   # tutor asks the parent for a new time
+npm run dev:respond -- <bookingId> reschedule-accept # tutor agrees to the parent's new time
+npm run dev:respond -- <bookingId> reschedule-decline # no agreement -> escalated to Admin
 ```
 
 The payment page uses a **sandbox** FPX gateway (no real money). Payment success/failure is simulated in the pay dialog.
@@ -79,6 +82,20 @@ Matches the `docs/UI_v1.pdf` mockups: Login / Sign up (3 steps + email OTP) · D
 3-step matching wizard + results with match % and reasons · AI Tutor Assistant (Book Robot chat panel) · Tutor profile ·
 Book a Lesson (weekly calendar) · My Bookings (pending / counter offer / payment / upcoming / completed / cancelled) ·
 My Children · Payments (sandbox FPX, transactions, refunds shown) · notifications bell · reviews.
+
+Also built for the Parent Portal and Admin (Xin Yue):
+- **Sign-up** with Basic / Contact / My Children (subject + learning goals) / Preferences steps; progress kept for the session.
+- **Forgot / reset password** with an emailed 6-digit code; **rate limiting** on login and code endpoints.
+- **Recommendation**: Find a Tutor ranks by the weighted score using the search, the parent's saved preferences and home
+  area; every card shows its own match % and reasons; results are paged ("Showing 1–9 of 11 tutors").
+- **Saved tutors** (heart button + Saved Tutors page) · **Learning progress** per child (lesson history with tutor summaries,
+  check-in records, subjects, next lesson).
+- **Reschedule requests**: mutual agreement moves the lesson, disagreement escalates to Admin.
+- **Disputed attendance** on a completed lesson marks it DISPUTED and asks Admin to review a refund.
+- **Booking housekeeping** (runs every 5 minutes in `backend/src/services/lifecycle.service.js`): unanswered requests expire at
+  the lesson time, unpaid bookings expire 1 hour before it, and parents and tutors get a reminder within 24 hours of a lesson.
+- **Admin**: user management, qualification approval, complaints with a report (date range, overdue, time to close,
+  categories, most complained about) and CSV export.
 
 Matching is **rule-based weighted scoring** (`backend/src/services/matching.service.js`, weights from Form 2), not machine learning.
 The chatbot is a guided quick-reply flow that fills the same criteria and calls the same service.

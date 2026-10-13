@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import api, { errorMessage } from '../../api/client'
 import { useMatching } from '../../assistant/MatchingContext'
 import Icon from '../../components/ui/Icon'
@@ -88,6 +88,16 @@ export default function FindTutor() {
   if (!bar || !catalog) return <Spinner />
 
   const set = (k) => (e) => setBar({ ...bar, [k]: e.target.value })
+  // Save / unsave straight from the results; the heart updates at once
+  async function toggleSave(t) {
+    try {
+      const r = await api.post(`/parent/favourites/${t.id}`)
+      setData((d) => ({ ...d, tutors: d.tutors.map((x) => (x.id === t.id ? { ...x, isFavourite: r.data.isFavourite } : x)) }))
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
+
   const search = () => { if (!bar.subject || !bar.grade) return setError('Subject and education level are required'); setError(''); setApplied(bar) }
 
   function tryAiMatching() {
@@ -153,6 +163,9 @@ export default function FindTutor() {
             </p>
           )}
         </div>
+        <Link to="/parent/favourites" className="ml-auto flex min-h-11 items-center gap-1.5 text-sm font-semibold text-brand-600 hover:underline">
+          <Icon name="heart" className="h-4 w-4" /> Saved tutors
+        </Link>
         <label className="flex items-center gap-2 text-sm font-semibold text-navy">
           Sort by:
           <select value={sort} onChange={(e) => setSort(e.target.value)} className="input h-10 w-48 font-medium">
@@ -171,7 +184,7 @@ export default function FindTutor() {
           <div className="card"><EmptyState icon="search" title="No tutors match these filters">Try another subject or level, or remove some filters.</EmptyState></div>
         )}
         <div className={`grid gap-4 md:grid-cols-2 xl:grid-cols-3 ${loading ? 'opacity-60' : ''}`}>
-          {data?.tutors.map((t) => <TutorCard key={t.id} tutor={t} match={t.match} />)}
+          {data?.tutors.map((t) => <TutorCard key={t.id} tutor={t} match={t.match} saved={t.isFavourite} onToggleSave={toggleSave} />)}
         </div>
         {data && (
           <div className="mt-6">

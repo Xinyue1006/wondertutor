@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import api, { errorMessage } from '../../api/client'
 import { useMatching } from '../../assistant/MatchingContext'
 import Avatar from '../../components/ui/Avatar'
@@ -102,6 +102,7 @@ export default function MyChildren() {
             <div className="mt-2 text-xs text-slate-400">{c.bookingCount} booking{c.bookingCount === 1 ? '' : 's'}</div>
             <div className="mt-3 grid grid-cols-2 gap-2">
               <button onClick={() => { applyChild(c); navigate('/parent/find-tutor/match') }} className="btn-primary col-span-2"><Icon name="search" className="h-4 w-4" /> Find a Tutor</button>
+              <Link to={`/parent/children/${c.id}/progress`} className="btn-outline col-span-2"><Icon name="chart" className="h-4 w-4" /> View Learning Progress</Link>
               <button onClick={() => openForm(c)} className="btn-outline"><Icon name="edit" className="h-4 w-4" /> Edit</button>
               <button onClick={() => { setError(''); setRemoving(c) }} className="btn-danger"><Icon name="trash" className="h-4 w-4" /> Remove</button>
             </div>

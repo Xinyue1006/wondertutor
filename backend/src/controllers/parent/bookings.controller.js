@@ -4,6 +4,7 @@ import { AppError } from '../../utils/AppError.js'
 import { assertChildFree, assertSlotBookable } from '../../services/booking.service.js'
 import { bookingInclude, toBookingDto } from '../../services/booking.dto.js'
 import { notify } from '../../services/notification.service.js'
+import { requestReschedule as askReschedule, respondReschedule, withdrawReschedule } from '../../services/reschedule.service.js'
 import { fromMinutes, mytToDate, toMinutes } from '../../utils/time.js'
 
 const createSchema = z.object({
@@ -145,20 +146,39 @@ export async function declineCounter(req, res) {
 // POST /parent/bookings/:id/refund-request
 // Parent-initiated refunds (dissatisfaction, disputed attendance) are never automatic: they go to Admin review.
 // The refund percentage is decided by the Admin, so the request only states the reason.
+// A COMPLETED lesson whose attendance the parent disputes ("the lesson did not happen as recorded") is also marked
+// DISPUTED, so it is clearly escalated to Admin and cannot be reviewed as a normal finished lesson in the meantime.
 export async function requestRefund(req, res) {
-  const { reason } = z.object({ reason: z.string().trim().min(10, 'Please explain why you are asking for a refund (at least 10 characters)').max(300) }).parse(req.body)
+  const { reason, attendanceDispute } = z
+    .object({
+      reason: z.string().trim().min(10, 'Please explain why you are asking for a refund (at least 10 characters)').max(300),
+      attendanceDispute: z.boolean().optional(),
+    })
+    .parse(req.body)
   const b = await ownBooking(req)
   if (!b.payment || b.payment.status !== 'PAID') throw new AppError(400, 'Only paid lessons can be refunded')
   if (!['CONFIRMED', 'COMPLETED'].includes(b.status)) throw new AppError(400, 'This booking is not eligible for a refund request')
   if (b.payment.refunds.some((r) => r.status === 'PENDING' || r.status === 'APPROVED'))
     throw new AppError(409, 'A refund request for this lesson is already being handled')
 
-  await prisma.refund.create({
-    data: { paymentId: b.payment.id, amount: b.payment.amount, type: 'ADMIN_REVIEW', reason },
-  })
+  const disputing = attendanceDispute && b.status === 'COMPLETED'
+  await prisma.$transaction([
+    prisma.refund.create({
+      data: { paymentId: b.payment.id, amount: b.payment.amount, type: 'ADMIN_REVIEW', reason: disputing ? `Attendance disputed: ${reason}` : reason },
+    }),
+    ...(disputing ? [prisma.booking.update({ where: { id: b.id }, data: { status: 'DISPUTED' } })] : []),
+  ])
+  if (disputing) {
+    await notify(b.tutor.userId, { type: 'BOOKING_DISPUTED', title: 'Lesson disputed', message: `The parent disputed the attendance for the ${b.subject} lesson. Our admin team will review it.`, link: '/tutor/bookings' })
+  }
   const admins = await prisma.user.findMany({ where: { role: 'ADMIN', status: 'ACTIVE' }, select: { id: true } })
   await Promise.all(
-    admins.map((a) => notify(a.id, { type: 'REFUND_REQUEST', title: 'New refund request', message: `${req.user.fullName} requested a refund for ${b.subject} (RM ${Number(b.payment.amount).toFixed(2)}).`, link: '/admin/finance' })),
+    admins.map((a) => notify(a.id, {
+      type: disputing ? 'BOOKING_DISPUTED' : 'REFUND_REQUEST',
+      title: disputing ? 'Attendance disputed' : 'New refund request',
+      message: `${req.user.fullName} ${disputing ? 'disputed the attendance and' : ''} requested a refund for ${b.subject} (RM ${Number(b.payment.amount).toFixed(2)}).`.replace('  ', ' '),
+      link: disputing ? '/admin/bookings' : '/admin/finance',
+    })),
   )
   await notify(req.user.id, { type: 'REFUND_REQUESTED', title: 'Refund request sent', message: 'Our team will review it and update you.', link: '/parent/payments' })
   res.status(201).json({ booking: toBookingDto(await ownBooking(req)) })
@@ -199,4 +219,35 @@ export async function cancelBooking(req, res) {
     link: '/tutor/bookings',
   })
   res.json({ booking: toBookingDto(updated) })
+}
+
+// ───────────── Reschedule (mutual agreement, otherwise Admin decides) ─────────────
+// bookingInclude carries both user ids (parent.userId, tutor.userId), which the service needs to notify the right person
+const withParties = ownBooking
+
+const reloadDto = async (id) => toBookingDto(await prisma.booking.findUnique({ where: { id }, include: bookingInclude }))
+
+// POST /parent/bookings/:id/reschedule { date, startTime, reason? }
+export async function requestReschedule(req, res) {
+  const data = z
+    .object({
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Choose a date'),
+      startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Choose a time'),
+      reason: z.string().trim().max(200, 'Reason must be 200 characters or fewer').optional(),
+    })
+    .parse(req.body)
+  const booking = await withParties(req)
+  await askReschedule({ booking, byUserId: req.user.id, ...data })
+  res.status(201).json({ booking: await reloadDto(booking.id) })
+}
+
+// POST /parent/bookings/:id/reschedule/:requestId/accept | decline | withdraw
+export async function answerReschedule(req, res) {
+  const booking = await withParties(req)
+  const requestId = Number(req.params.requestId)
+  const action = req.params.action
+  if (action === 'withdraw') await withdrawReschedule({ booking, requestId, byUserId: req.user.id })
+  else if (action === 'accept' || action === 'decline') await respondReschedule({ booking, requestId, byUserId: req.user.id, accept: action === 'accept' })
+  else throw new AppError(404, 'Unknown action')
+  res.json({ booking: await reloadDto(booking.id) })
 }

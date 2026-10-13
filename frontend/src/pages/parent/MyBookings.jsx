@@ -5,6 +5,7 @@ import Avatar from '../../components/ui/Avatar'
 import Icon from '../../components/ui/Icon'
 import { EmptyState, ErrorBox, Modal, PageTitle, Spinner, StatusPill, Stars, VerifiedTick } from '../../components/ui/Common'
 import LessonDetails from '../../components/LessonDetails'
+import RescheduleModal from '../../components/RescheduleModal'
 import { daysUntil, fmtDate, fmtDateLong, fmtTime, fmtTimeRange, money } from '../../lib/format'
 import { gradeLabel } from '../../lib/education'
 
@@ -23,10 +24,21 @@ export default function MyBookings() {
   const [detail, setDetail] = useState(null)
   const [cancelFor, setCancelFor] = useState(null)
   const [reviewFor, setReviewFor] = useState(null)
+  const [rescheduleFor, setRescheduleFor] = useState(null)
   const [notice, setNotice] = useState('')
 
   const load = useCallback(() => api.get('/parent/bookings').then((r) => setBookings(r.data.bookings)), [])
   useEffect(() => { load() }, [load])
+
+  // Opened from a notification (".../bookings?booking=12"): show that booking's details straight away, once
+  const focusId = Number(params.get('booking'))
+  useEffect(() => {
+    if (!focusId || !bookings) return
+    const b = bookings.find((x) => x.id === focusId)
+    if (b) setDetail(b)
+    setParams((p) => { p.delete('booking'); return p }, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusId, bookings])
 
   const counts = useMemo(() => {
     const list = bookings || []
@@ -61,7 +73,7 @@ export default function MyBookings() {
     show('cancelled') && ['Cancelled & Declined', 'These requests did not go ahead.', 'x', 'bg-red-50', 'text-red-500', by('CANCELLED', 'REJECTED', 'DISPUTED'), CancelledRow],
   ].filter(Boolean)
 
-  const handlers = { onDetail: setDetail, onCancel: setCancelFor, onReview: setReviewFor, act }
+  const handlers = { onDetail: setDetail, onCancel: setCancelFor, onReview: setReviewFor, onReschedule: setRescheduleFor, act }
 
   return (
     <div>
@@ -120,6 +132,20 @@ export default function MyBookings() {
       </div>
 
       <LessonDetails booking={detail} onClose={() => setDetail(null)} onChanged={load} />
+      <RescheduleModal
+        booking={rescheduleFor}
+        onClose={() => setRescheduleFor(null)}
+        onSubmit={async (body) => {
+          try {
+            await api.post(`/parent/bookings/${rescheduleFor.id}/reschedule`, body)
+            setRescheduleFor(null)
+            await load()
+            return null
+          } catch (err) {
+            return errorMessage(err) // shown inside the dialog, next to the choice that caused it
+          }
+        }}
+      />
       <CancelModal booking={cancelFor} onClose={() => setCancelFor(null)} onConfirm={async (reason) => { if (await act(`/parent/bookings/${cancelFor.id}/cancel`, { reason })) setCancelFor(null) }} />
       <ReviewModal booking={reviewFor} onClose={() => setReviewFor(null)} onDone={() => { setReviewFor(null); load() }} />
     </div>
@@ -198,7 +224,34 @@ function CounterRow({ b, onDetail, act }) {
   )
 }
 
-function PayRow({ b, onDetail, onCancel }) {
+// Shows where a reschedule stands, with the right buttons for whoever has to act next
+function RescheduleBanner({ b, act }) {
+  const r = b.reschedule
+  if (!r || !['PENDING', 'ESCALATED'].includes(r.status)) return null
+  const newTime = `${fmtDateLong(r.newStartAt)}, ${fmtTimeRange(r.newStartAt, r.newEndAt)}`
+  if (r.status === 'ESCALATED')
+    return <div role="status" className="flex gap-2 rounded-lg bg-accent-50 px-3 py-2 text-xs text-amber-900"><Icon name="info" className="h-4 w-4 shrink-0" /> The new time ({newTime}) was not agreed. Our admin team is reviewing it; the lesson stays at its current time for now.</div>
+  if (r.requestedBy === 'PARENT')
+    return (
+      <div role="status" className="rounded-lg bg-brand-25 px-3 py-2 text-xs text-slate-700">
+        <div className="flex gap-2"><Icon name="clock" className="h-4 w-4 shrink-0 text-brand-500" /> You asked to move this lesson to <b className="text-navy">{newTime}</b>. Waiting for the tutor.</div>
+        <button onClick={() => act(`/parent/bookings/${b.id}/reschedule/${r.id}/withdraw`)} className="mt-1 min-h-9 font-semibold text-brand-600 hover:underline">Withdraw request</button>
+      </div>
+    )
+  return (
+    <div role="status" className="rounded-lg border border-accent/50 bg-accent-50 px-3 py-2 text-xs text-slate-700">
+      <div className="flex gap-2"><Icon name="refresh" className="h-4 w-4 shrink-0 text-accent-600" /> The tutor asks to move this lesson to <b className="text-navy">{newTime}</b>.{r.reason ? ` Reason: ${r.reason}` : ''}</div>
+      <div className="mt-2 flex gap-2">
+        <button onClick={() => act(`/parent/bookings/${b.id}/reschedule/${r.id}/accept`)} className="btn-primary min-h-9 px-3 text-xs">Accept new time</button>
+        <button onClick={() => act(`/parent/bookings/${b.id}/reschedule/${r.id}/decline`)} className="btn-outline min-h-9 px-3 text-xs">Decline</button>
+      </div>
+    </div>
+  )
+}
+
+const canAskReschedule = (b) => !(b.reschedule?.status === 'PENDING')
+
+function PayRow({ b, onDetail, onCancel, onReschedule, act }) {
   return (
     <>
       <div className="space-y-2">
@@ -207,17 +260,19 @@ function PayRow({ b, onDetail, onCancel }) {
           <div className="text-xs text-slate-500">Agreed price</div>
           <div className="text-lg font-extrabold text-navy">RM{b.agreedPrice} / hour <span className="text-sm font-semibold text-slate-500">· total {money(b.totalAmount)}</span></div>
         </div>
+        <RescheduleBanner b={b} act={act} />
       </div>
       <div className="space-y-2">
         <Link to="/parent/payments" className="btn-primary w-full">Pay Now <Icon name="arrow-right" className="h-4 w-4" /></Link>
         <Btn onClick={() => onDetail(b)}>View Details <Icon name="arrow-right" className="h-4 w-4" /></Btn>
+        {canAskReschedule(b) && <Btn onClick={() => onReschedule(b)}><Icon name="calendar" className="h-4 w-4" /> Reschedule</Btn>}
         <Btn kind="danger" onClick={() => onCancel(b)}>Cancel Booking</Btn>
       </div>
     </>
   )
 }
 
-function UpcomingRow({ b, onDetail, onCancel }) {
+function UpcomingRow({ b, onDetail, onCancel, onReschedule, act }) {
   const d = daysUntil(b.startAt)
   return (
     <>
@@ -227,8 +282,13 @@ function UpcomingRow({ b, onDetail, onCancel }) {
           <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-brand-100 text-brand-500"><Icon name="calendar" className="h-5 w-5" /></span>
           <div><div className="font-bold text-navy">{d <= 0 ? 'Lesson today' : d === 1 ? 'Lesson tomorrow' : `Lesson in ${d} days`}</div><div className="text-xs text-slate-500">{fmtDate(b.startAt)}</div></div>
         </div>
+        <RescheduleBanner b={b} act={act} />
       </div>
-      <div className="space-y-2"><Btn kind="primary" onClick={() => onDetail(b)}>View Lesson Details</Btn><Btn kind="danger" onClick={() => onCancel(b)}>Cancel Booking</Btn></div>
+      <div className="space-y-2">
+        <Btn kind="primary" onClick={() => onDetail(b)}>View Lesson Details</Btn>
+        {canAskReschedule(b) && <Btn onClick={() => onReschedule(b)}><Icon name="calendar" className="h-4 w-4" /> Reschedule</Btn>}
+        <Btn kind="danger" onClick={() => onCancel(b)}>Cancel Booking</Btn>
+      </div>
     </>
   )
 }
