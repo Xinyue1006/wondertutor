@@ -214,17 +214,20 @@ export default function Signup() {
             />
           </aside>
 
-          <form onSubmit={next} className="rounded-2xl border border-brand-100 bg-white p-6 shadow-card md:p-8">
+          <form onSubmit={next} noValidate className="rounded-2xl border border-brand-100 bg-white p-6 shadow-card md:p-8">
             <h1 className="font-display text-3xl font-bold text-navy">Create Your {role === 'PARENT' ? 'Parent' : 'Tutor'} Account</h1>
             <p className="mt-1 text-sm text-slate-500">
               {role === 'PARENT' ? "Let's set up your profile to get started." : 'Build your profile and let parents discover your expertise.'}
             </p>
 
             <div className="mt-5 rounded-xl border border-brand-100 bg-brand-25 p-5">
-              <h2 className="mb-4 font-display text-lg font-bold text-navy">{sections.find((s) => s.id === section)?.label}</h2>
-              <ErrorBox className="mb-4">{error}</ErrorBox>
-
-              {section === 'basic' && (
+              {/* Every section is laid out in the same grid cell and the inactive ones are only hidden, so the card is always as tall as the
+                  tallest section and switching sections never moves the footer. (invisible = not focusable and skipped by screen readers) */}
+              <div className="grid">
+                {active.map((sec) => (
+                  <div key={sec.id} className={`col-start-1 row-start-1 ${section === sec.id ? '' : 'invisible'}`} aria-hidden={section !== sec.id}>
+                    <h2 className="mb-4 font-display text-lg font-bold text-navy">{sec.label}</h2>
+              {sec.id === 'basic' && (
                 <div className="grid gap-4 md:grid-cols-2">
                   <Input label="Full Name" required value={form.fullName} onChange={set('fullName')} placeholder="e.g. Tan Xin Yue" />
                   <Input label="Email Address" required type="email" value={form.email} onChange={set('email')} placeholder="you@example.com" />
@@ -248,7 +251,7 @@ export default function Signup() {
                 </div>
               )}
 
-              {section === 'contact' && (
+              {sec.id === 'contact' && (
                 <div className="grid gap-4 md:grid-cols-2">
                   {role === 'PARENT' && (
                     <div className="md:col-span-2">
@@ -273,11 +276,22 @@ export default function Signup() {
                 </div>
               )}
 
-              {section === 'children' && <Kids kids={kids} setKids={setKids} />}
-              {idx === active.length - 1 && <div className="mt-4"><Recaptcha onToken={setCaptcha} /></div>}
+                    {sec.id === 'children' && <Kids kids={kids} setKids={setKids} />}
+                    {sec.id === active[active.length - 1].id && <div className="mt-4"><Recaptcha onToken={setCaptcha} /></div>}
+                  </div>
+                ))}
+              </div>
             </div>
 
-            <button disabled={busy} className="btn-accent mt-5 h-12 w-full text-base">
+            {/* Fixed-height slot for the error: showing or clearing a message never changes the card height */}
+            <div className="mt-3 h-12 overflow-hidden text-sm" aria-live="polite">
+              {error && (
+                <p role="alert" className="flex items-start gap-1.5 font-medium text-red-700">
+                  <Icon name="info" className="mt-0.5 h-4 w-4 shrink-0" /> <span className="line-clamp-2">{error}</span>
+                </p>
+              )}
+            </div>
+            <button disabled={busy} className="btn-accent h-12 w-full text-base">
               {busy ? 'Creating account…' : idx < active.length - 1 ? 'Next' : 'Create Account'}
               {!busy && <Icon name="arrow-right" className="h-4 w-4" />}
             </button>
