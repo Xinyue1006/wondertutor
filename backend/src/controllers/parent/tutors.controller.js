@@ -233,6 +233,16 @@ export async function tutorSlots(req, res) {
 }
 
 // POST /parent/favourites/:tutorId: toggle
+// GET /parent/favourites: the parent's saved tutors (deactivated tutors are left out)
+export async function listFavourites(req, res) {
+  const rows = await prisma.favouriteTutor.findMany({
+    where: { parentId: req.parent.id, tutor: { user: { status: 'ACTIVE' } } },
+    include: { tutor: { include: tutorInclude } },
+  })
+  const tutors = rows.map((r) => ({ ...toTutorCard(r.tutor), isFavourite: true })).sort((a, b) => a.name.localeCompare(b.name))
+  res.json({ total: tutors.length, tutors })
+}
+
 export async function toggleFavourite(req, res) {
   const tutorId = Number(req.params.tutorId)
   const key = { parentId_tutorId: { parentId: req.parent.id, tutorId } }

@@ -123,6 +123,9 @@ function UserMenu() {
               <Link to="/parent/children" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-navy hover:bg-brand-50">
                 <Icon name="user" className="h-4 w-4" /> My Children
               </Link>
+              <Link to="/parent/favourites" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-navy hover:bg-brand-50">
+                <Icon name="heart" className="h-4 w-4" /> Saved Tutors
+              </Link>
             </>
           )}
           {user.role === 'PARENT' && (
@@ -213,7 +216,7 @@ function NotificationBell() {
 // Footer for the signed-in portals. Different from the public footer: it is about using the portal
 // (shortcuts, account, where to get help), not about marketing the platform.
 const ACCOUNT_LINKS = {
-  PARENT: [['/parent/profile', 'My Profile'], ['/parent/children', 'My Children'], ['/parent/complaints', 'My Complaints']],
+  PARENT: [['/parent/profile', 'My Profile'], ['/parent/children', 'My Children'], ['/parent/favourites', 'Saved Tutors'], ['/parent/complaints', 'My Complaints']],
   TUTOR: [],
   ADMIN: [],
 }

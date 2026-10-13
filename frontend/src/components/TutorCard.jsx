@@ -6,7 +6,8 @@ import { ModePills, VerifiedTick } from './ui/Common'
 
 // One tutor card, used by Find a Tutor (browse) and the matching results.
 // With a `match` it also shows the match % badge and the "why we recommend this tutor" reasons.
-export default function TutorCard({ tutor, match, query = '' }) {
+// With `onToggleSave` it also shows a heart button to save / unsave the tutor.
+export default function TutorCard({ tutor, match, query = '', saved = false, onToggleSave }) {
   const [more, setMore] = useState(false)
   const reasons = match?.reasons || []
   const shown = more ? reasons : reasons.slice(0, 3)
@@ -77,7 +78,19 @@ export default function TutorCard({ tutor, match, query = '' }) {
         </div>
       )}
 
-      <div className="mt-auto grid grid-cols-2 gap-3">
+      <div className={`mt-auto grid gap-3 ${onToggleSave ? 'grid-cols-[auto_1fr_1fr]' : 'grid-cols-2'}`}>
+        {onToggleSave && (
+          <button
+            type="button"
+            onClick={() => onToggleSave(tutor)}
+            aria-pressed={saved}
+            aria-label={saved ? `Remove ${tutor.name} from saved tutors` : `Save ${tutor.name}`}
+            title={saved ? 'Saved' : 'Save tutor'}
+            className={`flex h-10 w-11 items-center justify-center rounded-lg border transition ${saved ? 'border-red-200 bg-red-50 text-red-500' : 'border-slate-200 text-slate-500 hover:border-brand-500 hover:text-brand-500'}`}
+          >
+            <Icon name="heart" fill={saved} className="h-5 w-5" />
+          </button>
+        )}
         <Link to={`/parent/tutors/${tutor.id}${query}`} className="btn-outline">View Profile</Link>
         <Link to={`/parent/tutors/${tutor.id}/book${query}`} className="btn-primary">Book a Lesson</Link>
       </div>

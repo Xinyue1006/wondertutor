@@ -91,3 +91,26 @@ describe('pagination', () => {
     expect((await api(token).get(`${search}&page=0`)).status).toBe(400)
   })
 })
+
+describe('saved tutors', () => {
+  test('save, list and unsave; the browse results show which tutors are saved', async () => {
+    const { token } = await makeParent()
+    expect((await api(token).get('/parent/favourites')).total).toBe(0)
+    expect((await api(token).post(`/parent/favourites/${male.tutor.id}`)).isFavourite).toBe(true)
+    const list = await api(token).get('/parent/favourites')
+    expect(list.tutors.map((t) => t.id)).toEqual([male.tutor.id])
+    expect((await api(token).get(search)).tutors.find((t) => t.id === male.tutor.id).isFavourite).toBe(true)
+    expect((await api(token).post(`/parent/favourites/${male.tutor.id}`)).isFavourite).toBe(false)
+    expect((await api(token).get('/parent/favourites')).total).toBe(0)
+  })
+
+  test("one parent's saved list is private, and deactivated tutors drop off it", async () => {
+    const a = await makeParent()
+    const b = await makeParent()
+    await api(a.token).post(`/parent/favourites/${onlineOnly.tutor.id}`)
+    expect((await api(b.token).get('/parent/favourites')).total).toBe(0)
+    await prisma.user.update({ where: { id: onlineOnly.user.id }, data: { status: 'DEACTIVATED' } })
+    expect((await api(a.token).get('/parent/favourites')).total).toBe(0)
+    await prisma.user.update({ where: { id: onlineOnly.user.id }, data: { status: 'ACTIVE' } })
+  })
+})

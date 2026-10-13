@@ -31,6 +31,7 @@ router.get('/tutors', tutors.browseTutors)
 router.get('/tutors/:id', tutors.getTutor)
 router.get('/tutors/:id/reviews', tutors.tutorReviews)
 router.get('/tutors/:id/slots', tutors.tutorSlots)
+router.get('/favourites', tutors.listFavourites)
 router.post('/favourites/:tutorId', tutors.toggleFavourite)
 
 router.post('/matching', matching.createMatching)

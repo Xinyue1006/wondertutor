@@ -21,6 +21,7 @@ import MyChildren from './pages/parent/MyChildren'
 import Payments from './pages/parent/Payments'
 import Complaints from './pages/parent/Complaints'
 import Profile from './pages/parent/Profile'
+import SavedTutors from './pages/parent/SavedTutors'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import AdminUsers from './pages/admin/AdminUsers'
 import AdminComplaints from './pages/admin/AdminComplaints'
@@ -57,6 +58,7 @@ export default function App() {
           <Route path="payments" element={<Payments />} />
           <Route path="complaints" element={<Complaints />} />
           <Route path="profile" element={<Profile />} />
+          <Route path="favourites" element={<SavedTutors />} />
         </Route>
       </Route>
 
