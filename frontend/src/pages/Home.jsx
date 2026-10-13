@@ -29,7 +29,7 @@ const SAFETY = [
   ['user', 'Admin Support', 'Complaints handled by admins'],
 ]
 
-const labelCls = 'block text-xs font-bold text-navy'
+const labelCls = 'block whitespace-nowrap text-xs font-bold text-navy'
 const selectCls = 'mt-0.5 w-full bg-transparent text-sm text-slate-600 outline-none placeholder:text-slate-400'
 
 export default function Home() {
@@ -60,9 +60,8 @@ export default function Home() {
   return (
     <div className="space-y-8 pt-4">
       {/* ── Hero: full width, no card border (breaks out of the page container) ── */}
-      <section className="relative left-1/2 -mt-4 w-screen -translate-x-1/2 overflow-hidden bg-gradient-to-r from-brand-100/80 via-brand-50 to-brand-50">
-        <img src="/img/art/hero-blob.png" alt="" aria-hidden="true" className="pointer-events-none absolute -left-10 top-[14%] hidden h-[72%] w-auto opacity-80 md:block xl:left-0"
-          style={{ maskImage: 'linear-gradient(to right, #000 55%, transparent)', WebkitMaskImage: 'linear-gradient(to right, #000 55%, transparent)' }} />
+      <section className="relative left-1/2 -mt-4 w-screen -translate-x-1/2 overflow-hidden bg-gradient-to-r from-brand-50 via-brand-50 to-brand-25">
+        <img src="/img/art/hero-blob.png" alt="" aria-hidden="true" className="pointer-events-none absolute left-0 top-0 hidden h-full w-auto md:block" />
         <img
           src="/img/art/hero-girl.jpg"
           alt=""
@@ -70,9 +69,9 @@ export default function Home() {
           style={{ maskImage: 'linear-gradient(to right, transparent 0%, #000 32%)', WebkitMaskImage: 'linear-gradient(to right, transparent 0%, #000 32%)' }}
         />
         <div className="relative mx-auto max-w-[1300px] px-4 py-7 md:px-8 md:py-9">
-          <div className="lg:w-[56%] lg:pl-14">
+          <div className="lg:w-[50%] lg:pl-14">
             <div className="text-xs font-bold uppercase tracking-[0.18em] text-navy">Personalised tutor matching</div>
-            <h1 className="mt-2 text-4xl font-extrabold leading-[1.08] tracking-tight text-navy md:text-[2.6rem]">
+            <h1 className="font-display mt-2 text-4xl font-bold leading-[1.12] text-navy md:text-[2.5rem]">
               Find the right tutor for your{' '}
               <span className="relative inline-block">
                 child.
@@ -83,38 +82,38 @@ export default function Home() {
               Trusted tutors. Flexible booking. A safer and more supportive learning journey, all in one place.
             </p>
 
-          <form onSubmit={startSearch} className="mt-4 grid gap-2 rounded-2xl bg-white p-2.5 shadow-card sm:grid-cols-3 2xl:flex 2xl:items-center">
+          <form onSubmit={startSearch} className="relative mt-4 grid gap-2 rounded-2xl bg-white p-2.5 shadow-card sm:grid-cols-3 lg:flex lg:w-[138%] lg:items-center">
             <label className="flex min-w-0 flex-1 items-center gap-2 px-2">
               <Icon name="book" className="h-5 w-5 shrink-0 text-brand-500" />
               <span className="flex-1">
                 <span className={labelCls}>Subject</span>
-                <input className={selectCls} list="home-subjects" placeholder="e.g. Mathematics" value={search.subject} onChange={(e) => setSearch({ ...search, subject: e.target.value })} />
+                <input className={`${selectCls} combo`} list="home-subjects" placeholder="e.g. Mathematics" value={search.subject} onChange={(e) => setSearch({ ...search, subject: e.target.value })} />
               </span>
             </label>
-            <label className="flex min-w-0 flex-1 items-center gap-2 border-slate-100 px-2 sm:border-l 2xl:border-l">
+            <label className="flex min-w-0 flex-1 items-center gap-2 border-slate-100 px-2 sm:border-l">
               <Icon name="cap" className="h-5 w-5 shrink-0 text-brand-500" />
               <span className="flex-1">
                 <span className={labelCls}>Education Level</span>
-                <input className={selectCls} list="home-levels" placeholder="e.g. Primary" value={search.level} onChange={(e) => setSearch({ ...search, level: e.target.value })} />
+                <input className={`${selectCls} combo`} list="home-levels" placeholder="e.g. Primary" value={search.level} onChange={(e) => setSearch({ ...search, level: e.target.value })} />
               </span>
             </label>
-            <label className="flex min-w-0 flex-1 items-center gap-2 border-slate-100 px-2 sm:border-l 2xl:border-l">
+            <label className="flex min-w-0 flex-1 items-center gap-2 border-slate-100 px-2 sm:border-l">
               <Icon name="pin" className="h-5 w-5 shrink-0 text-brand-500" />
               <span className="flex-1">
                 <span className={labelCls}>Location</span>
-                <input className={selectCls} list="home-locations" placeholder="e.g. Kepong, KL" value={search.location} onChange={(e) => setSearch({ ...search, location: e.target.value })} />
+                <input className={`${selectCls} combo`} list="home-locations" placeholder="e.g. Kepong, KL" value={search.location} onChange={(e) => setSearch({ ...search, location: e.target.value })} />
               </span>
             </label>
             {/* Typing is allowed; the datalists suggest matching keywords as the parent types */}
             <datalist id="home-subjects">{home.subjects.map((x) => <option key={x} value={x} />)}</datalist>
             <datalist id="home-levels">{LEVELS.map((x) => <option key={x} value={x} />)}</datalist>
             <datalist id="home-locations">{home.locations.map((x) => <option key={x} value={x} />)}</datalist>
-            <button className="btn-accent h-10 px-5 sm:col-span-3 2xl:col-span-1">Search Tutors <Icon name="arrow-right" className="h-4 w-4" /></button>
+            <button className="btn-accent h-11 shrink-0 px-6 sm:col-span-3 lg:col-span-1">Search Tutors <Icon name="arrow-right" className="h-4 w-4" /></button>
           </form>
 
           <button
             onClick={tryAssistant}
-            className="mt-3 flex w-full max-w-xl items-center gap-3 rounded-2xl bg-white/90 px-4 py-2.5 text-left shadow-card transition hover:shadow-lg"
+            className="mt-3 flex w-full max-w-md items-center gap-3 rounded-2xl bg-white/80 px-4 py-2.5 text-left shadow-card transition hover:shadow-lg"
           >
             <Robot className="h-9 w-9 shrink-0" />
             <span className="flex-1">
@@ -144,7 +143,7 @@ export default function Home() {
       <section id="how-it-works" className="grid scroll-mt-24 gap-5 lg:grid-cols-2">
         <div className="grid gap-6 overflow-hidden rounded-3xl bg-gradient-to-br from-accent-50 via-white to-brand-50 p-7 shadow-card sm:grid-cols-[1fr_13rem]">
           <div>
-            <h2 className="text-2xl font-extrabold text-navy">Meet Your<br />AI Matching Assistant</h2>
+            <h2 className="font-display text-2xl font-bold text-navy">Meet Your<br />AI Matching Assistant</h2>
             <p className="mt-4 max-w-[17rem] text-base text-slate-600">
               Just tell us what your child needs, and we'll recommend suitable tutors with clear reasons.
             </p>
@@ -164,7 +163,7 @@ export default function Home() {
         </div>
 
         <div className="rounded-3xl bg-brand-50/70 p-7 shadow-card">
-          <h2 className="text-2xl font-extrabold text-navy">How It Works</h2>
+          <h2 className="font-display text-2xl font-bold text-navy">How It Works</h2>
           <p className="mt-1 text-sm text-slate-500">Finding a tutor is simple and hassle-free.</p>
           <div className="mt-6 grid gap-6 sm:grid-cols-2">
             {STEPS.map(([icon, title, text]) => (
@@ -185,7 +184,7 @@ export default function Home() {
         <div className="text-xs font-bold uppercase tracking-[0.18em] text-navy">Featured tutors</div>
         <div className="mt-1 flex flex-wrap items-end justify-between gap-2">
           <div>
-            <h2 className="text-3xl font-extrabold text-navy">Learn from Trusted Tutors</h2>
+            <h2 className="font-display text-3xl font-bold text-navy">Learn from Trusted Tutors</h2>
             <p className="mt-1 text-sm text-slate-500">Explore some of our qualified and experienced tutors.</p>
             <p className="mt-1 text-xs font-medium text-brand-600">Sample tutor profiles for demonstration.</p>
           </div>
@@ -222,7 +221,7 @@ export default function Home() {
       {/* ── Safer experience ── */}
       <section id="for-tutors" className="grid scroll-mt-24 items-center gap-5 rounded-3xl bg-brand-50/80 p-7 shadow-card lg:grid-cols-[1fr_1.4fr]">
         <div>
-          <h2 className="text-xl font-extrabold text-navy">A Safer and More Reliable Learning Experience</h2>
+          <h2 className="font-display text-xl font-bold text-navy">A Safer and More Reliable Learning Experience</h2>
           <p className="mt-2 text-sm text-slate-600">We provide the tools and systems to ensure a safe, transparent and trustworthy platform for both parents and tutors.</p>
         </div>
         <div className="grid grid-cols-2 gap-4 rounded-2xl bg-white p-5 shadow-card sm:grid-cols-4">
@@ -239,7 +238,7 @@ export default function Home() {
       {/* ── Call to action ── */}
       <section className="flex flex-wrap items-center justify-between gap-5 rounded-3xl bg-gradient-to-r from-brand-700 via-brand-500 to-brand-600 px-8 py-8 text-white shadow-card">
         <div>
-          <h2 className="text-2xl font-extrabold">Ready to Start Your Child's Learning Journey?</h2>
+          <h2 className="font-display text-2xl font-bold">Ready to Start Your Child's Learning Journey?</h2>
           <p className="mt-1 text-sm text-white/85">Join learners and tutors in building a brighter future together.</p>
         </div>
         <Link to="/signup" className="btn-accent h-12 px-8 text-base">Get Started <Icon name="arrow-right" className="h-4 w-4" /></Link>
