@@ -21,6 +21,11 @@ export const env = {
   },
   googleClientId: process.env.GOOGLE_CLIENT_ID,
   recaptchaSecret: process.env.RECAPTCHA_SECRET,
+  cloudinary: {
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+    apiKey: process.env.CLOUDINARY_API_KEY,
+    apiSecret: process.env.CLOUDINARY_API_SECRET,
+  },
 }
 
 export const isDev = env.nodeEnv !== 'production'
