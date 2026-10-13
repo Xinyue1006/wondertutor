@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import Icon from '../components/ui/Icon'
 import Robot from '../components/ui/Robot'
 import Avatar from '../components/ui/Avatar'
+import ComboField from '../components/ComboField'
 
 const LEVELS = ['Kindergarten', 'Primary', 'Secondary']
 
@@ -29,8 +30,6 @@ const SAFETY = [
   ['user', 'Admin Support', 'Complaints handled by admins'],
 ]
 
-const labelCls = 'block whitespace-nowrap text-xs font-bold text-navy'
-const selectCls = 'mt-0.5 w-full bg-transparent text-sm text-slate-600 outline-none placeholder:text-slate-400'
 
 export default function Home() {
   const { user } = useAuth()
@@ -60,7 +59,7 @@ export default function Home() {
   return (
     <div className="space-y-8 pt-4">
       {/* ── Hero: full width, no card border (breaks out of the page container) ── */}
-      <section className="relative left-1/2 -mt-4 w-screen -translate-x-1/2 overflow-hidden bg-gradient-to-r from-brand-50 via-brand-50 to-brand-25">
+      <section className="relative z-10 left-1/2 -mt-4 w-screen -translate-x-1/2 overflow-x-clip bg-gradient-to-r from-brand-50 via-brand-50 to-brand-25">
         <img src="/img/art/hero-blob.png" alt="" aria-hidden="true" className="pointer-events-none absolute left-0 top-0 hidden h-full w-auto md:block" />
         <img
           src="/img/art/hero-girl.jpg"
@@ -83,31 +82,9 @@ export default function Home() {
             </p>
 
           <form onSubmit={startSearch} className="relative mt-4 grid gap-2 rounded-2xl bg-white p-2.5 shadow-card sm:grid-cols-3 lg:flex lg:w-[138%] lg:items-center">
-            <label className="flex min-w-0 flex-1 items-center gap-2 px-2">
-              <Icon name="book" className="h-5 w-5 shrink-0 text-brand-500" />
-              <span className="flex-1">
-                <span className={labelCls}>Subject</span>
-                <input className={`${selectCls} combo`} list="home-subjects" placeholder="e.g. Mathematics" value={search.subject} onChange={(e) => setSearch({ ...search, subject: e.target.value })} />
-              </span>
-            </label>
-            <label className="flex min-w-0 flex-1 items-center gap-2 border-slate-100 px-2 sm:border-l">
-              <Icon name="cap" className="h-5 w-5 shrink-0 text-brand-500" />
-              <span className="flex-1">
-                <span className={labelCls}>Education Level</span>
-                <input className={`${selectCls} combo`} list="home-levels" placeholder="e.g. Primary" value={search.level} onChange={(e) => setSearch({ ...search, level: e.target.value })} />
-              </span>
-            </label>
-            <label className="flex min-w-0 flex-1 items-center gap-2 border-slate-100 px-2 sm:border-l">
-              <Icon name="pin" className="h-5 w-5 shrink-0 text-brand-500" />
-              <span className="flex-1">
-                <span className={labelCls}>Location</span>
-                <input className={`${selectCls} combo`} list="home-locations" placeholder="e.g. Kepong, KL" value={search.location} onChange={(e) => setSearch({ ...search, location: e.target.value })} />
-              </span>
-            </label>
-            {/* Typing is allowed; the datalists suggest matching keywords as the parent types */}
-            <datalist id="home-subjects">{home.subjects.map((x) => <option key={x} value={x} />)}</datalist>
-            <datalist id="home-levels">{LEVELS.map((x) => <option key={x} value={x} />)}</datalist>
-            <datalist id="home-locations">{home.locations.map((x) => <option key={x} value={x} />)}</datalist>
+            <ComboField icon="book" label="Subject" placeholder="e.g. Mathematics" value={search.subject} options={home.subjects} onChange={(v) => setSearch({ ...search, subject: v })} />
+            <ComboField icon="cap" label="Education Level" placeholder="e.g. Primary" value={search.level} options={LEVELS} onChange={(v) => setSearch({ ...search, level: v })} />
+            <ComboField icon="pin" label="Location" placeholder="e.g. Kepong, KL" value={search.location} options={home.locations} onChange={(v) => setSearch({ ...search, location: v })} />
             <button className="btn-accent h-11 shrink-0 px-6 sm:col-span-3 lg:col-span-1">Search Tutors <Icon name="arrow-right" className="h-4 w-4" /></button>
           </form>
 
@@ -162,7 +139,7 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="rounded-3xl bg-brand-50/70 p-7 shadow-card">
+        <div className="rounded-3xl bg-brand-25 p-7 shadow-card">
           <h2 className="font-display text-2xl font-bold text-navy">How It Works</h2>
           <p className="mt-1 text-sm text-slate-500">Finding a tutor is simple and hassle-free.</p>
           <div className="mt-6 grid gap-6 sm:grid-cols-2">
