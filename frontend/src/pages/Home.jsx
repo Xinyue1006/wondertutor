@@ -118,7 +118,7 @@ export default function Home() {
 
       {/* ── Assistant + How it works ── */}
       <section id="how-it-works" className="grid scroll-mt-24 gap-5 lg:grid-cols-2">
-        <div className="grid gap-6 overflow-hidden rounded-3xl bg-gradient-to-br from-accent-50 via-white to-brand-50 p-7 shadow-card sm:grid-cols-[1fr_13rem]">
+        <div className="grid gap-6 overflow-hidden rounded-3xl border border-brand-100 bg-gradient-to-br from-accent-50 via-white to-brand-50 p-7 shadow-card sm:grid-cols-[1fr_13rem]">
           <div>
             <h2 className="font-display text-2xl font-bold text-navy">Meet Your<br />AI Matching Assistant</h2>
             <p className="mt-4 max-w-[17rem] text-base text-slate-600">
@@ -139,13 +139,16 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="rounded-3xl bg-brand-25 p-7 shadow-card">
+        <div className="rounded-3xl border border-brand-100 bg-white p-7 shadow-card">
           <h2 className="font-display text-2xl font-bold text-navy">How It Works</h2>
           <p className="mt-1 text-sm text-slate-500">Finding a tutor is simple and hassle-free.</p>
           <div className="mt-6 grid gap-6 sm:grid-cols-2">
-            {STEPS.map(([icon, title, text]) => (
-              <div key={title} className="flex items-start gap-3">
-                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-100 text-brand-500"><Icon name={icon} className="h-6 w-6" /></span>
+            {STEPS.map(([icon, title, text], i) => (
+              <div key={title} className="flex items-start gap-3 rounded-2xl bg-brand-50 p-3">
+                <span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-brand-500 shadow-sm">
+                  <Icon name={icon} className="h-6 w-6" />
+                  <span className="absolute -left-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[11px] font-bold text-navy">{i + 1}</span>
+                </span>
                 <div>
                   <div className="text-sm font-bold text-navy">{title}</div>
                   <p className="mt-0.5 text-sm text-slate-600">{text}</p>
