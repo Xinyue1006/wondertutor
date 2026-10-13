@@ -123,6 +123,16 @@ frontend/src/
 - **Schema changes:** edit `schema.prisma`, run `npm run db:migrate`, and commit the generated `prisma/migrations/` folder. Tell your teammate to pull and run `npm run db:migrate`.
 - Never commit `.env`.
 
+## Testing
+
+| What | Command | Notes |
+|---|---|---|
+| Backend (Jest): matching scoring, booking rules, payments + commission snapshot, refunds, reviews, admin, complaints, security | `cd backend && npm test` | Uses a **separate** database `wondertutor_test`, created and migrated automatically (`pretest`). Your dev data is never touched. MySQL must be running. |
+| Frontend (Vitest + React Testing Library): login, route protection, matching wizard, tutor card, chatbot text reader, date helpers | `cd frontend && npm test` | Runs in a simulated browser, no servers needed. |
+| API demo (Postman) | Import `docs/WonderTutor.postman_collection.json` | Run *Login (parent)* and *Login (admin)* first; they store the tokens. |
+
+Vitest is used instead of Jest on the frontend because it reads the Vite config directly (Jest needs extra setup for `import.meta.env`). The test syntax is the same.
+
 ## Optional integrations (leave empty in development)
 
 Each one switches on only when its keys are filled in. Without keys the app still works.

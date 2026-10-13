@@ -54,7 +54,7 @@ export function parseText(text, catalog) {
 
   // Budget: "rm60", "under rm70", "rm40-80", "40 to 80"
   const range = t.match(/rm\s*(\d+)\s*(?:-|to|–)\s*(?:rm\s*)?(\d+)/) || t.match(/(\d+)\s*(?:-|to|–)\s*(\d+)\s*(?:rm|ringgit|\/\s*h)/)
-  const single = t.match(/(?:under|below|max|within|up to|budget(?: of)?)\s*rm?\s*(\d+)/) || t.match(/rm\s*(\d+)/)
+  const single = t.match(/(?:under|below|max|within|up to|budget(?: of)?)\s*(?:rm)?\s*(\d+)/) || t.match(/rm\s*(\d+)/)
   if (range) { found.budgetMin = Number(range[1]); found.budgetMax = Number(range[2]); notes.push(`RM${range[1]}–RM${range[2]}/hour`) }
   else if (single) { found.budgetMin = 20; found.budgetMax = Number(single[1]); notes.push(`up to RM${single[1]}/hour`) }
 

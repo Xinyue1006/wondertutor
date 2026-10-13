@@ -11,7 +11,7 @@ const app = express()
 app.use(helmet())
 app.use(cors({ origin: env.clientUrl, credentials: true }))
 app.use(express.json({ limit: '1mb' }))
-app.use(morgan('dev'))
+if (env.nodeEnv !== 'test') app.use(morgan('dev')) // keep test output readable
 
 app.use('/api', routes)
 
