@@ -75,11 +75,11 @@ export function PageTitle({ title, subtitle, icon, right, sparkle = true }) {
       <div className="flex items-start gap-3">
         {icon && <Icon name={icon} className="mt-1 h-9 w-9 text-navy" strokeWidth={1.75} />}
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-navy md:text-[2rem]">
+          <h1 className="text-3xl font-bold text-navy md:text-[2rem]">
             {title}
             {sparkle && <Icon name="sparkle" fill className="mb-3 ml-1.5 inline h-5 w-5 text-accent" />}
           </h1>
-          {subtitle && <p className="mt-1 text-slate-500">{subtitle}</p>}
+          {subtitle && <p className="mt-1 text-slate-600">{subtitle}</p>}
         </div>
       </div>
       {right}

@@ -30,9 +30,8 @@ export default function PublicLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
   // Only the in-page sections can be "current"; "Find a Tutor" just leads to Log In and must not light up on that page
   const isActive = (to) => to.startsWith('/#') && pathname === '/' && hash === to.slice(1)
-  // The landing page body is a whiter blue than the app pages (the hero keeps the stronger blue)
   return (
-    <div className={`flex min-h-screen flex-col overflow-x-clip ${isHome || pathname === '/signup' ? 'bg-gradient-to-b from-[#f9fbff] to-white' : ''}`}>
+    <div className={"flex min-h-screen flex-col overflow-x-clip"}>
       {/* Plain full-width bar (no box or border), like the landing mockup */}
       <header className="sticky top-0 z-30 w-full bg-white">
         <div className="mx-auto flex max-w-[81.25rem] items-center justify-between gap-3 px-4 py-2 md:px-8">

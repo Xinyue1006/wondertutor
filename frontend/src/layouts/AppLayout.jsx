@@ -42,7 +42,7 @@ export default function AppLayout() {
   const isParent = user.role === 'PARENT'
 
   const shell = (
-    <div className="min-h-screen pb-24">
+    <div className="flex min-h-screen flex-col">
       {/* Same bar as the public pages (landing, login, signup): flat, full width, white, yellow underline on the current page */}
       <header className="sticky top-0 z-30 w-full bg-white">
         <div className="mx-auto flex max-w-[81.25rem] items-center justify-between gap-3 px-4 py-2 md:px-8">
@@ -84,9 +84,10 @@ export default function AppLayout() {
           ))}
         </nav>
       </header>
-      <main className="mx-auto max-w-[81.25rem] px-3 py-6 md:px-6">
+      <main className="mx-auto w-full max-w-[81.25rem] flex-1 px-3 pb-16 pt-6 md:px-6">
         <Outlet />
       </main>
+      <AppFooter items={items} />
       {isParent && <AssistantWidget />}
     </div>
   )
@@ -206,5 +207,65 @@ function NotificationBell() {
         </div>
       )}
     </div>
+  )
+}
+
+// Footer for the signed-in portals. Different from the public footer: it is about using the portal
+// (shortcuts, account, where to get help), not about marketing the platform.
+const ACCOUNT_LINKS = {
+  PARENT: [['/parent/profile', 'My Profile'], ['/parent/children', 'My Children'], ['/parent/complaints', 'My Complaints']],
+  TUTOR: [],
+  ADMIN: [],
+}
+const HELP = {
+  PARENT: { text: 'A problem with a booking, payment or tutor? Tell our admin team and track the reply.', to: '/parent/complaints', cta: 'Report an issue' },
+  TUTOR: { text: 'Questions about bookings or payouts? The WonderTutor admin team can help.', to: null },
+  ADMIN: { text: 'You are signed in as an administrator. Actions here affect parents and tutors.', to: null },
+}
+
+function AppFooter({ items }) {
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+  const account = ACCOUNT_LINKS[user.role] || []
+  const help = HELP[user.role]
+  const link = 'inline-flex min-h-9 items-center text-slate-700 hover:text-brand-600 hover:underline'
+
+  return (
+    <footer className="mt-auto border-t border-brand-100 bg-brand-50 text-sm text-slate-700">
+      <div className="mx-auto grid max-w-[81.25rem] gap-8 px-4 py-8 md:grid-cols-[1.3fr_1fr_1fr_1.4fr] md:px-8">
+        <div>
+          <Logo className="h-8" />
+          <p className="mt-2 max-w-xs text-slate-600">Learn Today, Brighter Tomorrow.</p>
+        </div>
+        <nav aria-label="Portal shortcuts">
+          <h2 className="mb-2 text-base font-bold text-navy">Quick Links</h2>
+          <ul className="space-y-0.5">
+            {items.map(([to, label]) => <li key={to}><Link to={to} className={link}>{label}</Link></li>)}
+          </ul>
+        </nav>
+        <nav aria-label="Account">
+          <h2 className="mb-2 text-base font-bold text-navy">Account</h2>
+          <ul className="space-y-0.5">
+            {account.map(([to, label]) => <li key={to}><Link to={to} className={link}>{label}</Link></li>)}
+            <li>
+              <button type="button" onClick={() => { logout(); navigate('/login') }} className={`${link} text-red-700 hover:text-red-800`}>Log out</button>
+            </li>
+          </ul>
+        </nav>
+        {help && (
+          <div>
+            <h2 className="mb-2 text-base font-bold text-navy">Need Help?</h2>
+            <p className="text-slate-600">{help.text}</p>
+            {help.to && <Link to={help.to} className="btn-outline mt-3 min-h-11">{help.cta}</Link>}
+          </div>
+        )}
+      </div>
+      <div className="mx-auto max-w-[81.25rem] px-4 md:px-8">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-brand-200/70 py-4 text-xs text-slate-600">
+          <span>&copy; {new Date().getFullYear()} WonderTutor. All rights reserved.</span>
+          <span>Signed in as {user.fullName} ({user.role.charAt(0) + user.role.slice(1).toLowerCase()})</span>
+        </div>
+      </div>
+    </footer>
   )
 }

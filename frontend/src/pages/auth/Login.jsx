@@ -152,7 +152,7 @@ export default function Login() {
 
           {/* Server answers (wrong password, deactivated account...) sit right above the button that caused them */}
           <ErrorBox>{error}</ErrorBox>
-          <button disabled={busy} className="btn-accent h-11 w-full text-base">{busy ? 'Logging in…' : 'Log In'}</button>
+          <button disabled={busy} className="btn-primary h-11 w-full text-base">{busy ? 'Logging in…' : 'Log In'}</button>
 
           <div className="flex items-center gap-3 text-sm text-slate-500">
             <span className="h-px flex-1 bg-slate-200" /> or <span className="h-px flex-1 bg-slate-200" />

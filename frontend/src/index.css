@@ -22,20 +22,17 @@
   --shadow-card: 0 6px 28px rgba(26, 109, 255, 0.08);
 }
 
-/* Light-blue page background with soft decorative blobs (the browse page is intentionally lighter than the mockup) */
+/* One page background for the whole site (landing, auth and every portal page): nearly white with a hint of blue */
 body {
   @apply text-slate-700 antialiased;
-  background-color: #f1f7ff;
-  background-image:
-    radial-gradient(60rem 30rem at 85% -10%, rgba(120, 170, 255, 0.28), transparent 60%),
-    radial-gradient(45rem 26rem at -5% 40%, rgba(150, 195, 255, 0.22), transparent 60%),
-    linear-gradient(180deg, #eaf3ff 0%, #f4f9ff 45%, #f8fbff 100%);
+  background-color: #ffffff;
+  background-image: linear-gradient(180deg, #f6faff 0%, #fbfdff 40%, #ffffff 100%);
   background-attachment: fixed;
 }
 
 /* Reusable component classes. Declared with @utility so they work with @apply and with variants (hover:, md:) in Tailwind v4 */
 @utility card {
-  @apply rounded-2xl border border-white bg-white shadow-card;
+  @apply rounded-2xl border border-brand-100 bg-white shadow-card;
 }
 @utility btn {
   @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60;
@@ -160,3 +157,9 @@ html { font-size: clamp(16px, 0.833vw + 4px, 22px); }
 /* Always reserve the scrollbar's space. Without this, a page that fits the window (login) is about 15px wider than a
    page that scrolls (landing), so the centred nav bar jumps sideways when you switch between them. */
 html { scrollbar-gutter: stable; }
+
+/* Consistent headings everywhere: page titles (h1) and section / card titles (h2) use the display serif.
+   Base layer, so a page can still opt out with a font utility class. */
+@layer base {
+  h1, h2 { font-family: var(--font-display); }
+}
