@@ -25,12 +25,14 @@ function NavLink({ label, to, active }) {
 export default function PublicLayout() {
   const { pathname, hash } = useLocation()
   const isHome = pathname === '/'
+  // The login page is a single screen: no footer, and the page fills the window height so nothing needs scrolling
+  const isLogin = pathname === '/login'
   const [menuOpen, setMenuOpen] = useState(false)
   // Only the in-page sections can be "current"; "Find a Tutor" just leads to Log In and must not light up on that page
   const isActive = (to) => to.startsWith('/#') && pathname === '/' && hash === to.slice(1)
   // The landing page body is a whiter blue than the app pages (the hero keeps the stronger blue)
   return (
-    <div className={`min-h-screen overflow-x-clip ${isHome ? 'bg-gradient-to-b from-[#f9fbff] to-white' : ''}`}>
+    <div className={`flex min-h-screen flex-col overflow-x-clip ${isHome ? 'bg-gradient-to-b from-[#f9fbff] to-white' : ''}`}>
       {/* Plain full-width bar (no box or border), like the landing mockup */}
       <header className="relative z-20 w-full bg-white">
         <div className="mx-auto flex max-w-[81.25rem] items-center justify-between gap-3 px-4 py-2 md:px-8">
@@ -71,10 +73,10 @@ export default function PublicLayout() {
           </nav>
         )}
       </header>
-      <main className={`mx-auto max-w-[81.25rem] px-3 md:px-6 ${isHome ? '' : 'pb-10'}`}>
+      <main className={`${isLogin ? 'flex w-full flex-1 flex-col' : 'mx-auto w-full max-w-[81.25rem] px-3 md:px-6'} ${isHome || isLogin ? '' : 'pb-10'}`}>
         <Outlet />
       </main>
-      {/* Footer: light-blue band in the same container width as the sections. On the landing page it touches the CTA banner directly. */}
+      {!isLogin && (
       <footer id="about" className={`scroll-mt-24 bg-brand-50 text-sm text-slate-700 ${isHome ? '' : 'mt-2'}`}>
         <div className="mx-auto grid max-w-[81.25rem] gap-8 px-4 py-8 md:px-8 lg:grid-cols-[26rem_1fr] lg:gap-16">
           <div>
@@ -114,6 +116,7 @@ export default function PublicLayout() {
           </div>
         </div>
       </footer>
+      )}
     </div>
   )
 }
