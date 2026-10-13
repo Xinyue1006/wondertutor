@@ -217,7 +217,7 @@ export default function Signup() {
               points={['Set your availability', 'Manage your bookings', 'Track your earnings', 'Build your teaching profile']}
             />
           </div>
-          <button onClick={() => { setSection('basic'); setStep(1) }} className="btn-accent mx-auto mt-5 h-12 w-full max-w-[560px] text-base">
+          <button onClick={() => { setSection('basic'); setStep(1) }} className="btn-primary mx-auto mt-5 h-12 w-full max-w-[560px] text-base">
             Next <Icon name="arrow-right" className="h-4 w-4" />
           </button>
           <div className="mx-auto mt-4 max-w-[560px]">
@@ -349,7 +349,7 @@ export default function Signup() {
                 </p>
               )}
             </div>
-            <button disabled={busy} className="btn-accent h-12 w-full text-base">
+            <button disabled={busy} className="btn-primary h-12 w-full text-base">
               {busy ? 'Creating account…' : idx < active.length - 1 ? 'Next' : 'Create Account'}
               {!busy && <Icon name="arrow-right" className="h-4 w-4" />}
             </button>
@@ -370,7 +370,7 @@ export default function Signup() {
           <ErrorBox className="text-left">{error}</ErrorBox>
           <input required maxLength={6} inputMode="numeric" autoFocus className="input h-14 text-center text-2xl tracking-[0.6em]"
             value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))} />
-          <button disabled={busy || otp.length < 6} className="btn-accent h-12 w-full text-base">{busy ? 'Verifying…' : 'Verify & Continue'}</button>
+          <button disabled={busy || otp.length < 6} className="btn-primary h-12 w-full text-base">{busy ? 'Verifying…' : 'Verify & Continue'}</button>
           <button type="button" onClick={resendOtp} className="text-sm font-semibold text-brand-500 hover:underline">Resend code</button>
         </form>
       )}
