@@ -128,6 +128,9 @@ model ParentProfile {
   address   String?
   latitude  Float?
   longitude Float?
+  // Signup "Preferences" step: teaching mode, tutor gender, style, days, time of day, budget. All optional;
+  // they pre-fill the matching wizard (see src/utils/preferences.js for the shape).
+  preferences Json?
 
   children         Child[]
   bookings         Booking[]

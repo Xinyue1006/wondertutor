@@ -127,7 +127,7 @@ frontend/src/
 
 | What | Command | Notes |
 |---|---|---|
-| Backend (Jest): matching scoring, booking rules, payments + commission snapshot, refunds, reviews, admin, complaints, security | `cd backend && npm test` | Uses a **separate** database `wondertutor_test`, created and migrated automatically (`pretest`). Your dev data is never touched. MySQL must be running. |
+| Backend (Jest): matching scoring, booking rules, payments + commission snapshot, refunds, reviews, admin, complaints, security, parent signup and saved preferences | `cd backend && npm test` | Uses a **separate** database `wondertutor_test`, created and migrated automatically (`pretest`). Your dev data is never touched. MySQL must be running. |
 | Frontend (Vitest + React Testing Library): login, route protection, matching wizard, tutor card, chatbot text reader, date helpers | `cd frontend && npm test` | Runs in a simulated browser, no servers needed. |
 | API demo (Postman) | Import `docs/WonderTutor.postman_collection.json` | Run *Login (parent)* and *Login (admin)* first; they store the tokens. |
 

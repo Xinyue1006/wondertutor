@@ -259,7 +259,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"role\": \"PARENT\",\n  \"fullName\": \"Postman Parent\",\n  \"email\": \"postman@example.com\",\n  \"phone\": \"+60123456789\",\n  \"password\": \"Parent1234\",\n  \"address\": \"Kepong, Kuala Lumpur\"\n}"
+              "raw": "{\n  \"role\": \"PARENT\",\n  \"fullName\": \"Miki Lim\",\n  \"email\": \"postman@example.com\",\n  \"phone\": \"+60123456789\",\n  \"password\": \"Parent1234\",\n  \"address\": \"Kepong, Kuala Lumpur\",\n  \"children\": [\n    {\n      \"name\": \"Sarah\",\n      \"educationLevel\": \"PRIMARY\",\n      \"grade\": 5,\n      \"subject\": \"Mathematics\",\n      \"notes\": \"Wants to be faster at word problems\"\n    }\n  ],\n  \"preferences\": {\n    \"mode\": \"PHYSICAL\",\n    \"gender\": \"ANY\",\n    \"characteristics\": [\n      \"Structured\"\n    ],\n    \"days\": [\n      1,\n      6\n    ],\n    \"timePreset\": \"EVENING\",\n    \"budgetMax\": 60\n  }\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/auth/register",
@@ -628,7 +628,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"fullName\": \"Tan Xin Yue\",\n  \"phone\": \"+60123456780\",\n  \"address\": \"Kepong, Kuala Lumpur\"\n}"
+              "raw": "{\n  \"fullName\": \"Miki Lim\",\n  \"phone\": \"+60123456780\",\n  \"address\": \"Kepong, Kuala Lumpur\",\n  \"preferences\": {\n    \"mode\": \"PHYSICAL\",\n    \"gender\": \"ANY\",\n    \"characteristics\": [\n      \"Structured\"\n    ],\n    \"days\": [\n      1,\n      6\n    ],\n    \"timePreset\": \"EVENING\",\n    \"budgetMax\": 60\n  }\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/parent/profile",

@@ -7,6 +7,8 @@ import { AppError } from '../utils/AppError.js'
 import { signToken } from '../services/token.service.js'
 import { issueOtp, checkOtp } from '../services/otp.service.js'
 import { verifyRecaptcha } from '../services/recaptcha.service.js'
+import { cleanPreferences, preferencesSchema } from '../utils/preferences.js'
+import { findLocation } from '../data/catalog.js'
 
 // Never send passwordHash etc. to the client
 export function toUserDto(u) {
@@ -42,10 +44,13 @@ const registerSchema = z
           name: z.string().trim().min(1),
           educationLevel: z.enum(['KINDERGARTEN', 'PRIMARY', 'SECONDARY']),
           grade: z.coerce.number().int().min(1).max(6),
+          subject: z.string().trim().min(1).max(60).optional(), // the subject the child needs tuition in
+          notes: z.string().trim().max(500).optional(), // learning needs or goals
         }),
       )
       .max(5)
       .optional(),
+    preferences: preferencesSchema.optional(),
     // Tutor-only
     gender: z.enum(['MALE', 'FEMALE', 'UNSPECIFIED']).optional(),
     emergencyContactName: z.string().trim().optional(),
@@ -64,6 +69,7 @@ export async function register(req, res) {
   if (existing?.isEmailVerified) throw new AppError(409, 'An account with this email already exists')
 
   const passwordHash = await bcrypt.hash(data.password, 12)
+  const location = data.address ? findLocation(data.address) : null
 
   await prisma.$transaction(async (tx) => {
     // Allow retrying signup with an unverified email (e.g. typo in details)
@@ -77,7 +83,16 @@ export async function register(req, res) {
         fullName: data.fullName,
         phone: data.phone,
         ...(data.role === 'PARENT' && {
-          parent: { create: { address: data.address || null, children: { create: data.children ?? [] } } },
+          parent: {
+            create: {
+              address: data.address || null,
+              // Known areas also store coordinates: the matching distance score needs them from the very first search
+              latitude: location?.lat ?? null,
+              longitude: location?.lng ?? null,
+              preferences: cleanPreferences(data.preferences) ?? undefined,
+              children: { create: (data.children ?? []).map((c) => ({ ...c, notes: c.notes || null })) },
+            },
+          },
         }),
         ...(data.role === 'TUTOR' && {
           tutor: {
