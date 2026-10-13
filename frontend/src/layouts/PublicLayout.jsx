@@ -25,7 +25,7 @@ function NavLink({ label, to, active }) {
 export default function PublicLayout() {
   const { pathname, hash } = useLocation()
   const isHome = pathname === '/'
-  // The login area fills exactly one screen (see Login.jsx); the footer sits below it and is reached by scrolling
+  // The login page is a single screen: no footer, and the page fills the window height so nothing needs scrolling
   const isLogin = pathname === '/login'
   const [menuOpen, setMenuOpen] = useState(false)
   // Only the in-page sections can be "current"; "Find a Tutor" just leads to Log In and must not light up on that page
@@ -73,10 +73,11 @@ export default function PublicLayout() {
           </nav>
         )}
       </header>
-      <main className={`${isLogin ? 'w-full' : 'mx-auto w-full max-w-[81.25rem] px-3 md:px-6'} ${isHome || isLogin ? '' : 'pb-10'}`}>
+      <main className={`${isLogin ? 'flex w-full flex-1 flex-col' : 'mx-auto w-full max-w-[81.25rem] px-3 md:px-6'} ${isHome || isLogin ? '' : 'pb-10'}`}>
         <Outlet />
       </main>
-      <footer id="about" className={`scroll-mt-24 bg-brand-50 text-sm text-slate-700 ${isHome || isLogin ? '' : 'mt-2'}`}>
+      {!isLogin && (
+      <footer id="about" className={`scroll-mt-24 bg-brand-50 text-sm text-slate-700 ${isHome ? '' : 'mt-2'}`}>
         <div className="mx-auto grid max-w-[81.25rem] gap-8 px-4 py-8 md:px-8 lg:grid-cols-[26rem_1fr] lg:gap-16">
           <div>
             <Logo className="h-9" />
@@ -115,6 +116,7 @@ export default function PublicLayout() {
           </div>
         </div>
       </footer>
+      )}
     </div>
   )
 }

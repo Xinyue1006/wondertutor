@@ -32,7 +32,7 @@ export default function Login() {
   return (
     // Same pattern as the landing hero: a light-blue band with the photo anchored on one side and fading into it,
     // so the photo is never stretched or cropped hard on wide screens. The blank wall in the photo holds the headline.
-    <section className="relative left-1/2 flex min-h-[calc(100dvh-3.75rem)] w-screen -translate-x-1/2 items-center overflow-x-clip bg-gradient-to-r from-brand-50 via-brand-50 to-brand-25">
+    <section className="relative left-1/2 -mt-4 flex w-screen flex-1 -translate-x-1/2 items-center overflow-x-clip bg-gradient-to-r from-brand-50 via-brand-50 to-brand-25">
       <img
         src="/img/art/login-bg.jpg"
         alt=""
