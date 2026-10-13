@@ -317,13 +317,22 @@ export default function Home() {
         </ul>
       </section>
 
-      {/* ── Final call to action: one dominant button ── */}
-      <section aria-labelledby="cta-title" className="flex flex-wrap items-center justify-between gap-5 rounded-3xl bg-gradient-to-r from-brand-700 via-brand-600 to-brand-700 px-8 py-8 text-white shadow-card">
-        <div>
-          <h2 id="cta-title" className="font-display text-2xl font-bold">Ready to Start Your Child's Learning Journey?</h2>
-          <p className="mt-1 text-base text-white/90">Join learners and tutors in building a brighter future together.</p>
+      {/* ── Final call to action: full width like the hero, one dominant button ── */}
+      <section aria-labelledby="cta-title" className="relative left-1/2 w-screen -translate-x-1/2 overflow-hidden bg-gradient-to-r from-brand-700 via-brand-600 to-brand-700 text-white">
+        {/* decoration: soft circles on the left, handwritten note on the right (hidden on small screens) */}
+        <span className="pointer-events-none absolute -left-10 -top-12 h-40 w-40 rounded-full bg-brand-500/60" aria-hidden="true" />
+        <span className="pointer-events-none absolute -bottom-14 -left-6 h-36 w-36 rounded-full bg-accent" aria-hidden="true" />
+        <span className="pointer-events-none absolute bottom-6 left-24 hidden h-3 w-3 rounded-full bg-accent md:block" aria-hidden="true" />
+        <p className="pointer-events-none absolute right-[8%] top-1/2 hidden -translate-y-1/2 -rotate-6 text-center font-hand text-2xl leading-6 text-white/90 lg:block" aria-hidden="true">
+          Learn<br />Grow<br />Belong<br /><span className="text-accent">♡</span>
+        </p>
+        <div className="relative mx-auto flex max-w-[1300px] flex-wrap items-center justify-between gap-5 px-4 py-9 md:px-8 lg:pl-28 lg:pr-48">
+          <div>
+            <h2 id="cta-title" className="font-display text-2xl font-bold md:text-3xl">Ready to Start Your Child's Learning Journey?</h2>
+            <p className="mt-1 text-base text-white/90">Join learners and tutors in building a brighter future together.</p>
+          </div>
+          <Link to="/signup" className="btn-accent h-12 px-8 text-base max-sm:w-full">Get Started <Icon name="arrow-right" className="h-4 w-4" /></Link>
         </div>
-        <Link to="/signup" className="btn-accent h-12 px-8 text-base max-sm:w-full">Get Started <Icon name="arrow-right" className="h-4 w-4" /></Link>
       </section>
     </div>
   )
