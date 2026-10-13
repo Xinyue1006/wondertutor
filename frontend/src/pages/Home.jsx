@@ -54,22 +54,14 @@ function SideDecor() {
   const dotted = 'fill-none stroke-current'
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-1/2 -z-10 hidden w-screen -translate-x-1/2 overflow-hidden xl:block">
-      {/* left edge */}
-      <span className="absolute -left-16 top-[33%] h-52 w-52 rounded-full bg-brand-100/50" />
-      <span className="absolute -left-10 top-[62%] h-36 w-36 rounded-full bg-accent-100/60" />
-      <span className="absolute left-5 top-[52%] h-4 w-4 rounded-full bg-accent/70" />
-      <Icon name="cap" className="absolute left-6 top-[40%] h-9 w-9 -rotate-12 text-brand-200" strokeWidth={1.5} />
-      <Sparkle className="absolute left-12 top-[47%] h-4 w-4 opacity-70" />
-      <svg viewBox="0 0 80 160" className="absolute left-3 top-[56%] h-32 w-16 text-brand-200" strokeWidth="2" strokeDasharray="3 6" strokeLinecap="round"><path className={dotted} d="M10 4C70 40 0 90 60 156" /></svg>
-      <span className="absolute -left-8 top-[84%] h-28 w-28 rounded-full border-[6px] border-brand-100/70" />
+      {/* left edge: three quiet shapes */}
+      <span className="absolute -left-16 top-[34%] h-52 w-52 rounded-full bg-brand-100/50" />
+      <Icon name="cap" className="absolute left-8 top-[44%] h-9 w-9 -rotate-12 text-brand-200" strokeWidth={1.5} />
+      <span className="absolute -left-8 top-[78%] h-28 w-28 rounded-full border-[6px] border-brand-100/70" />
       {/* right edge */}
-      <span className="absolute -right-14 top-[27%] h-48 w-48 rounded-full bg-accent-100/60" />
-      <span className="absolute -right-12 top-[55%] h-44 w-44 rounded-full bg-brand-100/50" />
-      <Icon name="book" className="absolute right-7 top-[38%] h-9 w-9 rotate-12 text-brand-200" strokeWidth={1.5} />
-      <Sparkle className="absolute right-12 top-[45%] h-4 w-4 opacity-70" />
-      <span className="absolute right-6 top-[63%] h-4 w-4 rounded-full bg-brand-200" />
-      <svg viewBox="0 0 80 160" className="absolute right-3 top-[68%] h-32 w-16 text-accent" strokeWidth="2" strokeDasharray="3 6" strokeLinecap="round"><path className={dotted} d="M70 4C10 40 80 90 20 156" /></svg>
-      <span className="absolute -right-6 top-[86%] h-24 w-24 rounded-full border-[6px] border-accent-100" />
+      <span className="absolute -right-14 top-[28%] h-48 w-48 rounded-full bg-accent-100/60" />
+      <Icon name="book" className="absolute right-8 top-[46%] h-9 w-9 rotate-12 text-brand-200" strokeWidth={1.5} />
+      <svg viewBox="0 0 80 160" className="absolute right-3 top-[66%] h-32 w-16 text-accent" strokeWidth="2" strokeDasharray="3 6" strokeLinecap="round"><path className={dotted} d="M70 4C10 40 80 90 20 156" /></svg>
     </div>
   )
 }
