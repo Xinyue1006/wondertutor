@@ -60,6 +60,14 @@ export default function Signup() {
   const [photo, setPhoto] = useState(null)
   const [captcha, setCaptcha] = useState('')
   const [otp, setOtp] = useState('')
+  // Seconds until another code can be requested (the server allows one every 60 s)
+  const [cooldown, setCooldown] = useState(0)
+  const [resent, setResent] = useState(false)
+  useEffect(() => {
+    if (!cooldown) return
+    const t = setTimeout(() => setCooldown((s) => s - 1), 1000)
+    return () => clearTimeout(t)
+  }, [cooldown])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -157,6 +165,7 @@ export default function Signup() {
         }),
       })
       setStep(2)
+      setCooldown(60) // a code was just sent
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -181,8 +190,16 @@ export default function Signup() {
   }
 
   async function resendOtp() {
+    if (cooldown) return
     setError('')
-    try { await api.post('/auth/resend-otp', { email: form.email }) } catch (err) { setError(errorMessage(err)) }
+    setResent(false)
+    try {
+      await api.post('/auth/resend-otp', { email: form.email })
+      setResent(true)
+      setCooldown(60)
+    } catch (err) {
+      setError(errorMessage(err))
+    }
   }
 
   return (
@@ -377,10 +394,13 @@ export default function Signup() {
           <h1 className="font-display text-2xl font-bold text-navy">Verify your email</h1>
           <p className="text-sm text-slate-500">We sent a 6-digit code to <b className="text-navy">{form.email}</b>.</p>
           <ErrorBox className="text-left">{error}</ErrorBox>
-          <input required maxLength={6} inputMode="numeric" autoFocus className="input h-14 text-center text-2xl tracking-[0.6em]"
+          {resent && <p role="status" className="rounded-lg bg-brand-50 px-3 py-2 text-sm text-slate-700">A new code has been sent. Check your spam folder too.</p>}
+          <input required maxLength={6} inputMode="numeric" autoComplete="one-time-code" aria-label="6-digit verification code" autoFocus className="input h-14 text-center text-2xl tracking-[0.6em]"
             value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))} />
           <button disabled={busy || otp.length < 6} className="btn-primary h-12 w-full text-base">{busy ? 'Verifying…' : 'Verify & Continue'}</button>
-          <button type="button" onClick={resendOtp} className="text-sm font-semibold text-brand-500 hover:underline">Resend code</button>
+          <button type="button" onClick={resendOtp} disabled={cooldown > 0} className="min-h-11 text-sm font-semibold text-brand-600 hover:underline disabled:text-slate-500 disabled:no-underline">
+            {cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend code'}
+          </button>
         </form>
       )}
     </div>
