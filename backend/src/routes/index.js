@@ -3,6 +3,7 @@ import authRoutes from './auth.routes.js'
 import parentRoutes from './parent.routes.js'
 import adminRoutes from './admin.routes.js'
 import { uploadSignature } from '../controllers/uploads.controller.js'
+import { homeData } from '../controllers/public.controller.js'
 import { requireAuth } from '../middleware/auth.js'
 import * as notifications from '../controllers/notifications.controller.js'
 
@@ -10,6 +11,9 @@ const router = Router()
 
 router.get('/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }))
 router.use('/auth', authRoutes)
+
+// [XY] Public landing page data (top tutors + filter lists), no login needed
+router.get('/public/home', homeData)
 
 // [XY] Parent Portal: children, matching, bookings, payments, reviews
 router.use('/parent', parentRoutes)
