@@ -4,7 +4,7 @@ import Avatar from './ui/Avatar'
 import Icon from './ui/Icon'
 
 // Uploads an image straight to Cloudinary using a one-time signature from our backend.
-async function uploadImage(file) {
+export async function uploadImage(file) {
   const { data: sig } = await api.post('/uploads/signature')
   const form = new FormData()
   form.append('file', file)
@@ -18,28 +18,31 @@ async function uploadImage(file) {
   return json.secure_url
 }
 
+// Checks the chosen file, uploads it and reports the hosted URL. Shared by every photo control.
+export async function pickImage(e, { setBusy, setError, onChange }) {
+  const file = e.target.files?.[0]
+  e.target.value = ''
+  if (!file) return
+  if (!['image/jpeg', 'image/png'].includes(file.type)) return setError('Please choose a JPG or PNG image.')
+  if (file.size > 5 * 1024 * 1024) return setError('The image must be 5MB or smaller.')
+  setError('')
+  setBusy(true)
+  try {
+    onChange(await uploadImage(file))
+  } catch (err) {
+    setError(err?.response?.status === 501 ? 'Photo upload is not set up yet (Cloudinary keys missing).' : err?.response ? errorMessage(err) : err.message)
+  } finally {
+    setBusy(false)
+  }
+}
+
 // Photo box used on My Profile and the child form. `onChange(url)` gets the hosted image URL.
 export default function PhotoPicker({ value, name, onChange, rounded = 'rounded-full' }) {
   const input = useRef(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
-  async function pick(e) {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file) return
-    if (!['image/jpeg', 'image/png'].includes(file.type)) return setError('Please choose a JPG or PNG image.')
-    if (file.size > 5 * 1024 * 1024) return setError('The image must be 5MB or smaller.')
-    setError('')
-    setBusy(true)
-    try {
-      onChange(await uploadImage(file))
-    } catch (err) {
-      setError(err?.response?.status === 501 ? 'Photo upload is not set up yet (Cloudinary keys missing).' : err?.response ? errorMessage(err) : err.message)
-    } finally {
-      setBusy(false)
-    }
-  }
+  const pick = (e) => pickImage(e, { setBusy, setError, onChange })
 
   return (
     <div className="flex items-center gap-4">

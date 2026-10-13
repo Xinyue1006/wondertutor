@@ -45,7 +45,7 @@ export function toBookingDto(b) {
       gatewayRef: b.payment.gatewayRef, paidAt: b.payment.paidAt,
       refunds: (b.payment.refunds || []).map((r) => ({ id: r.id, amount: num(r.amount), type: r.type, status: r.status, reason: r.reason, createdAt: r.createdAt })),
     },
-    review: b.review && { rating: b.review.rating, comment: b.review.comment },
+    review: b.review && { rating: b.review.rating, comment: b.review.comment, photoUrl: b.review.photoUrl },
     // Attendance + summary are written by the Tutor Portal; parents only read them
     attendance: b.attendance && {
       checkInAt: b.attendance.checkInAt, checkOutAt: b.attendance.checkOutAt, checkInPhotoUrl: b.attendance.checkInPhotoUrl,

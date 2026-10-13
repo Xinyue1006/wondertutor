@@ -104,6 +104,7 @@ export default function LessonDetails({ booking: b, onClose, footer, onChanged }
       {b.review && (
         <div className="mt-3 flex items-center gap-2 text-sm text-slate-600">
           Your review: <Stars value={b.review.rating} /> {b.review.comment && <span className="truncate">“{b.review.comment}”</span>}
+          {b.review.photoUrl && <img src={b.review.photoUrl} alt="Your review photo" className="ml-auto h-10 w-10 shrink-0 rounded-lg object-cover" />}
         </div>
       )}
       {refunds.length > 0 && (

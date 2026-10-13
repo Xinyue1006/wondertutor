@@ -75,6 +75,12 @@ export async function createBooking(req, res) {
   await assertSlotBookable({ tutorId: tutor.id, startAt, endAt })
   await assertChildFree({ childId: child.id, startAt, endAt })
 
+  // A trial is the child's first lesson with this tutor (paid like any lesson, only marked so both sides know)
+  if (data.isTrial) {
+    const before = await prisma.booking.count({ where: { childId: child.id, tutorId: tutor.id, status: { notIn: ['REJECTED', 'CANCELLED'] } } })
+    if (before) throw new AppError(400, `${child.name} has already had a lesson booked with this tutor, so this cannot be a trial lesson`)
+  }
+
   const booking = await prisma.booking.create({
     data: {
       parentId: req.parent.id,

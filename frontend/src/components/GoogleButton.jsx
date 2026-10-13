@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { errorMessage } from '../api/client'
-import { homeFor } from './ProtectedRoute'
+import { afterLogin } from './ProtectedRoute'
 import { loadScript } from '../lib/loadScript'
 
 export const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
@@ -26,6 +26,7 @@ function GoogleG() {
 export default function GoogleButton({ role, onError, onNeedsRole }) {
   const { googleLogin } = useAuth()
   const navigate = useNavigate()
+  const from = useLocation().state?.from
   const box = useRef(null)
   const [ready, setReady] = useState(false)
 
@@ -39,7 +40,7 @@ export default function GoogleButton({ role, onError, onNeedsRole }) {
         callback: async ({ credential }) => {
           try {
             const user = await googleLogin(credential, role)
-            navigate(homeFor(user.role))
+            navigate(afterLogin(user, from))
           } catch (err) {
             const m = errorMessage(err)
             if (m.includes('choose Parent or Tutor') && onNeedsRole) return onNeedsRole(credential)

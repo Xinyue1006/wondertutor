@@ -2,7 +2,7 @@ import { useId, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { errorMessage } from '../../api/client'
-import { homeFor } from '../../components/ProtectedRoute'
+import { afterLogin } from '../../components/ProtectedRoute'
 import GoogleButton from '../../components/GoogleButton'
 import Icon from '../../components/ui/Icon'
 import { ErrorBox } from '../../components/ui/Common'
@@ -29,7 +29,7 @@ function LoginField({ label, icon, error, children }) {
 }
 
 export default function Login() {
-  const { login, googleLogin } = useAuth()
+  const { login, googleLogin, notice } = useAuth()
   const navigate = useNavigate()
   const { state } = useLocation()
   const [form, setForm] = useState({ email: state?.email || '', password: '', remember: true })
@@ -45,7 +45,7 @@ export default function Login() {
     setError('')
     try {
       const user = await googleLogin(newGoogle, role)
-      navigate(homeFor(user.role))
+      navigate(afterLogin(user, state?.from))
     } catch (err) {
       // Google's credential is short-lived; if it has expired the person simply clicks the Google button again
       setNewGoogle(null)
@@ -77,7 +77,7 @@ export default function Login() {
     setBusy(true)
     try {
       const user = await login(form.email, form.password, form.remember)
-      navigate(homeFor(user.role))
+      navigate(afterLogin(user, state?.from))
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -134,6 +134,8 @@ export default function Login() {
             <h2 className="font-display text-3xl font-bold text-navy">Welcome Back</h2>
             <p className="mt-1 text-sm text-slate-600">Log in to continue your learning journey.</p>
           </div>
+          {/* Why the user is here again (expired session, deactivated account) */}
+          {notice && <p role="status" className="flex gap-2 rounded-lg bg-accent-50 px-3 py-2.5 text-sm text-amber-900"><Icon name="info" className="mt-0.5 h-4 w-4 shrink-0" /> {notice}</p>}
 
           <LoginField label="Email Address" icon="mail" error={fieldErrors.email}>
             {(id, err) => (

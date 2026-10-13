@@ -222,6 +222,7 @@ export async function tutorReviews(req, res) {
       id: r.id,
       rating: r.rating,
       comment: r.comment,
+      photoUrl: r.photoUrl,
       createdAt: r.createdAt,
       parentName: r.parent.user.fullName,
       // "Parent of Primary 5 student": shown instead of the child's name to protect the child's privacy

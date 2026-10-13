@@ -6,6 +6,8 @@ import { notify } from '../../services/notification.service.js'
 const reviewSchema = z.object({
   rating: z.number({ message: 'Choose a rating' }).int('Choose a rating').min(1, 'Choose a rating').max(5, 'Rating is 1 to 5 stars'),
   comment: z.string().trim().max(500, 'Comment must be 500 characters or fewer').optional(),
+  // Optional photo of the child's work or the lesson; only images uploaded to our own Cloudinary account are accepted
+  photoUrl: z.string().url().startsWith('https://res.cloudinary.com/', 'Invalid photo').optional().nullable(),
 })
 
 // POST /parent/bookings/:id/review: one review per completed booking, parent -> tutor only
@@ -22,7 +24,7 @@ export async function createReview(req, res) {
   const before = { avg: booking.tutor.ratingAvg, count: booking.tutor.ratingCount }
   const review = await prisma.$transaction(async (tx) => {
     const created = await tx.review.create({
-      data: { bookingId: booking.id, parentId: req.parent.id, tutorId: booking.tutorId, rating: data.rating, comment: data.comment || null },
+      data: { bookingId: booking.id, parentId: req.parent.id, tutorId: booking.tutorId, rating: data.rating, comment: data.comment || null, photoUrl: data.photoUrl || null },
     })
     // Keep the tutor's average in sync so cards and sorting don't need to aggregate every time
     const agg = await tx.review.aggregate({ where: { tutorId: booking.tutorId }, _avg: { rating: true }, _count: { _all: true } })
@@ -63,5 +65,5 @@ export async function createReview(req, res) {
     )
   }
 
-  res.status(201).json({ review: { id: review.created.id, rating: review.created.rating, comment: review.created.comment } })
+  res.status(201).json({ review: { id: review.created.id, rating: review.created.rating, comment: review.created.comment, photoUrl: review.created.photoUrl } })
 }

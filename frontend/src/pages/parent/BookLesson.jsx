@@ -30,6 +30,7 @@ export default function BookLesson() {
   const [subject, setSubject] = useState('')
   const [price, setPrice] = useState(prefill.price || '')
   const [msg, setMsg] = useState(prefill.msg || '')
+  const [trial, setTrial] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(false)
@@ -82,7 +83,7 @@ export default function BookLesson() {
     try {
       await api.post('/parent/bookings', {
         tutorId: tutor.id, childId: child.id, date: sel.date, startTime: sel.start, teachingMode: mode,
-        proposedPrice: Number(price), subject, messageToTutor: msg || undefined,
+        proposedPrice: Number(price), subject, messageToTutor: msg || undefined, isTrial: trial,
       })
       setDone(true)
     } catch (err) {
@@ -217,6 +218,11 @@ export default function BookLesson() {
               <label className="block"><span className="mb-1 block text-sm font-bold text-navy">Message to Tutor <span className="font-normal text-slate-500">(Optional)</span></span>
                 <textarea rows={3} maxLength={200} className="input resize-none" placeholder="E.g. My child would like to focus on exam preparation. Thank you!" value={msg} onChange={(e) => setMsg(e.target.value)} />
                 <span className="block text-right text-xs text-slate-400">{msg.length}/200</span></label>
+              {/* Trial lessons are paid like any lesson; the flag only tells the tutor it is the child's first lesson with them */}
+              <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-slate-200 p-3 text-sm">
+                <input type="checkbox" className="mt-0.5 h-4 w-4 accent-brand-500" checked={trial} onChange={(e) => setTrial(e.target.checked)} />
+                <span><b className="text-navy">This is a trial lesson</b><span className="block text-xs text-slate-600">A first lesson to see if the tutor is a good fit. It is paid like a normal lesson.</span></span>
+              </label>
               <button onClick={send} disabled={busy || !teachesChild} className="btn-primary h-12 w-full text-base">{busy ? 'Sending…' : 'Send Booking Request'} {!busy && <Icon name="arrow-right" className="h-4 w-4" />}</button>
             </div>
           </section>

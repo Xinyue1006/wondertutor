@@ -149,3 +149,33 @@ describe('tutor profile', () => {
     expect((await api(parent.token).post(`/parent/favourites/${t.tutor.id}`)).status).toBe(404)
   })
 })
+
+describe('business rules from the client brief', () => {
+  test('a review can carry an optional photo, shown on the tutor profile', async () => {
+    const t = await makeTutor()
+    const b = await makeBooking({ parent: parent.parent, child: parent.child, tutor: t.tutor, date: '2026-01-06', start: '16:00', status: 'COMPLETED' })
+    const photoUrl = 'https://res.cloudinary.com/demo/image/upload/work.jpg'
+    expect((await api(parent.token).post(`/parent/bookings/${b.id}/review`, { rating: 5, photoUrl })).status).toBe(201)
+    const res = await api(parent.token).get(`/parent/tutors/${t.tutor.id}/reviews`)
+    expect(res.reviews[0].photoUrl).toBe(photoUrl)
+  })
+
+  test('a review photo must come from our own image host', async () => {
+    const t = await makeTutor()
+    const b = await makeBooking({ parent: parent.parent, child: parent.child, tutor: t.tutor, date: '2026-01-06', start: '17:00', status: 'COMPLETED' })
+    const res = await api(parent.token).post(`/parent/bookings/${b.id}/review`, { rating: 4, photoUrl: 'https://evil.example.com/x.jpg' })
+    expect(res.status).toBe(400)
+  })
+
+  test("a trial lesson is only allowed as the child's first lesson with that tutor", async () => {
+    const t = await makeTutor()
+    const p = await makeParent() // a fresh family, so no earlier lesson in this file gets in the way
+    const body = { tutorId: t.tutor.id, childId: p.child.id, date: nextDate(MONDAY), teachingMode: 'ONLINE', proposedPrice: 50, isTrial: true }
+    const first = await api(p.token).post('/parent/bookings', { ...body, startTime: '16:00' })
+    expect(first.status).toBe(201)
+    expect(first.booking.isTrial).toBe(true)
+    const second = await api(p.token).post('/parent/bookings', { ...body, startTime: '18:00' })
+    expect(second.status).toBe(400)
+    expect(second.message).toContain('cannot be a trial lesson')
+  })
+})

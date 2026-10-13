@@ -25,6 +25,7 @@ export default function Profile() {
   const [pw, setPw] = useState({ currentPassword: '', newPassword: '', confirm: '' })
   const [pwMsg, setPwMsg] = useState('')
   const [pwError, setPwError] = useState('')
+  const [pwBusy, setPwBusy] = useState(false)
 
   useEffect(() => {
     api.get('/parent/profile').then((r) => {
@@ -76,12 +77,15 @@ export default function Profile() {
     if (weak) return setPwError(weak)
     if (pw.newPassword !== pw.confirm) return setPwError('New passwords do not match')
     if (pw.newPassword === pw.currentPassword) return setPwError('Choose a password different from the current one')
+    setPwBusy(true)
     try {
       await api.post('/parent/profile/password', { currentPassword: pw.currentPassword, newPassword: pw.newPassword })
       setPw({ currentPassword: '', newPassword: '', confirm: '' })
       setPwMsg('Password updated.')
     } catch (err) {
       setPwError(errorMessage(err))
+    } finally {
+      setPwBusy(false)
     }
   }
 
@@ -120,7 +124,7 @@ export default function Profile() {
                   <input type="password" className="input h-11" value={pw[k]} onChange={(e) => setPw({ ...pw, [k]: e.target.value })} autoComplete={k === 'currentPassword' ? 'current-password' : 'new-password'} /></label>
               ))}
               <p className="text-xs text-slate-500">At least 8 characters with a letter and a number.</p>
-              <button className="btn-outline h-11 w-full">Update Password</button>
+              <button disabled={pwBusy} className="btn-outline h-11 w-full">{pwBusy ? 'Updating…' : 'Update Password'}</button>
             </>
           )}
         </form>

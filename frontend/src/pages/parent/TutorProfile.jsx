@@ -233,6 +233,11 @@ function Reviews({ tutor, reference }) {
                 <div className="flex items-center gap-2 text-xs text-slate-400"><Stars value={r.rating} size="h-3.5 w-3.5" /> {fmtShortDate(r.createdAt)}</div>
               </div>
               {r.comment && <p className="mt-1 text-sm text-slate-600">{r.comment}</p>}
+              {r.photoUrl && (
+                <a href={r.photoUrl} target="_blank" rel="noreferrer" className="mt-2 inline-block">
+                  <img src={r.photoUrl} alt={`Photo shared by ${r.parentName}`} loading="lazy" className="h-20 w-20 rounded-lg object-cover" />
+                </a>
+              )}
             </div>
           </li>
         ))}
