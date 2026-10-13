@@ -13,7 +13,7 @@ const LINKS = [
 export default function PublicLayout() {
   const { pathname } = useLocation()
   return (
-    <div className="min-h-screen pb-10">
+    <div className="min-h-screen overflow-x-clip pb-10">
       {/* Plain full-width bar (no box or border), like the landing mockup */}
       <header className="w-full bg-white">
         <div className="mx-auto flex max-w-[1300px] items-center justify-between gap-4 px-4 py-3 md:px-8">

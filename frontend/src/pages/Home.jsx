@@ -59,26 +59,28 @@ export default function Home() {
 
   return (
     <div className="space-y-10 pt-4">
-      {/* ── Hero ── */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-white via-brand-50 to-brand-100 shadow-card">
+      {/* ── Hero: full width, no card border (breaks out of the page container) ── */}
+      <section className="relative left-1/2 -mt-4 w-screen -translate-x-1/2 overflow-hidden bg-gradient-to-r from-white via-white to-brand-50">
+        <img src="/img/art/hero-blob.png" alt="" aria-hidden="true" className="pointer-events-none absolute -left-24 top-0 hidden h-full w-auto opacity-90 md:block xl:-left-12" />
         <img
           src="/img/art/hero-girl.jpg"
           alt=""
-          className="pointer-events-none absolute inset-y-0 right-0 hidden h-full w-auto lg:block"
-          style={{ maskImage: 'linear-gradient(to right, transparent 0%, #000 30%)', WebkitMaskImage: 'linear-gradient(to right, transparent 0%, #000 30%)' }}
+          className="pointer-events-none absolute inset-y-0 right-0 hidden h-full w-auto max-w-[62%] object-cover object-right lg:block"
+          style={{ maskImage: 'linear-gradient(to right, transparent 0%, #000 32%)', WebkitMaskImage: 'linear-gradient(to right, transparent 0%, #000 32%)' }}
         />
-        <div className="relative px-6 py-10 md:px-12 md:py-14 lg:w-[62%]">
-          <div className="text-xs font-bold uppercase tracking-[0.18em] text-navy">Personalised tutor matching</div>
-          <h1 className="mt-3 text-5xl font-extrabold leading-[1.05] tracking-tight text-navy md:text-6xl">
-            Find the right tutor for your{' '}
-            <span className="relative inline-block">
-              child.
-              <span className="absolute -bottom-1 left-0 h-1 w-full rounded-full bg-accent" />
-            </span>
-          </h1>
-          <p className="mt-4 max-w-md text-base text-slate-600">
-            Trusted tutors. Flexible booking. A safer and more supportive learning journey, all in one place.
-          </p>
+        <div className="relative mx-auto max-w-[1300px] px-4 py-12 md:px-8 md:py-16">
+          <div className="lg:w-[56%] lg:pl-10">
+            <div className="text-xs font-bold uppercase tracking-[0.18em] text-navy">Personalised tutor matching</div>
+            <h1 className="mt-3 text-5xl font-extrabold leading-[1.05] tracking-tight text-navy md:text-6xl">
+              Find the right tutor for your{' '}
+              <span className="relative inline-block">
+                child.
+                <span className="absolute -bottom-1 left-0 h-1 w-full rounded-full bg-accent" />
+              </span>
+            </h1>
+            <p className="mt-4 max-w-md text-base text-slate-600">
+              Trusted tutors. Flexible booking. A safer and more supportive learning journey, all in one place.
+            </p>
 
           <form onSubmit={startSearch} className="mt-7 grid gap-3 rounded-2xl bg-white p-3 shadow-card sm:grid-cols-3 2xl:flex 2xl:items-center">
             <label className="flex min-w-0 flex-1 items-center gap-2 px-2">
@@ -120,6 +122,7 @@ export default function Home() {
             </span>
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-500 text-white"><Icon name="arrow-right" className="h-4 w-4" /></span>
           </button>
+          </div>
         </div>
       </section>
 
