@@ -146,20 +146,39 @@ export async function declineCounter(req, res) {
 // POST /parent/bookings/:id/refund-request
 // Parent-initiated refunds (dissatisfaction, disputed attendance) are never automatic: they go to Admin review.
 // The refund percentage is decided by the Admin, so the request only states the reason.
+// A COMPLETED lesson whose attendance the parent disputes ("the lesson did not happen as recorded") is also marked
+// DISPUTED, so it is clearly escalated to Admin and cannot be reviewed as a normal finished lesson in the meantime.
 export async function requestRefund(req, res) {
-  const { reason } = z.object({ reason: z.string().trim().min(10, 'Please explain why you are asking for a refund (at least 10 characters)').max(300) }).parse(req.body)
+  const { reason, attendanceDispute } = z
+    .object({
+      reason: z.string().trim().min(10, 'Please explain why you are asking for a refund (at least 10 characters)').max(300),
+      attendanceDispute: z.boolean().optional(),
+    })
+    .parse(req.body)
   const b = await ownBooking(req)
   if (!b.payment || b.payment.status !== 'PAID') throw new AppError(400, 'Only paid lessons can be refunded')
   if (!['CONFIRMED', 'COMPLETED'].includes(b.status)) throw new AppError(400, 'This booking is not eligible for a refund request')
   if (b.payment.refunds.some((r) => r.status === 'PENDING' || r.status === 'APPROVED'))
     throw new AppError(409, 'A refund request for this lesson is already being handled')
 
-  await prisma.refund.create({
-    data: { paymentId: b.payment.id, amount: b.payment.amount, type: 'ADMIN_REVIEW', reason },
-  })
+  const disputing = attendanceDispute && b.status === 'COMPLETED'
+  await prisma.$transaction([
+    prisma.refund.create({
+      data: { paymentId: b.payment.id, amount: b.payment.amount, type: 'ADMIN_REVIEW', reason: disputing ? `Attendance disputed: ${reason}` : reason },
+    }),
+    ...(disputing ? [prisma.booking.update({ where: { id: b.id }, data: { status: 'DISPUTED' } })] : []),
+  ])
+  if (disputing) {
+    await notify(b.tutor.userId, { type: 'BOOKING_DISPUTED', title: 'Lesson disputed', message: `The parent disputed the attendance for the ${b.subject} lesson. Our admin team will review it.`, link: '/tutor/bookings' })
+  }
   const admins = await prisma.user.findMany({ where: { role: 'ADMIN', status: 'ACTIVE' }, select: { id: true } })
   await Promise.all(
-    admins.map((a) => notify(a.id, { type: 'REFUND_REQUEST', title: 'New refund request', message: `${req.user.fullName} requested a refund for ${b.subject} (RM ${Number(b.payment.amount).toFixed(2)}).`, link: '/admin/finance' })),
+    admins.map((a) => notify(a.id, {
+      type: disputing ? 'BOOKING_DISPUTED' : 'REFUND_REQUEST',
+      title: disputing ? 'Attendance disputed' : 'New refund request',
+      message: `${req.user.fullName} ${disputing ? 'disputed the attendance and' : ''} requested a refund for ${b.subject} (RM ${Number(b.payment.amount).toFixed(2)}).`.replace('  ', ' '),
+      link: disputing ? '/admin/bookings' : '/admin/finance',
+    })),
   )
   await notify(req.user.id, { type: 'REFUND_REQUESTED', title: 'Refund request sent', message: 'Our team will review it and update you.', link: '/parent/payments' })
   res.status(201).json({ booking: toBookingDto(await ownBooking(req)) })

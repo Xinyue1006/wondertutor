@@ -142,6 +142,23 @@ describe('cancelling and refunds', () => {
     expect((await api(parent.token).post(`/parent/bookings/${b.id}/refund-request`, body)).status).toBe(409)
   })
 
+  test('disputing the attendance of a completed lesson marks it DISPUTED for Admin and tells the tutor', async () => {
+    const b = await paidBooking('COMPLETED', '20:00')
+    const res = await api(parent.token).post(`/parent/bookings/${b.id}/refund-request`, { reason: 'The tutor never arrived.', attendanceDispute: true })
+    expect(res.status).toBe(201)
+    expect(res.booking.status).toBe('DISPUTED')
+    const refund = await prisma.refund.findFirst({ where: { payment: { bookingId: b.id } } })
+    expect(refund.reason).toBe('Attendance disputed: The tutor never arrived.')
+    const tutorUserId = (await prisma.tutorProfile.findUnique({ where: { id: b.tutorId } })).userId
+    expect(await prisma.notification.count({ where: { userId: tutorUserId, type: 'BOOKING_DISPUTED' } })).toBe(1)
+  })
+
+  test('a normal refund request (no dispute) leaves the lesson COMPLETED', async () => {
+    const b = await paidBooking('COMPLETED', '21:00')
+    const res = await api(parent.token).post(`/parent/bookings/${b.id}/refund-request`, { reason: 'Not happy with the teaching.' })
+    expect(res.booking.status).toBe('COMPLETED')
+  })
+
   test('unpaid bookings cannot be refunded', async () => {
     const t = await makeTutor()
     const b = await makeBooking({ parent: parent.parent, child: parent.child, tutor: t.tutor, date: monday, start: '16:00', status: 'PENDING' })

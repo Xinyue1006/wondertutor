@@ -21,6 +21,7 @@ function Row({ icon, label, children }) {
 export default function LessonDetails({ booking: b, onClose, footer, onChanged }) {
   const [asking, setAsking] = useState(false)
   const [reason, setReason] = useState('')
+  const [dispute, setDispute] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   if (!b) return null
@@ -33,7 +34,7 @@ export default function LessonDetails({ booking: b, onClose, footer, onChanged }
   async function sendRefund() {
     setBusy(true); setError('')
     try {
-      await api.post(`/parent/bookings/${b.id}/refund-request`, { reason })
+      await api.post(`/parent/bookings/${b.id}/refund-request`, { reason, ...(dispute && { attendanceDispute: true }) })
       setAsking(false); setReason('')
       onChanged?.()
       onClose()
@@ -116,6 +117,12 @@ export default function LessonDetails({ booking: b, onClose, footer, onChanged }
           <ErrorBox>{error}</ErrorBox>
           <label className="block text-sm font-bold text-navy">Why are you asking for a refund?
             <textarea rows={3} maxLength={300} className="input mt-1 resize-none" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. The tutor did not attend the lesson." /></label>
+          {b.status === 'COMPLETED' && (
+            <label className="flex min-h-10 cursor-pointer items-start gap-2 text-sm text-slate-700">
+              <input type="checkbox" className="mt-1 h-4 w-4 accent-brand-500" checked={dispute} onChange={(e) => setDispute(e.target.checked)} />
+              <span>The lesson did not happen as recorded (for example, the tutor did not come or left early). <span className="text-slate-500">The lesson is marked as disputed for our admin team.</span></span>
+            </label>
+          )}
           <p className="text-xs text-slate-500">Our team reviews every request and will let you know the outcome.</p>
           <div className="flex gap-2"><button disabled={busy} onClick={sendRefund} className="btn-primary px-4 py-1.5">{busy ? 'Sending…' : 'Send Request'}</button><button onClick={() => setAsking(false)} className="btn-outline px-4 py-1.5">Cancel</button></div>
         </div>
