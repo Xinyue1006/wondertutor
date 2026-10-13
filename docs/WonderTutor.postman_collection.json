@@ -2846,6 +2846,104 @@
               ]
             }
           }
+        },
+        {
+          "name": "Create a TRIAL booking request (only the child's first lesson with this tutor)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "if (json.booking.id) pm.collectionVariables.set('bookingId', String(json.booking.id));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{parentToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tutorId\": 2,\n  \"childId\": 1,\n  \"date\": \"2026-10-20\",\n  \"startTime\": \"15:00\",\n  \"teachingMode\": \"ONLINE\",\n  \"proposedPrice\": 55,\n  \"messageToTutor\": \"From Postman\",\n  \"isTrial\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/parent/bookings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "parent",
+                "bookings"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Leave a review with an optional photo (Cloudinary URL only)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{parentToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 5,\n  \"comment\": \"Great lesson\",\n  \"photoUrl\": \"https://res.cloudinary.com/demo/image/upload/sample.jpg\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/parent/bookings/{{bookingId}}/review",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "parent",
+                "bookings",
+                "{{bookingId}}",
+                "review"
+              ]
+            }
+          }
         }
       ]
     }

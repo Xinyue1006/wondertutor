@@ -94,8 +94,20 @@ Also built for the Parent Portal and Admin (Xin Yue):
 - **Disputed attendance** on a completed lesson marks it DISPUTED and asks Admin to review a refund.
 - **Booking housekeeping** (runs every 5 minutes in `backend/src/services/lifecycle.service.js`): unanswered requests expire at
   the lesson time, unpaid bookings expire 1 hour before it, and parents and tutors get a reminder within 24 hours of a lesson.
-- **Admin**: user management, qualification approval, complaints with a report (date range, overdue, time to close,
-  categories, most complained about) and CSV export.
+- **Admin**: user management, qualification approval (with a link to the uploaded document), a warning about upcoming
+  lessons before deactivating someone, complaints with a report (date range, overdue, time to close, categories,
+  most complained about) and CSV export.
+- **Reviews** may carry an optional photo; **trial lessons** can be marked (only a child's first lesson with that tutor).
+- **Refunds**: Cancel is the way to get money back for a lesson that has not started (Admin decides the refund);
+  a refund request is for a lesson that has started or finished (e.g. the tutor did not come).
+- **Input validation** everywhere (`backend/src/utils/validators.js`, mirrored in `frontend/src/lib/validation.js`):
+  Malaysian phone numbers (stored as +60…), real names, passwords (8–72 characters), real dates and times, RM amounts
+  with at most 2 decimals, and every ID in a URL.
+- **Robustness**: actions only apply to a booking still in the status it was loaded in (no double payments, refunds,
+  reviews or answers from a double click or a stale page); an expired session returns to Log In with the reason and
+  then back to the page the user wanted; pages that fail to load offer *Try again*.
+- **Accessibility**: dialogs keep keyboard focus inside and return it when closed, errors and new chat messages are
+  announced to screen readers, dropdowns report whether they are open, and every control has a label.
 
 Matching is **rule-based weighted scoring** (`backend/src/services/matching.service.js`, weights from Form 2), not machine learning.
 The chatbot is a guided quick-reply flow that fills the same criteria and calls the same service.
@@ -144,8 +156,8 @@ frontend/src/
 
 | What | Command | Notes |
 |---|---|---|
-| Backend (Jest): matching scoring, booking rules, payments + commission snapshot, refunds, reviews, admin, complaints, security, parent signup and saved preferences | `cd backend && npm test` | Uses a **separate** database `wondertutor_test`, created and migrated automatically (`pretest`). Your dev data is never touched. MySQL must be running. |
-| Frontend (Vitest + React Testing Library): login, route protection, matching wizard, tutor card, chatbot text reader, date helpers | `cd frontend && npm test` | Runs in a simulated browser, no servers needed. |
+| Backend (Jest): matching scoring, booking rules, payments + commission snapshot, refunds, reviews, admin, complaints, security, parent signup and saved preferences, input validation, double-submit and stale-page races | `cd backend && npm test` | Uses a **separate** database `wondertutor_test`, created and migrated automatically (`pretest`). Your dev data is never touched. MySQL must be running. |
+| Frontend (Vitest + React Testing Library): login, route protection and return-to page, matching wizard, tutor card, chatbot text reader, date helpers, form validation rules | `cd frontend && npm test` | Runs in a simulated browser, no servers needed. |
 | API demo (Postman) | Import `docs/WonderTutor.postman_collection.json` | Run *Login (parent)* and *Login (admin)* first; they store the tokens. |
 
 Vitest is used instead of Jest on the frontend because it reads the Vite config directly (Jest needs extra setup for `import.meta.env`). The test syntax is the same.
