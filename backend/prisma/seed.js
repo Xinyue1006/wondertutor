@@ -224,7 +224,7 @@ async function seedBasics() {
     update: {},
     create: {
       email: 'admin@wondertutor.local',
-      passwordHash: await bcrypt.hash('Admin1234', 12),
+      passwordHash: await bcrypt.hash(process.env.ADMIN_PASSWORD || 'Admin1234', 12) // set ADMIN_PASSWORD on a live site,
       role: 'ADMIN',
       fullName: 'WonderTutor Admin',
       isEmailVerified: true,
