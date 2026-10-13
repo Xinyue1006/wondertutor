@@ -140,10 +140,13 @@ export default function Signup() {
   }
 
   return (
-    <div className="pt-6">
+    // Same band as the landing hero and the login page: light blue, blue decoration down the left edge
+    <section className="relative left-1/2 -mb-12 w-screen -translate-x-1/2 overflow-x-clip bg-gradient-to-r from-brand-50 via-brand-50 to-brand-25 pb-12 pt-6">
+      <img src="/img/art/hero-blob.png" alt="" aria-hidden="true" className="pointer-events-none absolute left-0 top-0 hidden h-full max-h-[40rem] w-auto max-w-[110px] object-cover object-left md:block" style={{ maskImage: 'linear-gradient(to right, #000 60%, transparent)', WebkitMaskImage: 'linear-gradient(to right, #000 60%, transparent)' }} />
+    <div className="relative mx-auto max-w-[81.25rem] px-4 md:px-8">
       <div className="relative">
         {step < 2 && (
-          <button onClick={() => (step === 1 ? setStep(0) : navigate('/'))} className="absolute left-2 top-2 flex items-center gap-2 text-sm font-medium text-navy hover:text-brand-500">
+          <button onClick={() => (step === 1 ? setStep(0) : navigate('/'))} className="absolute left-0 top-0 flex min-h-11 items-center gap-2 text-sm font-medium text-navy hover:text-brand-600">
             <Icon name="arrow-left" className="h-4 w-4" /> Back
           </button>
         )}
@@ -152,11 +155,11 @@ export default function Signup() {
 
       {step === 0 && (
         <div className="mx-auto mt-6 max-w-[860px] text-center">
-          <h1 className="text-3xl font-extrabold text-navy">
+          <h1 className="font-display text-3xl font-bold text-navy md:text-4xl">
             Join WonderTutor <Icon name="sparkle" fill className="mb-2 inline h-5 w-5 text-accent" />
           </h1>
-          <p className="mt-1 text-sm text-slate-500">Create an account and be part of a brighter learning community.</p>
-          <div className="mt-6 grid gap-5 text-left md:grid-cols-2">
+          <p className="mt-1 text-base text-slate-700">Create an account and be part of a brighter learning community.</p>
+          <div role="radiogroup" aria-label="I am joining as" className="mt-6 grid gap-5 text-left md:grid-cols-2">
             <RoleCard
               active={role === 'PARENT'} onClick={() => setRole('PARENT')} img="/img/art/role-parent.jpg" tone="blue"
               title="I'm a Parent" desc="Find and book suitable tutors for your child."
@@ -168,7 +171,7 @@ export default function Signup() {
               points={['Set your availability', 'Manage your bookings', 'Track your earnings', 'Build your teaching profile']}
             />
           </div>
-          <button onClick={() => { setSection('basic'); setStep(1) }} className="btn-primary mx-auto mt-5 h-12 w-full max-w-[560px] text-base">
+          <button onClick={() => { setSection('basic'); setStep(1) }} className="btn-accent mx-auto mt-5 h-12 w-full max-w-[560px] text-base">
             Next <Icon name="arrow-right" className="h-4 w-4" />
           </button>
           <div className="mx-auto mt-4 max-w-[560px]">
@@ -192,8 +195,8 @@ export default function Signup() {
                 disabled={s.locked}
                 onClick={() => { setError(''); setSection(s.id) }}
                 title={s.locked ? 'Completed in the Tutor Portal after your email is verified' : ''}
-                className={`flex w-full items-center gap-3 rounded-lg border px-4 py-3 text-left text-sm font-medium transition ${
-                  section === s.id ? 'border-brand-500 bg-brand-50 text-brand-500' : 'border-transparent text-navy hover:bg-white/70'
+                className={`flex min-h-11 w-full items-center gap-3 rounded-lg border px-4 py-3 text-left text-sm font-medium transition ${
+                  section === s.id ? 'border-brand-500 bg-white text-brand-600 shadow-card' : 'border-transparent text-navy hover:bg-white/70'
                 } ${s.locked ? 'cursor-not-allowed opacity-55' : ''}`}
               >
                 <Icon name={s.icon} className="h-[18px] w-[18px]" /> {s.label}
@@ -206,14 +209,14 @@ export default function Signup() {
             />
           </aside>
 
-          <form onSubmit={next} className="card p-6 md:p-8">
-            <h1 className="text-3xl font-extrabold text-navy">Create Your {role === 'PARENT' ? 'Parent' : 'Tutor'} Account</h1>
+          <form onSubmit={next} className="rounded-2xl border border-brand-100 bg-white p-6 shadow-card md:p-8">
+            <h1 className="font-display text-3xl font-bold text-navy">Create Your {role === 'PARENT' ? 'Parent' : 'Tutor'} Account</h1>
             <p className="mt-1 text-sm text-slate-500">
               {role === 'PARENT' ? "Let's set up your profile to get started." : 'Build your profile and let parents discover your expertise.'}
             </p>
 
             <div className="mt-5 rounded-xl border border-brand-100 bg-brand-25 p-5">
-              <h2 className="mb-4 text-lg font-bold text-navy">{sections.find((s) => s.id === section)?.label}</h2>
+              <h2 className="mb-4 font-display text-lg font-bold text-navy">{sections.find((s) => s.id === section)?.label}</h2>
               <ErrorBox className="mb-4">{error}</ErrorBox>
 
               {section === 'basic' && (
@@ -269,7 +272,7 @@ export default function Signup() {
               {idx === active.length - 1 && <div className="mt-4"><Recaptcha onToken={setCaptcha} /></div>}
             </div>
 
-            <button disabled={busy} className="btn-primary mt-5 h-12 w-full text-base">
+            <button disabled={busy} className="btn-accent mt-5 h-12 w-full text-base">
               {busy ? 'Creating account…' : idx < active.length - 1 ? 'Next' : 'Create Account'}
               {!busy && <Icon name="arrow-right" className="h-4 w-4" />}
             </button>
@@ -283,18 +286,19 @@ export default function Signup() {
       )}
 
       {step === 2 && (
-        <form onSubmit={submitOtp} className="card mx-auto mt-8 max-w-md space-y-4 p-8 text-center">
+        <form onSubmit={submitOtp} className="mx-auto mt-8 max-w-md space-y-4 rounded-2xl border border-brand-100 bg-white p-8 text-center shadow-card">
           <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand-50 text-brand-500"><Icon name="mail" className="h-7 w-7" /></span>
-          <h1 className="text-2xl font-extrabold text-navy">Verify your email</h1>
+          <h1 className="font-display text-2xl font-bold text-navy">Verify your email</h1>
           <p className="text-sm text-slate-500">We sent a 6-digit code to <b className="text-navy">{form.email}</b>.</p>
           <ErrorBox className="text-left">{error}</ErrorBox>
           <input required maxLength={6} inputMode="numeric" autoFocus className="input h-14 text-center text-2xl tracking-[0.6em]"
             value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))} />
-          <button disabled={busy || otp.length < 6} className="btn-primary h-12 w-full text-base">{busy ? 'Verifying…' : 'Verify & Continue'}</button>
+          <button disabled={busy || otp.length < 6} className="btn-accent h-12 w-full text-base">{busy ? 'Verifying…' : 'Verify & Continue'}</button>
           <button type="button" onClick={resendOtp} className="text-sm font-semibold text-brand-500 hover:underline">Resend code</button>
         </form>
       )}
     </div>
+    </section>
   )
 }
 
@@ -321,22 +325,24 @@ function RoleCard({ active, onClick, title, desc, points, img, tone }) {
   return (
     <button
       type="button"
+      role="radio"
+      aria-checked={active}
       onClick={onClick}
-      className={`relative overflow-hidden rounded-2xl border-2 text-left transition ${
-        active ? (blue ? 'border-brand-500 bg-brand-50 shadow-lg' : 'border-accent bg-accent-50 shadow-lg') : 'border-transparent bg-white shadow-card hover:border-brand-100'
+      className={`relative flex flex-col overflow-hidden rounded-2xl border-2 p-3 text-left transition ${
+        active ? (blue ? 'border-brand-500 bg-white shadow-lg' : 'border-accent bg-accent-50 shadow-lg') : 'border-white bg-white shadow-card hover:border-brand-100'
       }`}
     >
-      <span className={`absolute right-4 top-4 z-10 flex h-6 w-6 items-center justify-center rounded-full border-2 bg-white ${active ? (blue ? 'border-brand-500' : 'border-accent') : 'border-slate-300'}`}>
-        {active && <span className={`h-3 w-3 rounded-full ${blue ? 'bg-brand-500' : 'bg-accent'}`} />}
+      <span className={`absolute right-5 top-5 z-10 flex h-7 w-7 items-center justify-center rounded-full border-2 bg-white ${active ? (blue ? 'border-brand-500' : 'border-accent') : 'border-slate-300'}`} aria-hidden="true">
+        {active && <span className={`h-3.5 w-3.5 rounded-full ${blue ? 'bg-brand-500' : 'bg-accent'}`} />}
       </span>
-      <img src={img} alt="" className="h-40 w-full object-cover" />
-      <div className="p-5">
-        <div className="text-center text-xl font-extrabold text-navy">{title}</div>
-        <div className="mb-3 text-center text-sm text-slate-500">{desc}</div>
-        <ul className="mx-auto w-fit space-y-1.5 text-sm text-navy">
+      <img src={img} alt="" aria-hidden="true" className="h-44 w-full rounded-xl object-cover" />
+      <div className="px-3 pb-3 pt-4">
+        <div className="text-center font-display text-xl font-bold text-navy">{title}</div>
+        <div className="mb-3 text-center text-sm text-slate-700">{desc}</div>
+        <ul className="mx-auto w-fit space-y-2 text-sm text-navy">
           {points.map((p) => (
             <li key={p} className="flex items-center gap-2">
-              <span className={`flex h-[18px] w-[18px] items-center justify-center rounded-full text-white ${blue ? 'bg-brand-500' : 'bg-accent'}`}>
+              <span className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-white ${blue ? 'bg-brand-500' : 'bg-accent-600'}`}>
                 <Icon name="check" className="h-3 w-3" strokeWidth={3.5} />
               </span>
               {p}

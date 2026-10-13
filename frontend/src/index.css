@@ -133,7 +133,7 @@ body {
 
 /* Visible keyboard focus on every control (WCAG 2.4.7); mouse clicks do not show it */
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
-  outline: 3px solid var(--color-brand-500);
+  outline: 3px solid #1a6dff; /* brand-500, written out because a var() here resolved to the text colour */
   outline-offset: 2px;
   border-radius: 8px;
 }
