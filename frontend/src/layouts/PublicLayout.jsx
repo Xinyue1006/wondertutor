@@ -32,7 +32,7 @@ export default function PublicLayout() {
       <main className="mx-auto max-w-[1300px] px-3 md:px-6">
         <Outlet />
       </main>
-      <footer id="about" className="mx-auto mt-14 max-w-[1300px] px-3 md:px-6 scroll-mt-24 border-t border-brand-100 pt-8 text-xs text-slate-500">
+      <footer id="about" className="mx-auto mt-14 max-w-[1300px] px-3 md:px-6 scroll-mt-24 border-t border-brand-100 pt-8 text-sm text-slate-600">
         <div className="grid gap-8 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
           <div>
             <Logo className="h-8" />
@@ -59,7 +59,7 @@ export default function PublicLayout() {
             <ul className="space-y-1.5"><li>Banting, Selangor, Malaysia</li></ul>
           </div>
         </div>
-        <div className="mt-8 border-t border-brand-100 py-4 text-center">&copy; {new Date().getFullYear()} WonderTutor. All rights reserved.</div>
+        <div className="mt-8 border-t border-brand-100 py-4 text-center text-xs">&copy; {new Date().getFullYear()} WonderTutor. All rights reserved.</div>
       </footer>
     </div>
   )

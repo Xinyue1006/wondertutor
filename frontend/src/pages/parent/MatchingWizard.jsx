@@ -26,6 +26,23 @@ export default function MatchingWizard() {
     if (kids.length && !c.childId && !c.subject && !c.level) applyChild(kids[0])
   }, [kids, c.childId, c.subject, c.level, applyChild])
 
+  // Carry over what was typed in the landing-page search bar (subject / level / location), once
+  useEffect(() => {
+    if (!catalog) return
+    let saved
+    try { saved = JSON.parse(sessionStorage.getItem('wt-home-search') || 'null'); sessionStorage.removeItem('wt-home-search') } catch { saved = null }
+    if (!saved) return
+    const pick = (list, text) => list.find((x) => x.toLowerCase() === String(text || '').trim().toLowerCase())
+    const level = { kindergarten: 'KINDERGARTEN', primary: 'PRIMARY', secondary: 'SECONDARY' }[String(saved.level || '').trim().toLowerCase()]
+    const patch = {}
+    const subject = pick(catalog.subjects, saved.subject)
+    const location = pick(catalog.locations, saved.location)
+    if (subject) patch.subject = subject
+    if (level) Object.assign(patch, { level, grade: null, childId: null }) // the grade is chosen in the wizard; drop any child's old grade
+    if (location) patch.location = location
+    if (Object.keys(patch).length) patchCriteria(patch)
+  }, [catalog, patchCriteria])
+
   if (!catalog) return <Spinner />
 
   function next() {

@@ -23,14 +23,14 @@ const STEPS = [
 ]
 
 const SAFETY = [
-  ['pin', 'GPS Attendance', 'Verified in-person lessons'],
+  ['pin', 'GPS Attendance', 'Check-in at the lesson location'],
   ['shield', 'Transparent Reviews', 'Real feedback from parents'],
-  ['card', 'Secure Payments', 'Powered by FPX'],
-  ['user', 'Admin Support', 'Assistance when needed'],
+  ['card', 'Secure Payments', 'Pay online via FPX'],
+  ['user', 'Admin Support', 'Complaints handled by admins'],
 ]
 
-const labelCls = 'block text-[11px] font-bold text-navy'
-const selectCls = 'mt-0.5 w-full bg-transparent text-xs text-slate-500 outline-none'
+const labelCls = 'block text-xs font-bold text-navy'
+const selectCls = 'mt-0.5 w-full bg-transparent text-sm text-slate-600 outline-none placeholder:text-slate-400'
 
 export default function Home() {
   const { user } = useAuth()
@@ -48,6 +48,13 @@ export default function Home() {
     e?.preventDefault()
     navigate(user?.role === 'PARENT' ? '/parent/find-tutor' : '/login')
   }
+  // The hero search only asks for the three required basics. Availability, budget, teaching mode and
+  // preferences are collected in the next step (the matching wizard), which picks these values up.
+  const startSearch = (e) => {
+    e.preventDefault()
+    try { sessionStorage.setItem('wt-home-search', JSON.stringify(search)) } catch { /* storage blocked: the wizard just starts empty */ }
+    navigate(user?.role === 'PARENT' ? '/parent/find-tutor/match' : '/login')
+  }
   const tryAssistant = () => navigate(user?.role === 'PARENT' ? '/parent/find-tutor/match' : '/signup')
 
   return (
@@ -61,7 +68,7 @@ export default function Home() {
           style={{ maskImage: 'linear-gradient(to right, transparent 0%, #000 30%)', WebkitMaskImage: 'linear-gradient(to right, transparent 0%, #000 30%)' }}
         />
         <div className="relative px-6 py-10 md:px-12 md:py-14 lg:w-[62%]">
-          <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-navy">Personalised tutor matching</div>
+          <div className="text-xs font-bold uppercase tracking-[0.18em] text-navy">Personalised tutor matching</div>
           <h1 className="mt-3 text-5xl font-extrabold leading-[1.05] tracking-tight text-navy md:text-6xl">
             Find the right tutor for your{' '}
             <span className="relative inline-block">
@@ -73,22 +80,22 @@ export default function Home() {
             Trusted tutors. Flexible booking. A safer and more supportive learning journey, all in one place.
           </p>
 
-          <form onSubmit={findTutor} className="mt-7 flex flex-col gap-3 rounded-2xl bg-white p-3 shadow-card md:flex-row md:items-center">
-            <label className="flex flex-1 items-center gap-2 px-2">
+          <form onSubmit={startSearch} className="mt-7 grid gap-3 rounded-2xl bg-white p-3 shadow-card sm:grid-cols-3 2xl:flex 2xl:items-center">
+            <label className="flex min-w-0 flex-1 items-center gap-2 px-2">
               <Icon name="book" className="h-5 w-5 shrink-0 text-brand-500" />
               <span className="flex-1">
                 <span className={labelCls}>Subject</span>
                 <input className={selectCls} list="home-subjects" placeholder="e.g. Mathematics" value={search.subject} onChange={(e) => setSearch({ ...search, subject: e.target.value })} />
               </span>
             </label>
-            <label className="flex flex-1 items-center gap-2 border-slate-100 px-2 md:border-l">
+            <label className="flex min-w-0 flex-1 items-center gap-2 border-slate-100 px-2 sm:border-l 2xl:border-l">
               <Icon name="cap" className="h-5 w-5 shrink-0 text-brand-500" />
               <span className="flex-1">
                 <span className={labelCls}>Education Level</span>
                 <input className={selectCls} list="home-levels" placeholder="e.g. Primary" value={search.level} onChange={(e) => setSearch({ ...search, level: e.target.value })} />
               </span>
             </label>
-            <label className="flex flex-1 items-center gap-2 border-slate-100 px-2 md:border-l">
+            <label className="flex min-w-0 flex-1 items-center gap-2 border-slate-100 px-2 sm:border-l 2xl:border-l">
               <Icon name="pin" className="h-5 w-5 shrink-0 text-brand-500" />
               <span className="flex-1">
                 <span className={labelCls}>Location</span>
@@ -99,17 +106,17 @@ export default function Home() {
             <datalist id="home-subjects">{home.subjects.map((x) => <option key={x} value={x} />)}</datalist>
             <datalist id="home-levels">{LEVELS.map((x) => <option key={x} value={x} />)}</datalist>
             <datalist id="home-locations">{home.locations.map((x) => <option key={x} value={x} />)}</datalist>
-            <button className="btn-accent h-11 px-5">Search Tutors <Icon name="arrow-right" className="h-4 w-4" /></button>
+            <button className="btn-accent h-11 px-5 sm:col-span-3 2xl:col-span-1">Search Tutors <Icon name="arrow-right" className="h-4 w-4" /></button>
           </form>
 
           <button
             onClick={tryAssistant}
             className="mt-4 flex w-full max-w-xl items-center gap-3 rounded-2xl bg-white p-4 text-left shadow-card transition hover:shadow-lg"
           >
-            <Icon name="sparkle" fill className="h-7 w-7 shrink-0 text-accent" />
+            <Robot className="h-11 w-11 shrink-0" />
             <span className="flex-1">
               <span className="block text-sm font-bold text-navy">Not sure which tutor to choose?</span>
-              <span className="block text-xs text-slate-500">Chat with our AI assistant and get personalised recommendations.</span>
+              <span className="block text-sm text-slate-600">Chat with our AI assistant and get personalised recommendations.</span>
             </span>
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-500 text-white"><Icon name="arrow-right" className="h-4 w-4" /></span>
           </button>
@@ -123,7 +130,7 @@ export default function Home() {
             <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-navy text-white"><Icon name={icon} className="h-6 w-6" /></span>
             <div>
               <div className="text-sm font-bold text-navy">{title}</div>
-              <p className="mt-0.5 text-xs text-slate-500">{text}</p>
+              <p className="mt-0.5 text-sm text-slate-600">{text}</p>
             </div>
           </div>
         ))}
@@ -134,13 +141,13 @@ export default function Home() {
         <div className="grid gap-6 overflow-hidden rounded-3xl bg-gradient-to-br from-accent-50 via-white to-brand-50 p-7 shadow-card sm:grid-cols-[1fr_13rem]">
           <div>
             <h2 className="text-2xl font-extrabold text-navy">Meet Your<br />AI Matching Assistant</h2>
-            <p className="mt-3 max-w-[16rem] text-sm text-slate-600">
+            <p className="mt-4 max-w-[17rem] text-base text-slate-600">
               Just tell us what your child needs, and we'll recommend suitable tutors with clear reasons.
             </p>
-            <button onClick={tryAssistant} className="btn-primary mt-5 h-11 px-6">Try AI Matching <Icon name="arrow-right" className="h-4 w-4" /></button>
+            <button onClick={tryAssistant} className="btn-primary mt-6 h-11 px-6">Try AI Matching <Icon name="arrow-right" className="h-4 w-4" /></button>
           </div>
           <div className="flex flex-col items-center">
-            <div className="w-full rounded-2xl bg-white/90 p-3 text-xs shadow-card">
+            <div className="w-full rounded-2xl bg-white/90 p-3 text-sm shadow-card">
               <div className="rounded-xl bg-brand-50 px-3 py-2 font-medium text-navy">Hi! Tell me what you're looking for?</div>
               <div className="mt-2 space-y-1.5">
                 {['What subject?', 'What education level?', 'Preferred location?', 'Any other preferences?'].map((q) => (
@@ -148,7 +155,7 @@ export default function Home() {
                 ))}
               </div>
             </div>
-            <Robot className="float-y mt-3 h-28 w-28" />
+            <Robot className="float-y mt-4 h-20 w-20" />
           </div>
         </div>
 
@@ -161,7 +168,7 @@ export default function Home() {
                 <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-100 text-brand-500"><Icon name={icon} className="h-6 w-6" /></span>
                 <div>
                   <div className="text-sm font-bold text-navy">{title}</div>
-                  <p className="mt-0.5 text-xs text-slate-500">{text}</p>
+                  <p className="mt-0.5 text-sm text-slate-600">{text}</p>
                 </div>
               </div>
             ))}
@@ -171,11 +178,12 @@ export default function Home() {
 
       {/* ── Featured tutors ── */}
       <section>
-        <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-navy">Featured tutors</div>
+        <div className="text-xs font-bold uppercase tracking-[0.18em] text-navy">Featured tutors</div>
         <div className="mt-1 flex flex-wrap items-end justify-between gap-2">
           <div>
             <h2 className="text-3xl font-extrabold text-navy">Learn from Trusted Tutors</h2>
             <p className="mt-1 text-sm text-slate-500">Explore some of our qualified and experienced tutors.</p>
+            <p className="mt-1 text-xs font-medium text-brand-600">Sample tutor profiles for demonstration.</p>
           </div>
           <button onClick={findTutor} className="flex items-center gap-1 text-xs font-bold text-navy hover:text-brand-500">
             View More Tutors <Icon name="arrow-right" className="h-3.5 w-3.5" />
@@ -188,20 +196,20 @@ export default function Home() {
                 <Avatar src={t.photoUrl} name={t.name} className="h-16 w-14" rounded="rounded-lg" text="text-lg" />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-bold text-navy">{t.name}</div>
-                  <div className="mt-0.5 flex items-center gap-1 text-xs text-slate-600">
+                  <div className="mt-0.5 flex items-center gap-1 text-sm text-slate-600">
                     <Icon name="star" fill className="h-3.5 w-3.5 text-accent" />
                     <b>{t.rating}</b> <span className="text-slate-400">({t.reviewCount} reviews)</span>
                   </div>
                 </div>
                 <Icon name="heart" className="h-4 w-4 text-slate-300" />
               </div>
-              <ul className="mt-3 space-y-1.5 text-xs text-slate-500">
+              <ul className="mt-3 space-y-2 text-sm text-slate-600">
                 <li className="flex items-center gap-2"><Icon name="book" className="h-3.5 w-3.5" />{t.mainSubject}</li>
                 <li className="flex items-center gap-2"><Icon name="cap" className="h-3.5 w-3.5" />{t.levels}</li>
                 <li className="flex items-center gap-2"><Icon name="pin" className="h-3.5 w-3.5" />{t.location}</li>
               </ul>
-              <div className="mt-3 text-sm font-bold text-navy">RM {t.hourlyRate} / hour</div>
-              <button onClick={findTutor} className="btn-outline mt-3 w-full py-1.5 text-xs">View Profile</button>
+              <div className="mt-3 text-base font-bold text-navy">RM {t.hourlyRate} / hour</div>
+              <button onClick={findTutor} className="btn-outline mt-3 w-full py-2 text-sm">View Profile</button>
             </div>
           ))}
         </div>
@@ -211,14 +219,14 @@ export default function Home() {
       <section id="for-tutors" className="grid scroll-mt-24 items-center gap-5 rounded-3xl bg-brand-50/80 p-7 shadow-card lg:grid-cols-[1fr_1.4fr]">
         <div>
           <h2 className="text-xl font-extrabold text-navy">A Safer and More Reliable Learning Experience</h2>
-          <p className="mt-2 text-xs text-slate-500">We provide the tools and systems to ensure a safe, transparent and trustworthy platform for both parents and tutors.</p>
+          <p className="mt-2 text-sm text-slate-600">We provide the tools and systems to ensure a safe, transparent and trustworthy platform for both parents and tutors.</p>
         </div>
         <div className="grid grid-cols-2 gap-4 rounded-2xl bg-white p-5 shadow-card sm:grid-cols-4">
           {SAFETY.map(([icon, title, sub]) => (
             <div key={title} className="text-center">
               <Icon name={icon} className="mx-auto h-8 w-8 text-brand-500" strokeWidth={1.5} />
-              <div className="mt-2 text-xs font-bold text-navy">{title}</div>
-              <div className="text-[10px] text-slate-500">{sub}</div>
+              <div className="mt-2 text-sm font-bold text-navy">{title}</div>
+              <div className="text-xs text-slate-600">{sub}</div>
             </div>
           ))}
         </div>
