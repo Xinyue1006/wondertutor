@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import api, { errorMessage } from '../../api/client'
 import Avatar from '../../components/ui/Avatar'
 import Icon from '../../components/ui/Icon'
-import { EmptyState, ErrorBox, PageTitle, Spinner, Stars } from '../../components/ui/Common'
+import { EmptyState, LoadError, PageTitle, Spinner, Stars } from '../../components/ui/Common'
 import { gradeLabel } from '../../lib/education'
 import { fmtDate, fmtDateLong, fmtTime, fmtTimeRange } from '../../lib/format'
 
@@ -14,11 +14,18 @@ export default function ChildProgress() {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
 
-  useEffect(() => {
+  const load = () => {
+    setError('')
     api.get(`/parent/children/${id}/progress`).then((r) => setData(r.data)).catch((e) => setError(errorMessage(e)))
-  }, [id])
+  }
+  useEffect(load, [id])
 
-  if (error) return <ErrorBox>{error}</ErrorBox>
+  if (error && !data) return (
+    <div>
+      <Link to="/parent/children" className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-navy hover:text-brand-600"><Icon name="arrow-left" className="h-4 w-4" /> My Children</Link>
+      <LoadError message={error} onRetry={load} />
+    </div>
+  )
   if (!data) return <Spinner />
   const { child, stats, subjects, nextLesson, timeline } = data
 

@@ -22,6 +22,7 @@ export default function MyChildren() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [removing, setRemoving] = useState(null)
+  const [removeBusy, setRemoveBusy] = useState(false)
 
   const [loadError, setLoadError] = useState('')
   const load = () => {
@@ -72,12 +73,16 @@ export default function MyChildren() {
   }
 
   async function remove() {
+    if (removeBusy) return
+    setRemoveBusy(true)
     try {
       await api.delete(`/parent/children/${removing.id}`)
       await load(); await refreshChildren()
       setRemoving(null)
     } catch (err) {
       setError(errorMessage(err))
+    } finally {
+      setRemoveBusy(false)
     }
   }
 
@@ -109,8 +114,9 @@ export default function MyChildren() {
             <div className="mt-3 grid grid-cols-2 gap-2">
               <button onClick={() => { applyChild(c); navigate('/parent/find-tutor/match') }} className="btn-primary col-span-2"><Icon name="search" className="h-4 w-4" /> Find a Tutor</button>
               <Link to={`/parent/children/${c.id}/progress`} className="btn-outline col-span-2"><Icon name="chart" className="h-4 w-4" /> View Learning Progress</Link>
-              <button onClick={() => openForm(c)} className="btn-outline"><Icon name="edit" className="h-4 w-4" /> Edit</button>
-              <button onClick={() => { setError(''); setRemoving(c) }} className="btn-danger"><Icon name="trash" className="h-4 w-4" /> Remove</button>
+              {/* A child with lessons keeps their profile: bookings, payments and progress refer to it */}
+              <button onClick={() => openForm(c)} className={`btn-outline ${c.bookingCount ? 'col-span-2' : ''}`}><Icon name="edit" className="h-4 w-4" /> Edit</button>
+              {!c.bookingCount && <button onClick={() => { setError(''); setRemoving(c) }} className="btn-danger"><Icon name="trash" className="h-4 w-4" /> Remove</button>}
             </div>
           </article>
         ))}
@@ -146,8 +152,8 @@ export default function MyChildren() {
       </Modal>
 
       <Modal open={!!removing} onClose={() => setRemoving(null)} title={`Remove ${removing?.name}?`}
-        footer={<><button onClick={() => setRemoving(null)} className="btn-outline">Cancel</button><button onClick={remove} className="btn bg-red-500 text-white hover:bg-red-600">Remove</button></>}>
-        <p className="text-sm text-slate-600">This removes the profile. Children with lesson history cannot be removed.</p>
+        footer={<><button onClick={() => setRemoving(null)} className="btn-outline">Cancel</button><button disabled={removeBusy} onClick={remove} className="btn bg-red-600 text-white hover:bg-red-700">{removeBusy ? 'Removing…' : 'Remove'}</button></>}>
+        <p className="text-sm text-slate-600">This removes {removing?.name}'s profile. It cannot be undone.</p>
         <ErrorBox className="mt-3">{removing && error}</ErrorBox>
       </Modal>
     </div>
