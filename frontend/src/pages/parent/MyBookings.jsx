@@ -30,6 +30,16 @@ export default function MyBookings() {
   const load = useCallback(() => api.get('/parent/bookings').then((r) => setBookings(r.data.bookings)), [])
   useEffect(() => { load() }, [load])
 
+  // Opened from a notification (".../bookings?booking=12"): show that booking's details straight away, once
+  const focusId = Number(params.get('booking'))
+  useEffect(() => {
+    if (!focusId || !bookings) return
+    const b = bookings.find((x) => x.id === focusId)
+    if (b) setDetail(b)
+    setParams((p) => { p.delete('booking'); return p }, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusId, bookings])
+
   const counts = useMemo(() => {
     const list = bookings || []
     const n = (g) => list.filter((b) => GROUPS[g].includes(b.status)).length
