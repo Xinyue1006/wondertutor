@@ -18,6 +18,8 @@ router.post('/qualifications/:id/review', users.reviewQualification)
 
 // [XY] complaints
 router.get('/complaints', complaints.listComplaints)
+router.get('/complaints/report', complaints.complaintsReport)
+router.get('/complaints/export', complaints.exportComplaints)
 router.patch('/complaints/:id', complaints.updateComplaint)
 
 // [YH] booking oversight / finance / system settings go here
