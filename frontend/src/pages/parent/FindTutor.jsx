@@ -5,6 +5,7 @@ import { useMatching } from '../../assistant/MatchingContext'
 import Icon from '../../components/ui/Icon'
 import Robot from '../../components/ui/Robot'
 import TutorCard from '../../components/TutorCard'
+import Pagination from '../../components/ui/Pagination'
 import FilterChips, { NO_EXTRA } from '../../components/FilterChips'
 import { ErrorBox, FilterDropdown, PageTitle, SelectBox, Spinner, EmptyState } from '../../components/ui/Common'
 import { GRADE_GROUPS, parseGrade } from '../../lib/education'
@@ -18,6 +19,7 @@ const SORTS = [
   ['experience', 'Most Experienced'],
   ['nearest', 'Nearest'],
 ]
+const PAGE_SIZE = 9
 const HOURS = Array.from({ length: 15 }, (_, i) => `${String(i + 8).padStart(2, '0')}:00`) // 08:00 - 22:00
 
 export default function FindTutor() {
@@ -30,6 +32,8 @@ export default function FindTutor() {
   const [applied, setApplied] = useState(null)
   const [extra, setExtra] = useState(NO_EXTRA)
   const [sort, setSort] = useState('recommended')
+  const [page, setPage] = useState(1)
+  const resultsTop = useRef(null)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -54,7 +58,7 @@ export default function FindTutor() {
   const query = useMemo(() => {
     if (!applied) return null
     const { level, grade } = parseGrade(applied.grade)
-    const p = { subject: applied.subject, level, grade, sort }
+    const p = { subject: applied.subject, level, grade, sort, page, pageSize: PAGE_SIZE }
     if (applied.location) p.location = applied.location
     if (applied.date && applied.time) Object.assign(p, { date: applied.date, time: applied.time })
     if (extra.minPrice !== '') p.minPrice = extra.minPrice
@@ -65,7 +69,9 @@ export default function FindTutor() {
     if (extra.mode) p.mode = extra.mode
     if (extra.characteristics.length) p.characteristics = extra.characteristics.join(',')
     return p
-  }, [applied, extra, sort])
+  }, [applied, extra, sort, page])
+
+  useEffect(() => { setPage(1) }, [applied, extra, sort])
 
   useEffect(() => {
     if (!query) return
@@ -138,7 +144,15 @@ export default function FindTutor() {
       </section>
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-xl font-extrabold text-navy">{data ? `${data.total} tutor${data.total === 1 ? '' : 's'} found` : '…'}</h2>
+        <div ref={resultsTop} className="scroll-mt-24">
+          {/* "Showing 1–9 of 11 tutors": what is on screen out of everything that matches */}
+          <h2 className="text-xl font-bold text-navy" aria-live="polite">{resultsHeading(data)}</h2>
+          {data?.total > 0 && sort === 'recommended' && (
+            <p className="text-sm text-slate-600">
+              Best match first{data.rankedBy?.length ? `, based on ${data.rankedBy.join(' and ')}` : ''}. Every card shows its match score and why.
+            </p>
+          )}
+        </div>
         <label className="flex items-center gap-2 text-sm font-semibold text-navy">
           Sort by:
           <select value={sort} onChange={(e) => setSort(e.target.value)} className="input h-10 w-48 font-medium">
@@ -157,11 +171,32 @@ export default function FindTutor() {
           <div className="card"><EmptyState icon="search" title="No tutors match these filters">Try another subject or level, or remove some filters.</EmptyState></div>
         )}
         <div className={`grid gap-4 md:grid-cols-2 xl:grid-cols-3 ${loading ? 'opacity-60' : ''}`}>
-          {data?.tutors.map((t) => <TutorCard key={t.id} tutor={t} />)}
+          {data?.tutors.map((t) => <TutorCard key={t.id} tutor={t} match={t.match} />)}
         </div>
+        {data && (
+          <div className="mt-6">
+            <Pagination
+              page={data.page}
+              totalPages={data.totalPages}
+              onChange={(p) => { setPage(p); resultsTop.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }}
+              label="Tutor results pages"
+            />
+          </div>
+        )}
       </div>
     </div>
   )
+}
+
+// "Showing 1–9 of 11 tutors" / "Showing 1 tutor" / "No tutors found"
+export function resultsHeading(data) {
+  if (!data) return 'Searching…'
+  if (data.total === 0) return 'No tutors found'
+  const from = (data.page - 1) * data.pageSize + 1
+  const to = from + data.tutors.length - 1
+  if (data.total === 1) return 'Showing 1 tutor'
+  if (from === 1 && to === data.total) return `Showing all ${data.total} tutors`
+  return `Showing ${from}–${to} of ${data.total} tutors`
 }
 
 // "Select date & time" popover: a date and a 1-hour start time

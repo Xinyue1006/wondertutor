@@ -23,3 +23,14 @@ export function cleanPreferences(input) {
   const empty = p.mode === 'EITHER' && p.gender === 'ANY' && !p.characteristics.length && !p.days.length && !p.timePreset && p.budgetMax == null
   return empty ? null : p
 }
+
+// Default lesson window for each "time of day" preference (the same first choice the wizard shows)
+export const TIME_WINDOWS = { MORNING: ['09:00', '11:00'], AFTERNOON: ['14:00', '16:00'], EVENING: ['18:00', '20:00'] }
+
+// Saved preferences as SOFT matching criteria: they only change the weighted score, never who is eligible
+export function preferencesToCriteria(p) {
+  if (!p) return {}
+  const c = { mode: p.mode, gender: p.gender, characteristics: p.characteristics, days: p.days, budgetMax: p.budgetMax }
+  if (p.timePreset && TIME_WINDOWS[p.timePreset]) [c.timeStart, c.timeEnd] = TIME_WINDOWS[p.timePreset]
+  return c
+}

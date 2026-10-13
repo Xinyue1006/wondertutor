@@ -6,6 +6,7 @@ import { rankTutors, distanceKm } from '../../services/matching.service.js'
 import { tutorInclude, toTutorCard, toTutorProfile } from '../../services/tutor.service.js'
 import { getTutorSlots } from '../../services/booking.service.js'
 import { addDays, mondayOf, mytParts, mytToDate, toMinutes, todayMyt } from '../../utils/time.js'
+import { preferencesToCriteria } from '../../utils/preferences.js'
 
 // GET /parent/catalog: option lists for the filter bar, wizard and chatbot
 export function catalog(req, res) {
@@ -37,6 +38,8 @@ const browseSchema = z.object({
   maxDistance: z.coerce.number().optional(), // km
   characteristics: z.string().optional(), // "Structured,Interactive"
   sort: z.enum(['recommended', 'price_asc', 'price_desc', 'rating', 'experience', 'nearest']).default('recommended'),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(30).default(9),
 })
 
 // Tutors whose account is active and who teach the subject at the level (the DB-side part of the mandatory filter)
@@ -65,25 +68,40 @@ async function isFreeAt(tutor, date, time) {
   return !clash
 }
 
-// GET /parent/tutors: browse + filter + sort
+// GET /parent/tutors: browse + filter + sort + page
+//
+// Two different jobs, kept separate on purpose:
+//  - FILTERS (subject, level, and anything the parent picks in the filter bar) decide WHO is shown.
+//  - The RECOMMENDATION score decides the ORDER. Besides the search itself it uses the parent's saved
+//    preferences (gender, teaching style, days, time of day, budget, teaching mode) and their home area,
+//    as soft criteria in the approved weighted score. So two parents searching the same subject can see a
+//    different order, and every card carries its own match %, label and "why we recommend" reasons.
 export async function browseTutors(req, res) {
   const q = browseSchema.parse(req.query)
   const loc = q.location ? findLocation(q.location) : null
+  const prefs = preferencesToCriteria(req.parent.preferences)
+  const explicitDays = q.days ? q.days.split(',').map(Number) : []
+  const explicitStyles = q.characteristics ? q.characteristics.split(',') : []
+
+  // What the search asked for wins; otherwise the saved preference is used (for scoring only)
   const criteria = {
+    ...prefs,
     subject: q.subject,
     level: q.level,
     grade: q.grade,
-    lat: loc?.lat,
-    lng: loc?.lng,
-    mode: q.mode || 'EITHER',
-    days: q.days ? q.days.split(',').map(Number) : [],
-    characteristics: q.characteristics ? q.characteristics.split(',') : [],
+    lat: loc?.lat ?? req.parent.latitude ?? undefined,
+    lng: loc?.lng ?? req.parent.longitude ?? undefined,
+    mode: q.mode || prefs.mode || 'EITHER',
+    days: explicitDays.length ? explicitDays : prefs.days || [],
+    characteristics: explicitStyles.length ? explicitStyles : prefs.characteristics || [],
+    budgetMax: q.maxPrice ?? prefs.budgetMax ?? null,
   }
 
   const tutors = await activeTutors(q.subject, q.level)
-  // Mandatory filters + weighted score. Browse "Recommended" sorting reuses the matching service.
+  // Mandatory filters (subject + level/grade) + weighted score, best match first
   let ranked = rankTutors(tutors, criteria)
 
+  // Hard filters: only what the parent explicitly chose in the filter bar
   ranked = ranked.filter(({ tutor }) => {
     const rate = Number(tutor.hourlyRate)
     if (q.minPrice != null && rate < q.minPrice) return false
@@ -91,8 +109,8 @@ export async function browseTutors(req, res) {
     if (q.minRating != null && tutor.ratingAvg < q.minRating) return false
     if (q.mode === 'ONLINE' && !tutor.offersOnline) return false
     if (q.mode === 'PHYSICAL' && !tutor.offersPhysical) return false
-    if (criteria.days.length && !criteria.days.some((d) => tutor.availability.some((a) => a.dayOfWeek === d))) return false
-    if (criteria.characteristics.length && !criteria.characteristics.some((c) => (tutor.characteristics || []).includes(c))) return false
+    if (explicitDays.length && !explicitDays.some((d) => tutor.availability.some((a) => a.dayOfWeek === d))) return false
+    if (explicitStyles.length && !explicitStyles.some((c) => (tutor.characteristics || []).includes(c))) return false
     if (q.maxDistance != null && loc && tutor.offersPhysical && !tutor.offersOnline) {
       const km = distanceKm(loc.lat, loc.lng, tutor.latitude, tutor.longitude)
       if (km != null && km > q.maxDistance) return false
@@ -105,9 +123,7 @@ export async function browseTutors(req, res) {
     ranked = ranked.filter((_, i) => free[i])
   }
 
-  // "Recommended for your child" = the two strongest matches for the current filters (and at least 80%)
-  const recommendedIds = new Set(ranked.filter(({ match }) => match.score >= 80).slice(0, 2).map(({ tutor }) => tutor.id))
-
+  // "Recommended" keeps the score order; the other sorts re-order the same list (ties fall back to the score)
   const byFn = {
     price_asc: (a, b) => Number(a.tutor.hourlyRate) - Number(b.tutor.hourlyRate),
     price_desc: (a, b) => Number(b.tutor.hourlyRate) - Number(a.tutor.hourlyRate),
@@ -115,19 +131,36 @@ export async function browseTutors(req, res) {
     experience: (a, b) => b.tutor.yearsExperience - a.tutor.yearsExperience,
     nearest: (a, b) => (a.match.distanceKm ?? 999) - (b.match.distanceKm ?? 999),
   }[q.sort]
-  if (byFn) ranked.sort(byFn)
+  if (byFn) ranked = ranked.map((r, i) => ({ ...r, i })).sort((a, b) => byFn(a, b) || a.i - b.i)
+
+  // Page of results. A page past the end returns the last page instead of an empty list.
+  const total = ranked.length
+  const totalPages = Math.max(1, Math.ceil(total / q.pageSize))
+  const page = Math.min(q.page, totalPages)
+  const pageRows = ranked.slice((page - 1) * q.pageSize, page * q.pageSize)
 
   const favourites = new Set(
     (await prisma.favouriteTutor.findMany({ where: { parentId: req.parent.id }, select: { tutorId: true } })).map((f) => f.tutorId),
   )
 
+  // Tell the parent what the order is based on (explainability)
+  const p = req.parent.preferences
+  const basis = []
+  if (loc) basis.push(`distance from ${q.location}`)
+  else if (req.parent.latitude != null && req.parent.address) basis.push(`distance from your home area (${req.parent.address})`)
+  if (p && (p.gender !== 'ANY' || p.characteristics?.length || p.days?.length || p.timePreset || p.budgetMax != null || p.mode !== 'EITHER')) basis.push('your saved preferences')
+
   res.json({
-    total: ranked.length,
-    tutors: ranked.map(({ tutor, match }) => ({
+    total,
+    page,
+    pageSize: q.pageSize,
+    totalPages,
+    rankedBy: basis,
+    tutors: pageRows.map(({ tutor, match }) => ({
       ...toTutorCard(tutor, q.subject),
       isFavourite: favourites.has(tutor.id),
-      recommended: recommendedIds.has(tutor.id),
       distanceKm: match.distanceKm,
+      match: { score: match.score, label: match.label, reasons: match.reasons },
     })),
   })
 }
