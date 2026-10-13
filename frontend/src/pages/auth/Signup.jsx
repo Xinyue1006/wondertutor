@@ -146,7 +146,8 @@ export default function Signup() {
       <div className="pointer-events-none absolute inset-0 hidden overflow-hidden md:block" aria-hidden="true">
         <span className="absolute -left-24 top-16 h-72 w-72 rounded-full bg-brand-100/40" />
         <span className="absolute -left-10 bottom-10 h-40 w-40 rounded-full bg-brand-100/30" />
-        <img src="/img/art/leaf-corner.jpg" alt="" className="absolute bottom-0 right-0 h-56 w-auto opacity-90" style={{ maskImage: 'linear-gradient(to top, #000 50%, transparent), linear-gradient(to left, #000 50%, transparent)', maskComposite: 'intersect', WebkitMaskImage: 'linear-gradient(to top, #000 50%, transparent), linear-gradient(to left, #000 50%, transparent)', WebkitMaskComposite: 'source-in' }} />
+        {/* transparent cut-out of the plant: it bleeds off the right edge and fades out softly at the bottom, so nothing ends on a hard line */}
+        <img src="/img/art/leaf-corner.png" alt="" className="absolute bottom-3 right-0 h-[22rem] w-auto" />
       </div>
     <div className="relative mx-auto max-w-[81.25rem] px-4 md:px-8">
       <div className="relative">
