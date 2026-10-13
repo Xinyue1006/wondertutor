@@ -51,7 +51,8 @@ export async function getTutorSlots(tutorId, fromDate, days = 7) {
 }
 
 // Throws unless the requested hour is inside the tutor's availability and not taken
-export async function assertSlotBookable({ tutorId, startAt, endAt }) {
+// ignoreBookingId: when an existing booking is being moved, it must not clash with itself
+export async function assertSlotBookable({ tutorId, startAt, endAt, ignoreBookingId }) {
   if (startAt <= new Date()) throw new AppError(400, 'Please choose a time in the future')
   const { date, time, dow } = mytParts(startAt)
   const availability = await prisma.availabilitySlot.findMany({ where: { tutorId, dayOfWeek: dow } })
@@ -61,7 +62,7 @@ export async function assertSlotBookable({ tutorId, startAt, endAt }) {
   )
   if (!inside) throw new AppError(400, 'The tutor is not available at that time')
   const clash = await prisma.booking.findFirst({
-    where: { tutorId, status: { in: SLOT_BLOCKING }, startAt: { lt: endAt }, endAt: { gt: startAt } },
+    where: { tutorId, status: { in: SLOT_BLOCKING }, startAt: { lt: endAt }, endAt: { gt: startAt }, ...(ignoreBookingId && { id: { not: ignoreBookingId } }) },
   })
   if (clash) throw new AppError(409, 'That time slot has just been taken. Please pick another slot.')
 }

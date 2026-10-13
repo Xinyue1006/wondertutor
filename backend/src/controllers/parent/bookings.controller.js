@@ -4,6 +4,7 @@ import { AppError } from '../../utils/AppError.js'
 import { assertChildFree, assertSlotBookable } from '../../services/booking.service.js'
 import { bookingInclude, toBookingDto } from '../../services/booking.dto.js'
 import { notify } from '../../services/notification.service.js'
+import { requestReschedule as askReschedule, respondReschedule, withdrawReschedule } from '../../services/reschedule.service.js'
 import { fromMinutes, mytToDate, toMinutes } from '../../utils/time.js'
 
 const createSchema = z.object({
@@ -199,4 +200,35 @@ export async function cancelBooking(req, res) {
     link: '/tutor/bookings',
   })
   res.json({ booking: toBookingDto(updated) })
+}
+
+// ───────────── Reschedule (mutual agreement, otherwise Admin decides) ─────────────
+// bookingInclude carries both user ids (parent.userId, tutor.userId), which the service needs to notify the right person
+const withParties = ownBooking
+
+const reloadDto = async (id) => toBookingDto(await prisma.booking.findUnique({ where: { id }, include: bookingInclude }))
+
+// POST /parent/bookings/:id/reschedule { date, startTime, reason? }
+export async function requestReschedule(req, res) {
+  const data = z
+    .object({
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Choose a date'),
+      startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Choose a time'),
+      reason: z.string().trim().max(200, 'Reason must be 200 characters or fewer').optional(),
+    })
+    .parse(req.body)
+  const booking = await withParties(req)
+  await askReschedule({ booking, byUserId: req.user.id, ...data })
+  res.status(201).json({ booking: await reloadDto(booking.id) })
+}
+
+// POST /parent/bookings/:id/reschedule/:requestId/accept | decline | withdraw
+export async function answerReschedule(req, res) {
+  const booking = await withParties(req)
+  const requestId = Number(req.params.requestId)
+  const action = req.params.action
+  if (action === 'withdraw') await withdrawReschedule({ booking, requestId, byUserId: req.user.id })
+  else if (action === 'accept' || action === 'decline') await respondReschedule({ booking, requestId, byUserId: req.user.id, accept: action === 'accept' })
+  else throw new AppError(404, 'Unknown action')
+  res.json({ booking: await reloadDto(booking.id) })
 }

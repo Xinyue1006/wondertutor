@@ -44,6 +44,8 @@ router.post('/bookings/:id/decline-counter', bookings.declineCounter)
 router.post('/bookings/:id/cancel', bookings.cancelBooking)
 router.post('/bookings/:id/refund-request', bookings.requestRefund)
 router.post('/bookings/:id/review', reviews.createReview)
+router.post('/bookings/:id/reschedule', bookings.requestReschedule)
+router.post('/bookings/:id/reschedule/:requestId/:action', bookings.answerReschedule)
 
 router.get('/complaints', complaints.listComplaints)
 router.post('/complaints', complaints.createComplaint)
