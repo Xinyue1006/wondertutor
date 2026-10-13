@@ -4,6 +4,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import api from '../api/client'
 import { useAuth } from '../context/AuthContext'
+import { preferencesToCriteria } from '../lib/preferences'
 
 const Ctx = createContext(null)
 
@@ -63,7 +64,11 @@ export function MatchingProvider({ children }) {
 
   useEffect(() => {
     if (user?.role !== 'PARENT') return
-    api.get('/parent/catalog').then((r) => setCatalog(r.data)).catch(() => {})
+    api.get('/parent/catalog').then((r) => {
+      setCatalog(r.data)
+      // The parent's saved preferences (signup / My Profile) are the starting point of every search
+      setCriteria((c) => ({ ...c, ...preferencesToCriteria(r.data.preferences) }))
+    }).catch(() => {})
     refreshChildren().catch(() => {})
   }, [user, refreshChildren])
 

@@ -16,6 +16,8 @@ export function catalog(req, res) {
     locations: LOCATIONS.map((l) => l.name),
     // The parent's saved address, used as the default "Location" filter when it is a known area
     homeLocation: LOCATIONS.some((l) => l.name === req.parent.address) ? req.parent.address : null,
+    // Saved signup/profile preferences: the matching wizard starts from these
+    preferences: req.parent.preferences ?? null,
   })
 }
 

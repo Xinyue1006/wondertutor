@@ -80,4 +80,30 @@ describe('Login page', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Log In' }))
     await waitFor(() => expect(loginCalls).toHaveLength(0))
   })
+
+  test('each problem is shown next to its own field and nothing is sent', async () => {
+    renderLogin()
+    await userEvent.click(screen.getByRole('button', { name: 'Log In' }))
+    expect(await screen.findByText('Enter your email address.')).toBeInTheDocument()
+    expect(screen.getByText('Enter your password.')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('you@example.com')).toHaveAttribute('aria-invalid', 'true')
+    expect(loginCalls).toHaveLength(0)
+  })
+
+  test('keyboard focus moves to the first field that needs fixing', async () => {
+    renderLogin()
+    await userEvent.type(screen.getByPlaceholderText('Enter your password'), 'secret')
+    await userEvent.click(screen.getByRole('button', { name: 'Log In' }))
+    expect(screen.getByPlaceholderText('you@example.com')).toHaveFocus()
+  })
+
+  test('a badly formed email is explained and the error clears once the visitor edits it', async () => {
+    renderLogin()
+    await userEvent.type(screen.getByPlaceholderText('you@example.com'), 'not-an-email')
+    await userEvent.type(screen.getByPlaceholderText('Enter your password'), 'secret')
+    await userEvent.click(screen.getByRole('button', { name: 'Log In' }))
+    expect(await screen.findByText(/Enter a valid email/)).toBeInTheDocument()
+    await userEvent.type(screen.getByPlaceholderText('you@example.com'), 'x')
+    expect(screen.queryByText(/Enter a valid email/)).not.toBeInTheDocument()
+  })
 })

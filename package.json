@@ -3,6 +3,8 @@
   "private": true,
   "description": "Root scripts so the whole project can be built and started from one place (used for hosting)",
   "scripts": {
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
     "build": "npm --prefix frontend install && npm --prefix frontend run build && npm --prefix backend install && npm --prefix backend run db:deploy",
     "start": "npm --prefix backend start"
   }
