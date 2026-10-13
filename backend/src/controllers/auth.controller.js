@@ -8,7 +8,7 @@ import { signToken } from '../services/token.service.js'
 import { issueOtp, checkOtp } from '../services/otp.service.js'
 import { verifyRecaptcha } from '../services/recaptcha.service.js'
 import { cleanPreferences, preferencesSchema } from '../utils/preferences.js'
-import { findLocation } from '../data/catalog.js'
+import { SUBJECTS, findLocation } from '../data/catalog.js'
 
 // Never send passwordHash etc. to the client
 export function toUserDto(u) {
@@ -44,7 +44,7 @@ const registerSchema = z
           name: z.string().trim().min(1),
           educationLevel: z.enum(['KINDERGARTEN', 'PRIMARY', 'SECONDARY']),
           grade: z.coerce.number().int().min(1).max(6),
-          subject: z.string().trim().min(1).max(60).optional(), // the subject the child needs tuition in
+          subject: z.enum(SUBJECTS, { message: 'Choose a subject from the list' }).optional(), // the subject the child needs tuition in
           notes: z.string().trim().max(500).optional(), // learning needs or goals
         }),
       )
