@@ -34,7 +34,7 @@ export async function dashboard(req, res) {
     children: children.map(toChildDto),
     counts,
     upcoming: upcoming.map(toBookingDto),
-    activity: activity.map((n) => ({ id: n.id, type: n.type, title: n.title, message: n.message, createdAt: n.createdAt })),
+    activity: activity.map((n) => ({ id: n.id, type: n.type, title: n.title, message: n.message, link: n.link, createdAt: n.createdAt })),
     lastSearch: lastSearch ? { id: lastSearch.id, criteria: lastSearch.criteria, createdAt: lastSearch.createdAt } : null,
   })
 }

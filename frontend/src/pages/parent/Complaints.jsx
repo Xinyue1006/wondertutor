@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import api, { errorMessage } from '../../api/client'
 import Icon from '../../components/ui/Icon'
-import { EmptyState, ErrorBox, Modal, PageTitle, SelectBox, Spinner } from '../../components/ui/Common'
+import { EmptyState, ErrorBox, LoadError, Modal, PageTitle, SelectBox, Spinner } from '../../components/ui/Common'
 import { fmtDate, fmtShortDate } from '../../lib/format'
 import { checkText } from '../../lib/validation'
 
@@ -28,10 +28,12 @@ export default function Complaints() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
-  const load = () => api.get('/parent/complaints').then((r) => setData(r.data))
+  const [loadError, setLoadError] = useState('')
+  const load = () => { setLoadError(''); return api.get('/parent/complaints').then((r) => setData(r.data)).catch((e) => setLoadError(errorMessage(e))) }
   useEffect(() => {
     load()
-    api.get('/parent/bookings').then((r) => setBookings(r.data.bookings.filter((b) => ['CONFIRMED', 'COMPLETED', 'CANCELLED'].includes(b.status))))
+    // Only for the optional "which lesson" dropdown: if it fails, the complaint can still be filed without one
+    api.get('/parent/bookings').then((r) => setBookings(r.data.bookings.filter((b) => ['CONFIRMED', 'COMPLETED', 'CANCELLED', 'DISPUTED'].includes(b.status)))).catch(() => {})
   }, [])
 
   // Deep link from a lesson: /parent/complaints?booking=<id>
@@ -71,7 +73,7 @@ export default function Complaints() {
     }
   }
 
-  if (!data) return <Spinner />
+  if (!data) return loadError ? <LoadError message={loadError} onRetry={load} /> : <Spinner />
 
   return (
     <div>

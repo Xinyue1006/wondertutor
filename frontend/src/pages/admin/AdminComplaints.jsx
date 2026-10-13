@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import api, { errorMessage } from '../../api/client'
 import Icon from '../../components/ui/Icon'
-import { EmptyState, ErrorBox, Modal, PageTitle, Spinner } from '../../components/ui/Common'
+import { EmptyState, ErrorBox, LoadError, Modal, PageTitle, Spinner } from '../../components/ui/Common'
 import { ComplaintPill } from '../parent/Complaints'
 import { fmtDate, fmtShortDate } from '../../lib/format'
 import ComplaintsReport from '../../components/ComplaintsReport'
@@ -14,7 +14,11 @@ export default function AdminComplaints() {
   const [data, setData] = useState(null)
   const [sel, setSel] = useState(null)
 
-  const load = useCallback(() => api.get('/admin/complaints', { params: { status } }).then((r) => setData(r.data)), [status])
+  const [loadError, setLoadError] = useState('')
+  const load = useCallback(() => {
+    setLoadError('')
+    return api.get('/admin/complaints', { params: { status } }).then((r) => setData(r.data)).catch((e) => setLoadError(errorMessage(e)))
+  }, [status])
   useEffect(() => { load() }, [load])
 
   const total = data ? Object.values(data.counts).reduce((a, b) => a + b, 0) : 0
@@ -30,7 +34,7 @@ export default function AdminComplaints() {
           </button>))}
       </div>
 
-      {!data ? <Spinner /> : data.complaints.length === 0 ? (
+      {!data ? (loadError ? <LoadError message={loadError} onRetry={load} /> : <Spinner />) : data.complaints.length === 0 ? (
         <div className="card"><EmptyState icon="shield" title="No complaints here">Nothing to review in this list.</EmptyState></div>
       ) : (
         <div className="space-y-3">

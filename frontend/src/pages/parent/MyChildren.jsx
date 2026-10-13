@@ -5,7 +5,7 @@ import { useMatching } from '../../assistant/MatchingContext'
 import Avatar from '../../components/ui/Avatar'
 import PhotoPicker from '../../components/PhotoPicker'
 import Icon from '../../components/ui/Icon'
-import { EmptyState, ErrorBox, Modal, PageTitle, SelectBox, Spinner } from '../../components/ui/Common'
+import { EmptyState, ErrorBox, LoadError, Modal, PageTitle, SelectBox, Spinner } from '../../components/ui/Common'
 import { GRADE_GROUPS, gradeLabel, parseGrade } from '../../lib/education'
 import { checkName, checkText } from '../../lib/validation'
 
@@ -23,7 +23,11 @@ export default function MyChildren() {
   const [busy, setBusy] = useState(false)
   const [removing, setRemoving] = useState(null)
 
-  const load = () => api.get('/parent/children').then((r) => { setKids(r.data.children); return r.data.children })
+  const [loadError, setLoadError] = useState('')
+  const load = () => {
+    setLoadError('')
+    return api.get('/parent/children').then((r) => { setKids(r.data.children); return r.data.children }).catch((e) => { setLoadError(errorMessage(e)); return [] })
+  }
   useEffect(() => { load() }, [])
 
   // Deep links from the dashboard: ?add=1 / ?edit=<id>
@@ -77,7 +81,7 @@ export default function MyChildren() {
     }
   }
 
-  if (!kids) return <Spinner />
+  if (!kids) return loadError ? <LoadError message={loadError} onRetry={load} /> : <Spinner />
 
   return (
     <div>

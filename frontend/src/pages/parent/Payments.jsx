@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import api, { errorMessage } from '../../api/client'
 import Avatar from '../../components/ui/Avatar'
 import Icon from '../../components/ui/Icon'
-import { EmptyState, ErrorBox, Modal, PageTitle, SelectBox, Spinner, StatusPill } from '../../components/ui/Common'
+import { EmptyState, ErrorBox, LoadError, Modal, PageTitle, SelectBox, Spinner, StatusPill } from '../../components/ui/Common'
 import LessonDetails from '../../components/LessonDetails'
 import { fmtDate, fmtTime, fmtTimeRange, money } from '../../lib/format'
 import { gradeLabel } from '../../lib/education'
@@ -21,9 +21,10 @@ export default function Payments() {
   const [methodOpen, setMethodOpen] = useState(false)
   const [bank, setBank] = useState(savedBank())
 
-  const load = () => api.get('/parent/payments').then((r) => setData(r.data))
+  const [loadError, setLoadError] = useState('')
+  const load = () => { setLoadError(''); return api.get('/parent/payments').then((r) => setData(r.data)).catch((e) => setLoadError(errorMessage(e))) }
   useEffect(() => { load() }, [])
-  if (!data) return <Spinner />
+  if (!data) return loadError ? <LoadError message={loadError} onRetry={load} /> : <Spinner />
 
   const { required, summary, transactions, banks } = data
   const rows = showAll ? transactions : transactions.slice(0, 5)

@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import api, { errorMessage } from '../../api/client'
 import Avatar from '../../components/ui/Avatar'
 import Icon from '../../components/ui/Icon'
-import { EmptyState, ErrorBox, Modal, PageTitle, Spinner, VerifiedTick } from '../../components/ui/Common'
+import { EmptyState, ErrorBox, LoadError, Modal, PageTitle, Spinner, VerifiedTick } from '../../components/ui/Common'
 import { fmtShortDate } from '../../lib/format'
 import { gradeLabel } from '../../lib/education'
 
@@ -18,8 +18,10 @@ export default function AdminUsers() {
   const flagged = params.get('flagged') || ''
   const pending = params.get('pending') || ''
 
+  const [loadError, setLoadError] = useState('')
   const load = useCallback(() => {
-    api.get('/admin/users', { params: { role, status, flagged, q } }).then((r) => setData(r.data))
+    setLoadError('')
+    api.get('/admin/users', { params: { role, status, flagged, q } }).then((r) => setData(r.data)).catch((e) => setLoadError(errorMessage(e)))
   }, [role, status, flagged, q])
   useEffect(() => {
     const t = setTimeout(load, 250) // wait for the admin to stop typing
@@ -54,7 +56,7 @@ export default function AdminUsers() {
         </label>
       </div>
 
-      {!data ? <Spinner /> : users.length === 0 ? (
+      {!data ? (loadError ? <LoadError message={loadError} onRetry={load} /> : <Spinner />) : users.length === 0 ? (
         <div className="card"><EmptyState icon="user" title="No users found">Try different filters.</EmptyState></div>
       ) : (
         <div className="card overflow-x-auto p-2">
@@ -94,7 +96,7 @@ function UserModal({ id, onClose, onChanged }) {
   const [note, setNote] = useState('')
   const [confirm, setConfirm] = useState(false)
 
-  const load = useCallback(() => api.get(`/admin/users/${id}`).then((r) => setUser(r.data.user)), [id])
+  const load = useCallback(() => api.get(`/admin/users/${id}`).then((r) => setUser(r.data.user)).catch((e) => setError(errorMessage(e))), [id])
   useEffect(() => { setUser(null); setError(''); setConfirm(false); if (id) load() }, [id, load])
   if (!id) return null
 
@@ -108,7 +110,7 @@ function UserModal({ id, onClose, onChanged }) {
 
   return (
     <Modal open onClose={onClose} title={user ? user.fullName : 'Loading…'} width="max-w-2xl">
-      {!user ? <Spinner /> : (
+      {!user ? (error ? <ErrorBox>{error}</ErrorBox> : <Spinner />) : (
         <div className="space-y-4">
           <ErrorBox>{error}</ErrorBox>
           <div className="grid gap-2 rounded-xl bg-brand-25 p-4 text-sm sm:grid-cols-2">

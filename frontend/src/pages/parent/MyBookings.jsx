@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import api, { errorMessage } from '../../api/client'
 import Avatar from '../../components/ui/Avatar'
 import Icon from '../../components/ui/Icon'
-import { EmptyState, ErrorBox, Modal, PageTitle, Spinner, StatusPill, Stars, VerifiedTick } from '../../components/ui/Common'
+import { EmptyState, ErrorBox, LoadError, Modal, PageTitle, Spinner, StatusPill, Stars, VerifiedTick } from '../../components/ui/Common'
 import LessonDetails from '../../components/LessonDetails'
 import RescheduleModal from '../../components/RescheduleModal'
 import { pickImage } from '../../components/PhotoPicker'
@@ -32,7 +32,11 @@ export default function MyBookings() {
   const inFlight = useRef(false)
   const [acting, setActing] = useState(false)
 
-  const load = useCallback(() => api.get('/parent/bookings').then((r) => setBookings(r.data.bookings)), [])
+  const [loadError, setLoadError] = useState('')
+  const load = useCallback(() => {
+    setLoadError('')
+    return api.get('/parent/bookings').then((r) => setBookings(r.data.bookings)).catch((e) => setLoadError(errorMessage(e)))
+  }, [])
   useEffect(() => { load() }, [load])
 
   // Opened from a notification (".../bookings?booking=12"): show that booking's details straight away, once
@@ -51,7 +55,7 @@ export default function MyBookings() {
     return { all: list.length, pending: n('pending'), upcoming: n('upcoming'), completed: n('completed'), cancelled: n('cancelled'), finished: list.filter((b) => b.status === 'COMPLETED').length }
   }, [bookings])
 
-  if (!bookings) return <Spinner />
+  if (!bookings) return loadError ? <LoadError message={loadError} onRetry={load} /> : <Spinner />
 
   const sorted = [...bookings].sort((a, b) => (sortNewest ? new Date(b.startAt) - new Date(a.startAt) : new Date(a.startAt) - new Date(b.startAt)))
   const show = (group) => tab === 'all' || tab === group

@@ -6,7 +6,7 @@ import PhotoPicker from '../../components/PhotoPicker'
 import PreferencesFields from '../../components/PreferencesFields'
 import { fromApiPreferences, toApiPreferences } from '../../lib/preferences'
 import Icon from '../../components/ui/Icon'
-import { ErrorBox, PageTitle, Spinner } from '../../components/ui/Common'
+import { ErrorBox, LoadError, PageTitle, Spinner } from '../../components/ui/Common'
 import { checkName, checkPassword, checkPhone, checkText, normalizePhone } from '../../lib/validation'
 
 // My Profile: edit contact details + address (used for tutor distance), change password
@@ -27,16 +27,19 @@ export default function Profile() {
   const [pwError, setPwError] = useState('')
   const [pwBusy, setPwBusy] = useState(false)
 
-  useEffect(() => {
+  const [loadError, setLoadError] = useState('')
+  const load = () => {
+    setLoadError('')
     api.get('/parent/profile').then((r) => {
       const p = r.data.profile
       setForm({ fullName: p.fullName, phone: p.phone || '', address: p.address || '', profilePhotoUrl: p.profilePhotoUrl })
       setHasPassword(p.hasPassword)
       setPrefs(fromApiPreferences(p.preferences))
-    })
-  }, [])
+    }).catch((e) => setLoadError(errorMessage(e)))
+  }
+  useEffect(() => { load() }, [])
 
-  if (!form || !prefs) return <Spinner />
+  if (!form || !prefs) return loadError ? <LoadError message={loadError} onRetry={load} /> : <Spinner />
 
   async function save(e) {
     e.preventDefault()
