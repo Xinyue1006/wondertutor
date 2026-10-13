@@ -25,30 +25,109 @@ const BUDGETS = [
 const budgetText = (c) =>
   c.budgetMax == null ? 'Any budget' : (c.budgetMin ?? 20) <= 20 ? `Up to RM${c.budgetMax}/hour` : `RM${c.budgetMin} – RM${c.budgetMax}/hour`
 
+// The launcher can be dragged anywhere (mouse, touch or pen) so it never hides content the parent needs.
+// A short tap still opens the chat; the arrow keys move it for keyboard users; the spot is remembered in this browser.
+const POS_KEY = 'wt-assistant-pos'
+const SIZE = 76
+const MARGIN = 8
+const DRAG_THRESHOLD = 6 // px of movement before a press counts as a drag rather than a tap
+
+const clampPos = ({ right, bottom }) => ({
+  right: Math.min(Math.max(right, MARGIN), window.innerWidth - SIZE - MARGIN),
+  bottom: Math.min(Math.max(bottom, MARGIN), window.innerHeight - SIZE - MARGIN),
+})
+
+function loadPos() {
+  try {
+    const p = JSON.parse(localStorage.getItem(POS_KEY) || 'null')
+    if (p && Number.isFinite(p.right) && Number.isFinite(p.bottom)) return clampPos(p)
+  } catch { /* storage blocked or bad value: use the default corner */ }
+  return { right: 16, bottom: 16 }
+}
+
 export default function AssistantWidget() {
   const { chatOpen, setChatOpen } = useMatching()
   const [bubble, setBubble] = useState(true)
+  const [pos, setPos] = useState(loadPos)
+  const [dragging, setDragging] = useState(false)
+  const drag = useRef(null) // { x, y, start, moved }
+  const suppressClick = useRef(false)
+
+  const save = (p) => { try { localStorage.setItem(POS_KEY, JSON.stringify(p)) } catch { /* not remembered */ } }
+
+  // Keep it on screen when the window gets smaller
+  useEffect(() => {
+    const onResize = () => setPos((p) => clampPos(p))
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  function onPointerDown(e) {
+    if (e.button !== undefined && e.button !== 0) return
+    drag.current = { x: e.clientX, y: e.clientY, start: pos, moved: false }
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+  }
+  function onPointerMove(e) {
+    const d = drag.current
+    if (!d) return
+    const dx = e.clientX - d.x
+    const dy = e.clientY - d.y
+    if (!d.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return
+    if (!d.moved) { d.moved = true; setDragging(true); setBubble(false) }
+    setPos(clampPos({ right: d.start.right - dx, bottom: d.start.bottom - dy }))
+  }
+  function onPointerUp() {
+    const d = drag.current
+    drag.current = null
+    if (d?.moved) {
+      suppressClick.current = true // the click that follows a drag must not open the chat
+      setDragging(false)
+      setPos((p) => { save(p); return p })
+    }
+  }
+  function onClick() {
+    if (suppressClick.current) { suppressClick.current = false; return }
+    setChatOpen(!chatOpen)
+  }
+  function onKeyDown(e) {
+    const step = e.shiftKey ? 64 : 16
+    const move = { ArrowLeft: [step, 0], ArrowRight: [-step, 0], ArrowUp: [0, step], ArrowDown: [0, -step] }[e.key]
+    if (!move) return
+    e.preventDefault()
+    setPos((p) => { const next = clampPos({ right: p.right + move[0], bottom: p.bottom + move[1] }); save(next); return next })
+  }
+
+  // When the button sits on the left half of the screen, the greeting opens towards the right so it stays visible
+  const onLeft = pos.right + SIZE / 2 > window.innerWidth / 2
 
   return (
     <>
       {chatOpen && <ChatPanel />}
-      <div className="fixed bottom-4 right-4 z-40 flex flex-col items-end">
-        {bubble && !chatOpen && (
-          <div className="pop-in relative mb-1 mr-2 w-48 rounded-xl bg-white px-3 py-2 text-left shadow-lg ring-1 ring-brand-100">
+      <div className={`fixed z-40 flex flex-col ${onLeft ? 'items-start' : 'items-end'}`} style={{ right: pos.right, bottom: pos.bottom }}>
+        {bubble && !chatOpen && !dragging && (
+          <div className={`pop-in relative mb-1 w-48 rounded-xl bg-white px-3 py-2 text-left shadow-lg ring-1 ring-brand-100 ${onLeft ? 'ml-2' : 'mr-2'}`}>
             <button onClick={() => setBubble(false)} className="absolute right-1.5 top-1.5 text-slate-400 hover:text-slate-600" aria-label="Dismiss">
               <Icon name="x" className="h-3.5 w-3.5" />
             </button>
             <div className="text-xs font-bold text-navy">AI Tutor Assistant</div>
-            <div className="text-xs text-slate-500">Hi! How can I help you today?</div>
-            <span className="absolute -bottom-1.5 right-8 h-3 w-3 rotate-45 bg-white ring-1 ring-brand-100 [clip-path:polygon(100%_0,100%_100%,0_100%)]" />
+            <div className="text-xs text-slate-600">Hi! How can I help you today?</div>
+            <span className={`absolute -bottom-1.5 h-3 w-3 rotate-45 bg-white ring-1 ring-brand-100 [clip-path:polygon(100%_0,100%_100%,0_100%)] ${onLeft ? 'left-8' : 'right-8'}`} />
           </div>
         )}
         <button
-          onClick={() => setChatOpen(!chatOpen)}
-          className="float-y flex h-[76px] w-[76px] items-center justify-center rounded-full bg-white shadow-xl ring-2 ring-brand-100 transition hover:scale-105"
-          aria-label={chatOpen ? 'Close AI Tutor Assistant' : 'Open AI Tutor Assistant'}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          onClick={onClick}
+          onKeyDown={onKeyDown}
+          title="Drag to move. Click to chat."
+          className={`flex h-[76px] w-[76px] touch-none select-none items-center justify-center rounded-full bg-white shadow-xl ring-2 ring-brand-100 transition-transform ${
+            dragging ? 'scale-105 cursor-grabbing' : 'float-y cursor-grab hover:scale-105'
+          }`}
+          aria-label={chatOpen ? 'Close AI Tutor Assistant' : 'Open AI Tutor Assistant (use the arrow keys to move this button)'}
         >
-          <Robot className="h-[62px] w-[62px]" />
+          <Robot className="pointer-events-none h-[62px] w-[62px]" />
         </button>
       </div>
     </>
