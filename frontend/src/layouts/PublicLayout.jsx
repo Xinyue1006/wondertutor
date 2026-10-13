@@ -32,7 +32,7 @@ export default function PublicLayout() {
     <div className={`min-h-screen overflow-x-clip ${isHome ? 'bg-gradient-to-b from-[#f9fbff] to-white' : ''}`}>
       {/* Plain full-width bar (no box or border), like the landing mockup */}
       <header className="relative z-20 w-full bg-white">
-        <div className="mx-auto flex max-w-[1300px] items-center justify-between gap-3 px-4 py-2 md:px-8">
+        <div className="mx-auto flex max-w-[81.25rem] items-center justify-between gap-3 px-4 py-2 md:px-8">
           <Link to="/" aria-label="WonderTutor home" className="flex min-h-11 items-center">
             {/* The compact "W" mark on phones keeps room for the Log In / Sign Up buttons */}
             <Logo mark className="h-9 sm:hidden" />
@@ -70,12 +70,12 @@ export default function PublicLayout() {
           </nav>
         )}
       </header>
-      <main className={`mx-auto max-w-[1300px] px-3 md:px-6 ${isHome ? '' : 'pb-10'}`}>
+      <main className={`mx-auto max-w-[81.25rem] px-3 md:px-6 ${isHome ? '' : 'pb-10'}`}>
         <Outlet />
       </main>
       {/* Footer: light-blue band in the same container width as the sections. On the landing page it touches the CTA banner directly. */}
       <footer id="about" className={`scroll-mt-24 bg-brand-50 text-sm text-slate-700 ${isHome ? '' : 'mt-2'}`}>
-        <div className="mx-auto grid max-w-[1300px] gap-8 px-4 py-8 md:px-8 lg:grid-cols-[26rem_1fr] lg:gap-16">
+        <div className="mx-auto grid max-w-[81.25rem] gap-8 px-4 py-8 md:px-8 lg:grid-cols-[26rem_1fr] lg:gap-16">
           <div>
             <Logo className="h-9" />
             <p className="mt-3 max-w-sm">A trusted tutoring platform connecting parents and tutors for a brighter tomorrow. Built with Wonderland Learning Materials &amp; Tuition Centre.</p>
@@ -106,7 +106,7 @@ export default function PublicLayout() {
             </div>
           </div>
         </div>
-        <div className="mx-auto max-w-[1300px] px-4 md:px-8">
+        <div className="mx-auto max-w-[81.25rem] px-4 md:px-8">
           <div className="flex flex-wrap items-center justify-between gap-1 border-t border-brand-200/70 py-4 text-sm text-slate-600">
             <span>&copy; {new Date().getFullYear()} WonderTutor. All rights reserved.</span>
             <span>Learn Today, Brighter Tomorrow.</span>

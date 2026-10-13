@@ -80,7 +80,7 @@ export default function MatchingWizard() {
 
       <Stepper step={step} />
 
-      <section className="card mx-auto mt-4 max-w-[1000px] p-6 md:p-8">
+      <section className="card mx-auto mt-4 max-w-[62.5rem] p-6 md:p-8">
         <ErrorBox className="mb-4">{error}</ErrorBox>
         {step === 0 && <StepLearning c={c} kids={kids} catalog={catalog} patch={patchCriteria} applyChild={applyChild} onNext={next} />}
         {step === 1 && <StepSchedule c={c} catalog={catalog} patch={patchCriteria} onBack={() => setStep(0)} onNext={next} />}

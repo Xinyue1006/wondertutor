@@ -152,3 +152,7 @@ body {
   .grid > *, .flex > * { min-width: 0; }
   img, svg, video { max-width: 100%; }
 }
+
+/* Fluid scale for big monitors: the root size stays 16px up to a 1440px-wide window, then grows gently (about 20px at 1900px).
+   Tailwind sizes and the page container are in rem, so the whole layout scales with it instead of sitting small in the middle. */
+html { font-size: clamp(16px, 0.833vw + 4px, 22px); }

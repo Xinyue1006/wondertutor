@@ -137,10 +137,10 @@ export default function Home() {
           src="/img/art/hero-girl.jpg"
           alt=""
           aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0 right-0 hidden h-full w-auto max-w-[62%] object-cover object-right lg:block"
+          className="pointer-events-none absolute inset-y-0 right-0 hidden h-full w-[52%] object-cover object-[right_58%] lg:block"
           style={{ maskImage: 'linear-gradient(to right, transparent 0%, rgba(0,0,0,0.35) 18%, rgba(0,0,0,0.8) 36%, #000 55%)', WebkitMaskImage: 'linear-gradient(to right, transparent 0%, rgba(0,0,0,0.35) 18%, rgba(0,0,0,0.8) 36%, #000 55%)' }}
         />
-        <div className="relative mx-auto max-w-[1300px] px-4 py-8 md:px-8 md:py-10">
+        <div className="relative mx-auto max-w-[81.25rem] px-4 py-8 md:px-8 md:py-10">
           <div className="lg:w-[50%] lg:pl-14">
             <div className="eyebrow">Personalised tutor matching</div>
             <h1 id="hero-title" className="mt-2 font-display text-4xl font-bold leading-[1.12] text-navy md:text-[2.5rem]">
@@ -344,7 +344,7 @@ export default function Home() {
         <p className="pointer-events-none absolute right-[8%] top-1/2 hidden -translate-y-1/2 -rotate-6 text-center font-hand text-xl leading-5 text-white/55 lg:block" aria-hidden="true">
           Learn<br />Grow<br />Belong<br /><span className="text-accent/70">♡</span>
         </p>
-        <div className="relative mx-auto flex max-w-[1300px] flex-wrap items-center justify-between gap-5 px-4 py-9 md:px-8 lg:pl-28 lg:pr-48">
+        <div className="relative mx-auto flex max-w-[81.25rem] flex-wrap items-center justify-between gap-5 px-4 py-9 md:px-8 lg:pl-28 lg:pr-48">
           <div>
             <h2 id="cta-title" className="font-display text-2xl font-bold md:text-3xl">Ready to Start Your Child's Learning Journey?</h2>
             <p className="mt-1 text-base text-white/90">Join learners and tutors in building a brighter future together.</p>
