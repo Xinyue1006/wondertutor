@@ -63,9 +63,15 @@ export async function getUser(req, res) {
   })
   if (!user) throw new AppError(404, 'User not found')
   const threshold = await getThreshold()
+  // Lessons still to come, so Admin knows who is affected before deactivating the account
+  const who = user.tutor ? { tutorId: user.tutor.id } : user.parent ? { parentId: user.parent.id } : null
+  const upcomingLessons = who
+    ? await prisma.booking.count({ where: { ...who, status: { in: ['PENDING', 'COUNTER_OFFERED', 'AWAITING_PAYMENT', 'CONFIRMED'] }, startAt: { gt: new Date() } } })
+    : 0
   res.json({
     user: {
       ...dto(user, threshold),
+      upcomingLessons,
       qualifications: user.tutor?.qualifications ?? [],
       subjects: user.tutor?.subjects ?? [],
       children: user.parent?.children.map((c) => ({ id: c.id, name: c.name, educationLevel: c.educationLevel, grade: c.grade })) ?? [],

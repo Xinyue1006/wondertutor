@@ -6,7 +6,7 @@ import { ErrorBox } from './ui/Common'
 // Admin summary of how complaints are being handled, for any date range, plus a CSV download for record keeping
 const hoursLabel = (h) => (h == null ? '—' : h < 48 ? `${h} h` : `${Math.round((h / 24) * 10) / 10} days`)
 
-export default function ComplaintsReport() {
+export default function ComplaintsReport({ refreshKey = 0 }) {
   const [range, setRange] = useState({ from: '', to: '' })
   const [report, setReport] = useState(null)
   const [error, setError] = useState('')
@@ -19,7 +19,7 @@ export default function ComplaintsReport() {
     setError('')
     api.get('/admin/complaints/report', { params }).then((r) => setReport(r.data)).catch((e) => setError(errorMessage(e)))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [range.from, range.to])
+  }, [range.from, range.to, refreshKey])
 
   async function download() {
     setDownloading(true)

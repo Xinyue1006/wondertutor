@@ -179,3 +179,16 @@ describe('business rules from the client brief', () => {
     expect(second.message).toContain('cannot be a trial lesson')
   })
 })
+
+describe('admin user management', () => {
+  test("a user's detail says how many lessons are still to come, so Admin knows who deactivation affects", async () => {
+    const admin = await makeAdmin()
+    const t = await makeTutor()
+    const p = await makeParent()
+    await makeBooking({ parent: p.parent, child: p.child, tutor: t.tutor, date: nextDate(MONDAY), start: '16:00', status: 'CONFIRMED' })
+    await makeBooking({ parent: p.parent, child: p.child, tutor: t.tutor, date: '2026-01-05', start: '16:00', status: 'COMPLETED' })
+    const res = await api(admin.token).get(`/admin/users/${t.user.id}`)
+    expect(res.user.upcomingLessons).toBe(1)
+    expect((await api(admin.token).get(`/admin/users/${p.user.id}`)).user.upcomingLessons).toBe(1)
+  })
+})

@@ -13,6 +13,8 @@ export default function AdminComplaints() {
   const [status, setStatus] = useState('')
   const [data, setData] = useState(null)
   const [sel, setSel] = useState(null)
+  // Bumped after every status change so the report above recounts
+  const [reportVersion, setReportVersion] = useState(0)
 
   const [loadError, setLoadError] = useState('')
   const load = useCallback(() => {
@@ -26,7 +28,7 @@ export default function AdminComplaints() {
   return (
     <div>
       <PageTitle title="Complaints & Reports" subtitle="Review complaints from parents and respond to them." />
-      <ComplaintsReport />
+      <ComplaintsReport refreshKey={reportVersion} />
       <div className="card mb-4 flex flex-wrap gap-2 p-3">
         {TABS.map(([v, l]) => (
           <button key={l} onClick={() => setStatus(v)} className={`rounded-lg border px-4 py-2 text-sm font-semibold ${status === v ? 'border-brand-500 bg-brand-500 text-white' : 'border-brand-200 bg-white text-navy hover:border-brand-500'}`}>
@@ -54,7 +56,7 @@ export default function AdminComplaints() {
         </div>
       )}
 
-      <ReviewModal complaint={sel} onClose={() => setSel(null)} onDone={() => { setSel(null); load() }} />
+      <ReviewModal complaint={sel} onClose={() => setSel(null)} onDone={() => { setSel(null); load(); setReportVersion((v) => v + 1) }} />
     </div>
   )
 }
@@ -68,8 +70,10 @@ function ReviewModal({ complaint: c, onClose, onDone }) {
   const closed = ['RESOLVED', 'DISMISSED'].includes(c.status)
 
   async function act(status) {
-    setBusy(true)
     setError('')
+    // The parent reads this response, so a closed complaint always says what was done or why
+    if (status !== 'IN_PROGRESS' && response.trim().length < 3) return setError('Write a response to the parent before resolving or dismissing.')
+    setBusy(true)
     try {
       await api.patch(`/admin/complaints/${c.id}`, { status, adminResponse: response || undefined })
       onDone()
