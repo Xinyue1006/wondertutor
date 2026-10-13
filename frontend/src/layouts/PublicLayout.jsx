@@ -26,7 +26,8 @@ export default function PublicLayout() {
   const { pathname, hash } = useLocation()
   const isHome = pathname === '/'
   const [menuOpen, setMenuOpen] = useState(false)
-  const isActive = (to) => (to.startsWith('/#') ? pathname === '/' && hash === to.slice(1) : pathname === to)
+  // Only the in-page sections can be "current"; "Find a Tutor" just leads to Log In and must not light up on that page
+  const isActive = (to) => to.startsWith('/#') && pathname === '/' && hash === to.slice(1)
   // The landing page body is a whiter blue than the app pages (the hero keeps the stronger blue)
   return (
     <div className={`min-h-screen overflow-x-clip ${isHome ? 'bg-gradient-to-b from-[#f9fbff] to-white' : ''}`}>
