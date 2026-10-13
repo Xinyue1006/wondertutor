@@ -31,13 +31,16 @@ export default function Login() {
   }
 
   return (
-    // Full-width hero like the landing page: bright desk photo as the background, the pitch on the left
-    // and the white form card on the right.
-    <section className="relative left-1/2 -mt-4 w-screen -translate-x-1/2 overflow-x-clip bg-brand-50">
-      <img src="/img/art/login-bg.jpg" alt="" aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full object-cover object-[center_100%]" />
-      {/* soft wash so the text stays readable on top of the photo, and the photo blends into the light-blue page */}
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/70 via-brand-50/40 to-transparent" aria-hidden="true" />
-      <img src="/img/art/hero-blob.png" alt="" aria-hidden="true" className="pointer-events-none absolute left-0 top-0 hidden h-full w-auto max-w-[110px] object-cover object-left md:block" style={{ maskImage: 'linear-gradient(to right, #000 60%, transparent)', WebkitMaskImage: 'linear-gradient(to right, #000 60%, transparent)' }} />
+    // Same pattern as the landing hero: a light-blue band with the photo anchored on one side and fading into it,
+    // so the photo is never stretched or cropped hard on wide screens. The blank wall in the photo holds the headline.
+    <section className="relative left-1/2 -mt-4 w-screen -translate-x-1/2 overflow-x-clip bg-gradient-to-r from-brand-50 via-brand-50 to-brand-25">
+      <img
+        src="/img/art/login-bg.jpg"
+        alt=""
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-y-0 left-0 hidden h-full w-[64%] object-cover object-[left_bottom] lg:block"
+        style={{ maskImage: 'linear-gradient(to right, #000 55%, transparent)', WebkitMaskImage: 'linear-gradient(to right, #000 55%, transparent)' }}
+      />
 
       <div className="relative mx-auto grid max-w-[81.25rem] items-center gap-8 px-4 py-10 md:px-8 md:py-14 lg:grid-cols-[1.15fr_1fr] lg:gap-12">
         <div className="order-2 lg:order-1 lg:self-start lg:pl-14 lg:pt-6">
@@ -53,7 +56,7 @@ export default function Login() {
           <p className="mt-4 max-w-md text-base text-slate-700">
             Connecting passionate tutors with motivated learners for a brighter future.
           </p>
-          <ul className="mt-6 flex w-fit flex-wrap gap-x-8 gap-y-4 rounded-2xl bg-white/80 px-6 py-4 shadow-card backdrop-blur-sm">
+          <ul className="mt-6 flex flex-wrap gap-x-8 gap-y-4">
             {[
               ['cap', 'Trusted Tutors', 'Verified profiles'],
               ['calendar', 'Flexible Booking', 'Learn at your time'],
@@ -66,6 +69,7 @@ export default function Login() {
               </li>
             ))}
           </ul>
+          <img src="/img/art/login-bg.jpg" alt="" aria-hidden="true" className="mt-6 h-40 w-full rounded-2xl object-cover object-[center_bottom] lg:hidden" />
         </div>
 
         <form onSubmit={onSubmit} aria-label="Log in" className="order-1 mx-auto w-full max-w-[28rem] space-y-4 rounded-2xl bg-white p-6 shadow-card md:p-8 lg:order-2 lg:ml-auto">
