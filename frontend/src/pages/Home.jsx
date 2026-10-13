@@ -89,6 +89,9 @@ export default function Home() {
   }
 
   const errorList = Object.values(errors).filter(Boolean)
+  // One short sentence, whatever combination is wrong
+  const errorText = errors.subject && errors.level && !search.subject.trim() && !search.level.trim() ? 'Choose a subject and an education level.' : errorList.join(' ')
+  const selection = [search.subject, search.level, search.location].filter((v) => v.trim()).join(' · ')
   const ready = search.subject.trim() && search.level.trim() && errorList.length === 0
 
   return (
@@ -127,19 +130,21 @@ export default function Home() {
               </button>
             </form>
 
-            {/* Feedback: what is wrong, or confirmation of what was chosen. Not colour alone: icon + words. */}
-            <div className="mt-2 min-h-6 text-sm" aria-live="polite">
+            {/* Feedback line. Its height is fixed (and long text is cut with an ellipsis) so choosing options
+                never makes the hero grow or jump. Icon + words, so it never relies on colour alone. */}
+            <div className="mt-2 h-11 overflow-hidden text-sm lg:h-6" aria-live="polite">
               {errorList.length > 0 ? (
-                <p role="alert" className="flex items-center gap-1.5 font-medium text-red-700">
-                  <Icon name="info" className="h-4 w-4 shrink-0" /> {errorList.join(' ')}
+                <p role="alert" className="flex items-start gap-1.5 font-medium text-red-700 lg:items-center">
+                  <Icon name="info" className="mt-0.5 h-4 w-4 shrink-0 lg:mt-0" />
+                  <span className="line-clamp-2 lg:truncate">{errorText}</span>
                 </p>
               ) : ready ? (
-                <p className="flex items-center gap-1.5 text-slate-700">
-                  <Icon name="check-circle" className="h-4 w-4 shrink-0 text-ok" />
-                  {search.subject}, {search.level}{search.location ? `, ${search.location}` : ''}. Next you can add days, budget and preferences.
+                <p className="flex items-start gap-1.5 text-slate-700 lg:items-center">
+                  <Icon name="check-circle" className="mt-0.5 h-4 w-4 shrink-0 text-ok lg:mt-0" />
+                  <span className="line-clamp-2 lg:truncate" title={selection}>Selected: {selection}</span>
                 </p>
               ) : (
-                <p className="text-slate-600">Subject and education level are needed. Location is optional.</p>
+                <p className="line-clamp-2 text-slate-600 lg:truncate">Subject and education level are required. Location is optional.</p>
               )}
             </div>
 

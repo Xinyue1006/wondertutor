@@ -49,7 +49,7 @@ describe('landing page', () => {
     setup(full)
     await screen.findByText('Daniel Tan')
     await userEvent.click(screen.getByRole('button', { name: /Search Tutors/ }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('Choose a subject. Choose an education level.')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Choose a subject and an education level.')
     expect(screen.queryByText('LOGIN PAGE')).not.toBeInTheDocument()
   })
 
@@ -69,7 +69,7 @@ describe('landing page', () => {
     await userEvent.click(await screen.findByRole('option', { name: 'Mathematics' }))
     await userEvent.type(screen.getByRole('combobox', { name: /Education Level/ }), 'Prim')
     await userEvent.click(await screen.findByRole('option', { name: 'Primary' }))
-    expect(screen.getByText(/Next you can add days, budget and preferences/)).toBeInTheDocument()
+    expect(screen.getByText('Selected: Mathematics · Primary')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /Search Tutors/ }))
     expect(await screen.findByText('LOGIN PAGE')).toBeInTheDocument()
     expect(JSON.parse(sessionStorage.getItem('wt-home-search'))).toMatchObject({ subject: 'Mathematics', level: 'Primary' })
