@@ -19,10 +19,10 @@ const PERKS = [
 ]
 
 const STEPS = [
-  ['search', 'Tell Us Your Needs', 'Subject, level, location, schedule and preferences.'],
-  ['sparkle', 'Get Matched', 'Our assistant recommends suitable tutors for you.'],
-  ['calendar', 'Choose & Book', 'Compare profiles, negotiate and confirm a session.'],
-  ['star', 'Learn & Review', 'Attend the lesson and leave a review to support other learners.'],
+  ['search', 'Tell Us Your Needs', 'Subject, level, location and preferences.'],
+  ['sparkle', 'Get Matched', 'We recommend suitable tutors for you.'],
+  ['calendar', 'Choose & Book', 'Compare profiles and confirm a session.'],
+  ['star', 'Learn & Review', 'Attend the lesson, then leave a review.'],
 ]
 
 // Each claim here exists in the system (or is part of the approved scope); "Secure Payments" is not repeated from the benefits row
@@ -197,35 +197,36 @@ export default function Home() {
       </section>
 
       {/* ── Assistant + How it works: same height, padding and weight ── */}
-      <section id="how-it-works" className="grid scroll-mt-24 gap-6 lg:grid-cols-2">
-        <div className="relative grid gap-6 overflow-hidden rounded-3xl border border-brand-100 bg-gradient-to-br from-accent-50 via-white to-brand-50 p-7 shadow-card sm:grid-cols-[1fr_13rem]">
+      <section id="how-it-works" className="grid scroll-mt-24 gap-6 lg:grid-cols-[5fr_6fr]">
+        <div className="relative grid gap-6 overflow-hidden rounded-3xl border border-brand-100 bg-gradient-to-br from-accent-50 via-white to-brand-50 p-6 shadow-card sm:grid-cols-[1fr_12rem]">
           <Moon className="absolute left-1 top-1 h-8 w-8 -rotate-12" />
           <Sparkle className="absolute bottom-5 left-[46%] hidden h-4 w-4 sm:block" />
           <PaperPlane className="absolute bottom-3 right-4 h-9 w-9" />
+          <Robot className="float-y absolute bottom-2 right-16 hidden h-16 w-16 sm:block" />
           <svg viewBox="0 0 120 60" className="absolute -right-3 bottom-8 hidden h-14 w-28 text-brand-200 sm:block" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="3 5" strokeLinecap="round" aria-hidden="true"><path d="M2 54C30 54 40 10 70 22s30 20 48 4" /></svg>
           <div className="flex flex-col">
             <h2 className="section-title mt-3">Meet Your<br />AI Matching Assistant</h2>
-            <p className="mt-4 max-w-[17rem] text-base text-slate-700">
+            <p className="mt-3 max-w-[17rem] text-[15px] text-slate-700">
               Just tell us what your child needs, and we'll recommend suitable tutors with clear reasons.
             </p>
-            <button onClick={tryAssistant} className="btn-primary mt-auto h-12 w-fit whitespace-nowrap px-6 max-sm:mt-6 max-sm:w-full">Try AI Matching <Icon name="arrow-right" className="h-4 w-4" /></button>
+            <button onClick={tryAssistant} className="btn-primary mt-5 h-12 w-fit whitespace-nowrap px-6 max-sm:w-full">Try AI Matching <Icon name="arrow-right" className="h-4 w-4" /></button>
           </div>
           <div className="flex flex-col items-center">
             {/* Illustration of the guided questions, not a live chat */}
-            <div className="w-full rounded-2xl bg-white/90 p-3 text-sm shadow-card" aria-label="Example of the assistant's questions" role="group">
+            <div className="w-full rounded-2xl bg-white/90 p-2.5 text-sm shadow-card" aria-label="Example of the assistant's questions" role="group">
               <div className="relative rounded-2xl rounded-bl-sm bg-brand-50 px-3 py-2 font-medium text-navy">Hi! Tell me what you're looking for?</div>
-              <div className="mt-2 space-y-1.5" aria-hidden="true">
+              <div className="mt-1.5 space-y-1" aria-hidden="true">
                 {['What subject?', 'What education level?', 'Preferred location?', 'Any other preferences?'].map((q) => (
-                  <div key={q} className="ml-auto w-fit rounded-2xl rounded-br-sm border border-brand-100 bg-white px-3 py-1 text-slate-600">{q}</div>
+                  <div key={q} className="ml-auto w-fit rounded-2xl rounded-br-sm border border-brand-100 bg-white px-3 py-0.5 text-[13px] text-slate-600">{q}</div>
                 ))}
               </div>
-              <p className="mt-2 text-center text-xs text-slate-500">Example questions</p>
+              <p className="mt-1.5 text-center text-xs text-slate-500">Example questions</p>
             </div>
-            <Robot className="float-y mt-3 h-20 w-20 self-start" />
+            
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-3xl border border-brand-100 bg-white p-7 shadow-card">
+        <div className="relative overflow-hidden rounded-3xl border border-brand-100 bg-white p-6 shadow-card">
           <p className="absolute right-6 top-4 hidden w-28 -rotate-6 text-center font-hand text-xl font-bold leading-5 text-navy sm:block" aria-hidden="true">
             Same<br />Goals<br />Brighter<br />Futures <span className="text-brand-500">♡</span>
           </p>
@@ -233,7 +234,7 @@ export default function Home() {
           <Sparkle className="absolute bottom-4 right-5 hidden h-4 w-4 sm:block" />
           <h2 className="section-title">How It Works</h2>
           <p className="caption mt-1">Finding a tutor is simple and hassle-free.</p>
-          <ol className="mt-6 grid gap-4 sm:grid-cols-2">
+          <ol className="mt-5 grid gap-3 sm:grid-cols-2">
             {STEPS.map(([icon, title, text], i) => (
               <li key={title} className="flex items-start gap-3 rounded-2xl bg-brand-50 p-3">
                 <span className="relative mt-1 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand-100 text-brand-600">
