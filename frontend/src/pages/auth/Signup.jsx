@@ -334,7 +334,7 @@ function RoleCard({ active, onClick, title, desc, points, img, tone }) {
       aria-checked={active}
       onClick={onClick}
       className={`relative flex flex-col overflow-hidden rounded-2xl border-2 p-3 text-left transition ${
-        active ? (blue ? 'border-brand-500 bg-brand-50 shadow-lg' : 'border-accent bg-accent-50 shadow-lg') : (blue ? 'border-white bg-brand-50/60 shadow-card hover:border-brand-200' : 'border-white bg-accent-50/70 shadow-card hover:border-accent/60')
+        active ? (blue ? 'border-brand-500 bg-white shadow-lg' : 'border-accent bg-accent-50 shadow-lg') : 'border-white bg-white shadow-card hover:border-brand-100'
       }`}
     >
       <span className={`absolute right-5 top-5 z-10 flex h-7 w-7 items-center justify-center rounded-full border-2 bg-white ${active ? (blue ? 'border-brand-500' : 'border-accent') : 'border-slate-300'}`} aria-hidden="true">
