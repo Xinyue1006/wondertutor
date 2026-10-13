@@ -140,8 +140,8 @@ export default function Signup() {
   }
 
   return (
-    // Same light-blue band as the landing hero and the login page
-    <section className="relative left-1/2 -mb-12 w-screen -translate-x-1/2 overflow-x-clip bg-gradient-to-r from-brand-50 via-brand-50 to-brand-25 pb-12 pt-6">
+    // Sits on the same nearly-white body colour as the landing page (set in PublicLayout)
+    <section className="relative left-1/2 -mb-12 w-screen -translate-x-1/2 overflow-x-clip pb-12 pt-6">
       {/* quiet decoration like the mockup: pale circles on the left, leaves in the bottom-right corner */}
       <div className="pointer-events-none absolute inset-0 hidden overflow-hidden md:block" aria-hidden="true">
         <span className="absolute -left-24 top-16 h-72 w-72 rounded-full bg-brand-100/40" />
