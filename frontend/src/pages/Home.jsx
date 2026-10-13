@@ -58,7 +58,7 @@ export default function Home() {
   const tryAssistant = () => navigate(user?.role === 'PARENT' ? '/parent/find-tutor/match' : '/signup')
 
   return (
-    <div className="space-y-10 pt-4">
+    <div className="space-y-8 pt-4">
       {/* ── Hero: full width, no card border (breaks out of the page container) ── */}
       <section className="relative left-1/2 -mt-4 w-screen -translate-x-1/2 overflow-hidden bg-gradient-to-r from-white via-white to-brand-50">
         <img src="/img/art/hero-blob.png" alt="" aria-hidden="true" className="pointer-events-none absolute -left-24 top-0 hidden h-full w-auto opacity-90 md:block xl:-left-12" />
@@ -68,21 +68,21 @@ export default function Home() {
           className="pointer-events-none absolute inset-y-0 right-0 hidden h-full w-auto max-w-[62%] object-cover object-right lg:block"
           style={{ maskImage: 'linear-gradient(to right, transparent 0%, #000 32%)', WebkitMaskImage: 'linear-gradient(to right, transparent 0%, #000 32%)' }}
         />
-        <div className="relative mx-auto max-w-[1300px] px-4 py-12 md:px-8 md:py-16">
+        <div className="relative mx-auto max-w-[1300px] px-4 py-7 md:px-8 md:py-9">
           <div className="lg:w-[56%] lg:pl-10">
             <div className="text-xs font-bold uppercase tracking-[0.18em] text-navy">Personalised tutor matching</div>
-            <h1 className="mt-3 text-5xl font-extrabold leading-[1.05] tracking-tight text-navy md:text-6xl">
+            <h1 className="mt-2 text-4xl font-extrabold leading-[1.08] tracking-tight text-navy md:text-[2.6rem]">
               Find the right tutor for your{' '}
               <span className="relative inline-block">
                 child.
                 <span className="absolute -bottom-1 left-0 h-1 w-full rounded-full bg-accent" />
               </span>
             </h1>
-            <p className="mt-4 max-w-md text-base text-slate-600">
+            <p className="mt-2 max-w-md text-[15px] text-slate-600">
               Trusted tutors. Flexible booking. A safer and more supportive learning journey, all in one place.
             </p>
 
-          <form onSubmit={startSearch} className="mt-7 grid gap-3 rounded-2xl bg-white p-3 shadow-card sm:grid-cols-3 2xl:flex 2xl:items-center">
+          <form onSubmit={startSearch} className="mt-4 grid gap-2 rounded-2xl bg-white p-2.5 shadow-card sm:grid-cols-3 2xl:flex 2xl:items-center">
             <label className="flex min-w-0 flex-1 items-center gap-2 px-2">
               <Icon name="book" className="h-5 w-5 shrink-0 text-brand-500" />
               <span className="flex-1">
@@ -108,14 +108,14 @@ export default function Home() {
             <datalist id="home-subjects">{home.subjects.map((x) => <option key={x} value={x} />)}</datalist>
             <datalist id="home-levels">{LEVELS.map((x) => <option key={x} value={x} />)}</datalist>
             <datalist id="home-locations">{home.locations.map((x) => <option key={x} value={x} />)}</datalist>
-            <button className="btn-accent h-11 px-5 sm:col-span-3 2xl:col-span-1">Search Tutors <Icon name="arrow-right" className="h-4 w-4" /></button>
+            <button className="btn-accent h-10 px-5 sm:col-span-3 2xl:col-span-1">Search Tutors <Icon name="arrow-right" className="h-4 w-4" /></button>
           </form>
 
           <button
             onClick={tryAssistant}
-            className="mt-4 flex w-full max-w-xl items-center gap-3 rounded-2xl bg-white p-4 text-left shadow-card transition hover:shadow-lg"
+            className="mt-3 flex w-full max-w-xl items-center gap-3 rounded-2xl bg-white/90 px-4 py-2.5 text-left shadow-card transition hover:shadow-lg"
           >
-            <Robot className="h-11 w-11 shrink-0" />
+            <Robot className="h-9 w-9 shrink-0" />
             <span className="flex-1">
               <span className="block text-sm font-bold text-navy">Not sure which tutor to choose?</span>
               <span className="block text-sm text-slate-600">Chat with our AI assistant and get personalised recommendations.</span>
