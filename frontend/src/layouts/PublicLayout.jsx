@@ -3,6 +3,7 @@ import Logo from '../components/Logo'
 
 // Public nav (matches the login / signup mockups). "Find a Tutor" needs an account, so it leads to Log In.
 const LINKS = [
+  ['Home', '/'],
   ['Find a Tutor', '/login'],
   ['How It Works', '/#how-it-works'],
   ['For Parents', '/#for-parents'],
@@ -31,6 +32,35 @@ export default function PublicLayout() {
       <main className="mx-auto max-w-[1300px]">
         <Outlet />
       </main>
+      <footer id="about" className="mx-auto mt-14 max-w-[1300px] scroll-mt-24 border-t border-brand-100 pt-8 text-xs text-slate-500">
+        <div className="grid gap-8 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
+          <div>
+            <Logo className="h-8" />
+            <p className="mt-3 max-w-xs">A trusted tutoring platform connecting parents and tutors for a brighter tomorrow. Built with Wonderland Learning Materials &amp; Tuition Centre, Banting.</p>
+          </div>
+          <div>
+            <div className="mb-2 font-bold text-navy">Platform</div>
+            <ul className="space-y-1.5">
+              <li><Link to="/login" className="hover:text-brand-500">Find a Tutor</Link></li>
+              <li><a href="/#how-it-works" className="hover:text-brand-500">How It Works</a></li>
+              <li><a href="/#for-parents" className="hover:text-brand-500">For Parents</a></li>
+              <li><a href="/#for-tutors" className="hover:text-brand-500">For Tutors</a></li>
+            </ul>
+          </div>
+          <div>
+            <div className="mb-2 font-bold text-navy">Account</div>
+            <ul className="space-y-1.5">
+              <li><Link to="/login" className="hover:text-brand-500">Log In</Link></li>
+              <li><Link to="/signup" className="hover:text-brand-500">Sign Up</Link></li>
+            </ul>
+          </div>
+          <div>
+            <div className="mb-2 font-bold text-navy">Contact</div>
+            <ul className="space-y-1.5"><li>Banting, Selangor, Malaysia</li></ul>
+          </div>
+        </div>
+        <div className="mt-8 border-t border-brand-100 py-4 text-center">&copy; {new Date().getFullYear()} WonderTutor. All rights reserved.</div>
+      </footer>
     </div>
   )
 }
