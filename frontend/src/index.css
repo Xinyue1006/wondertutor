@@ -156,3 +156,7 @@ body {
 /* Fluid scale for big monitors: the root size stays 16px up to a 1440px-wide window, then grows gently (about 20px at 1900px).
    Tailwind sizes and the page container are in rem, so the whole layout scales with it instead of sitting small in the middle. */
 html { font-size: clamp(16px, 0.833vw + 4px, 22px); }
+
+/* Always reserve the scrollbar's space. Without this, a page that fits the window (login) is about 15px wider than a
+   page that scrolls (landing), so the centred nav bar jumps sideways when you switch between them. */
+html { scrollbar-gutter: stable; }

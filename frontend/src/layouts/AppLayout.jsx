@@ -43,18 +43,19 @@ export default function AppLayout() {
 
   const shell = (
     <div className="min-h-screen pb-24">
-      <header className="sticky top-0 z-30 px-3 pt-3 md:px-6">
-        <div className="mx-auto flex max-w-[87.5rem] items-center justify-between gap-4 rounded-2xl bg-white px-4 shadow-card md:px-6">
-          <Link to={items[0]?.[0] || '/'} className="shrink-0 py-3"><Logo className="h-8" /></Link>
-          <nav className="hidden items-stretch gap-1 self-stretch md:flex">
+      {/* Same bar as the public pages (landing, login, signup): flat, full width, white, yellow underline on the current page */}
+      <header className="sticky top-0 z-30 w-full bg-white">
+        <div className="mx-auto flex max-w-[81.25rem] items-center justify-between gap-3 px-4 py-2 md:px-8">
+          <Link to={items[0]?.[0] || '/'} aria-label="WonderTutor dashboard" className="flex min-h-11 shrink-0 items-center"><Logo className="h-9" /></Link>
+          <nav aria-label="Main" className="hidden items-center gap-7 text-sm font-medium text-navy md:flex">
             {items.map(([to, label]) => (
               <NavLink
                 key={to}
                 to={to}
                 end={to.split('/').length === 2}
                 className={({ isActive }) =>
-                  `flex items-center border-b-[3px] px-4 text-sm font-semibold transition ${
-                    isActive ? 'border-brand-500 text-brand-500' : 'border-transparent text-navy hover:text-brand-500'
+                  `flex min-h-11 items-center border-b-[3px] transition ${
+                    isActive ? 'border-accent text-brand-500' : 'border-transparent hover:text-brand-500'
                   }`
                 }
               >
@@ -62,20 +63,20 @@ export default function AppLayout() {
               </NavLink>
             ))}
           </nav>
-          <div className="flex items-center gap-2 py-2 md:gap-4">
+          <div className="flex items-center gap-2 md:gap-4">
             <NotificationBell />
             <UserMenu />
           </div>
         </div>
         {/* Phone: nav moves to a horizontal scroller */}
-        <nav className="mx-auto mt-2 flex max-w-[87.5rem] gap-2 overflow-x-auto md:hidden">
+        <nav aria-label="Main" className="mx-auto flex max-w-[81.25rem] gap-2 overflow-x-auto px-4 pb-2 md:hidden">
           {items.map(([to, label]) => (
             <NavLink
               key={to}
               to={to}
               end={to.split('/').length === 2}
               className={({ isActive }) =>
-                `shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold ${isActive ? 'bg-brand-500 text-white' : 'bg-white text-navy'}`
+                `flex min-h-10 shrink-0 items-center rounded-full px-4 text-sm font-medium ${isActive ? 'bg-brand-500 text-white' : 'bg-brand-50 text-navy'}`
               }
             >
               {label}
@@ -83,7 +84,7 @@ export default function AppLayout() {
           ))}
         </nav>
       </header>
-      <main className="mx-auto max-w-[87.5rem] px-3 py-6 md:px-6">
+      <main className="mx-auto max-w-[81.25rem] px-3 py-6 md:px-6">
         <Outlet />
       </main>
       {isParent && <AssistantWidget />}

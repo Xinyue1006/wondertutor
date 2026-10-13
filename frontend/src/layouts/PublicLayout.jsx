@@ -34,7 +34,7 @@ export default function PublicLayout() {
   return (
     <div className={`flex min-h-screen flex-col overflow-x-clip ${isHome ? 'bg-gradient-to-b from-[#f9fbff] to-white' : ''}`}>
       {/* Plain full-width bar (no box or border), like the landing mockup */}
-      <header className="relative z-20 w-full bg-white">
+      <header className="sticky top-0 z-30 w-full bg-white">
         <div className="mx-auto flex max-w-[81.25rem] items-center justify-between gap-3 px-4 py-2 md:px-8">
           <Link to="/" aria-label="WonderTutor home" className="flex min-h-11 items-center">
             {/* The compact "W" mark on phones keeps room for the Log In / Sign Up buttons */}
