@@ -48,6 +48,32 @@ const Sparkle = ({ className }) => (
   <svg viewBox="0 0 24 24" className={className} aria-hidden="true"><path d="M12 1l2.6 8.4L23 12l-8.4 2.6L12 23l-2.6-8.4L1 12l8.4-2.6z" fill="#ffc83d" /></svg>
 )
 
+// Soft background shapes for the empty side margins on wide screens. They sit behind every section (the page
+// root is its own stacking context), are very low contrast, and are hidden from screen readers.
+function SideDecor() {
+  const dotted = 'fill-none stroke-current'
+  return (
+    <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-1/2 -z-10 hidden w-screen -translate-x-1/2 overflow-hidden xl:block">
+      {/* left edge */}
+      <span className="absolute -left-16 top-[33%] h-52 w-52 rounded-full bg-brand-100/50" />
+      <span className="absolute -left-10 top-[62%] h-36 w-36 rounded-full bg-accent-100/60" />
+      <span className="absolute left-5 top-[52%] h-4 w-4 rounded-full bg-accent/70" />
+      <Icon name="cap" className="absolute left-6 top-[40%] h-9 w-9 -rotate-12 text-brand-200" strokeWidth={1.5} />
+      <Sparkle className="absolute left-12 top-[47%] h-4 w-4 opacity-70" />
+      <svg viewBox="0 0 80 160" className="absolute left-3 top-[56%] h-32 w-16 text-brand-200" strokeWidth="2" strokeDasharray="3 6" strokeLinecap="round"><path className={dotted} d="M10 4C70 40 0 90 60 156" /></svg>
+      <span className="absolute -left-8 top-[84%] h-28 w-28 rounded-full border-[6px] border-brand-100/70" />
+      {/* right edge */}
+      <span className="absolute -right-14 top-[27%] h-48 w-48 rounded-full bg-accent-100/60" />
+      <span className="absolute -right-12 top-[55%] h-44 w-44 rounded-full bg-brand-100/50" />
+      <Icon name="book" className="absolute right-7 top-[38%] h-9 w-9 rotate-12 text-brand-200" strokeWidth={1.5} />
+      <Sparkle className="absolute right-12 top-[45%] h-4 w-4 opacity-70" />
+      <span className="absolute right-6 top-[63%] h-4 w-4 rounded-full bg-brand-200" />
+      <svg viewBox="0 0 80 160" className="absolute right-3 top-[68%] h-32 w-16 text-accent" strokeWidth="2" strokeDasharray="3 6" strokeLinecap="round"><path className={dotted} d="M70 4C10 40 80 90 20 156" /></svg>
+      <span className="absolute -right-6 top-[86%] h-24 w-24 rounded-full border-[6px] border-accent-100" />
+    </div>
+  )
+}
+
 const readSaved = () => {
   try { return { subject: '', level: '', location: '', ...JSON.parse(sessionStorage.getItem(SEARCH_KEY) || '{}') } } catch { return { subject: '', level: '', location: '' } }
 }
@@ -110,7 +136,8 @@ export default function Home() {
   const ready = search.subject.trim() && search.level.trim() && errorList.length === 0
 
   return (
-    <div className="space-y-10 pt-4">
+    <div className="relative isolate space-y-10 pt-4">
+      <SideDecor />
       {/* ── Hero: full width, no card border (breaks out of the page container) ── */}
       <section aria-labelledby="hero-title" className="relative left-1/2 z-10 -mt-4 w-screen -translate-x-1/2 overflow-x-clip bg-gradient-to-r from-brand-50 via-brand-50 to-brand-25">
         <img src="/img/art/hero-blob.png" alt="" aria-hidden="true" className="pointer-events-none absolute left-0 top-0 hidden h-full w-auto max-w-[110px] object-cover object-left md:block" style={{ maskImage: 'linear-gradient(to right, #000 60%, transparent)', WebkitMaskImage: 'linear-gradient(to right, #000 60%, transparent)' }} />
@@ -320,11 +347,10 @@ export default function Home() {
       {/* ── Final call to action: full width like the hero, one dominant button ── */}
       <section aria-labelledby="cta-title" className="relative left-1/2 w-screen -translate-x-1/2 overflow-hidden bg-gradient-to-r from-brand-700 via-brand-600 to-brand-700 text-white">
         {/* decoration: soft circles on the left, handwritten note on the right (hidden on small screens) */}
-        <span className="pointer-events-none absolute -left-10 -top-12 h-40 w-40 rounded-full bg-brand-500/60" aria-hidden="true" />
-        <span className="pointer-events-none absolute -bottom-14 -left-6 h-36 w-36 rounded-full bg-accent" aria-hidden="true" />
-        <span className="pointer-events-none absolute bottom-6 left-24 hidden h-3 w-3 rounded-full bg-accent md:block" aria-hidden="true" />
-        <p className="pointer-events-none absolute right-[8%] top-1/2 hidden -translate-y-1/2 -rotate-6 text-center font-hand text-2xl leading-6 text-white/90 lg:block" aria-hidden="true">
-          Learn<br />Grow<br />Belong<br /><span className="text-accent">♡</span>
+        <span className="pointer-events-none absolute -left-10 -top-14 h-36 w-36 rounded-full bg-white/10" aria-hidden="true" />
+        <span className="pointer-events-none absolute -bottom-12 -left-5 h-24 w-24 rounded-full bg-accent/80" aria-hidden="true" />
+        <p className="pointer-events-none absolute right-[8%] top-1/2 hidden -translate-y-1/2 -rotate-6 text-center font-hand text-xl leading-5 text-white/55 lg:block" aria-hidden="true">
+          Learn<br />Grow<br />Belong<br /><span className="text-accent/70">♡</span>
         </p>
         <div className="relative mx-auto flex max-w-[1300px] flex-wrap items-center justify-between gap-5 px-4 py-9 md:px-8 lg:pl-28 lg:pr-48">
           <div>
