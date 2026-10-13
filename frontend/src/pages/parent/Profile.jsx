@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import api, { errorMessage } from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
 import { useMatching } from '../../assistant/MatchingContext'
-import Avatar from '../../components/ui/Avatar'
+import PhotoPicker from '../../components/PhotoPicker'
 import Icon from '../../components/ui/Icon'
 import { ErrorBox, PageTitle, Spinner } from '../../components/ui/Common'
 
@@ -22,7 +22,7 @@ export default function Profile() {
   useEffect(() => {
     api.get('/parent/profile').then((r) => {
       const p = r.data.profile
-      setForm({ fullName: p.fullName, phone: p.phone || '', address: p.address || '' })
+      setForm({ fullName: p.fullName, phone: p.phone || '', address: p.address || '', profilePhotoUrl: p.profilePhotoUrl })
       setHasPassword(p.hasPassword)
     })
   }, [])
@@ -34,7 +34,7 @@ export default function Profile() {
     setMsg(''); setError(''); setBusy(true)
     try {
       const r = await api.put('/parent/profile', form)
-      setUser({ ...user, fullName: r.data.profile.fullName, phone: r.data.profile.phone })
+      setUser({ ...user, fullName: r.data.profile.fullName, phone: r.data.profile.phone, profilePhotoUrl: r.data.profile.profilePhotoUrl })
       setMsg('Profile saved.')
     } catch (err) {
       setError(errorMessage(err))
@@ -61,11 +61,8 @@ export default function Profile() {
       <PageTitle icon="user" title="My Profile" subtitle="Keep your details up to date so tutors and our team can reach you." />
       <div className="grid items-start gap-6 lg:grid-cols-2">
         <form onSubmit={save} className="card space-y-4 p-6">
-          <div className="flex items-center gap-4">
-            <Avatar src={user.profilePhotoUrl} name={user.fullName} className="h-20 w-20" text="text-2xl" />
-            <div><div className="text-lg font-extrabold text-navy">{user.fullName}</div><div className="text-sm text-slate-500">{user.email}</div>
-              <div className="text-xs text-slate-400">Photo upload will be available once photo storage is connected.</div></div>
-          </div>
+          <PhotoPicker value={form.profilePhotoUrl} name={user.fullName} onChange={(url) => setForm({ ...form, profilePhotoUrl: url })} />
+          <div className="text-sm text-slate-500">{user.email}</div>
           <ErrorBox>{error}</ErrorBox>
           {msg && <div className="rounded-lg bg-ok-50 px-3 py-2.5 text-sm text-ok">{msg}</div>}
           <label className="block"><span className="mb-1.5 block text-sm font-bold text-navy">Full Name</span>

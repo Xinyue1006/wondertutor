@@ -22,6 +22,8 @@ const profileSchema = z.object({
   fullName: z.string().trim().min(2, 'Full name is required').max(80),
   phone: z.string().trim().min(8, 'Enter a valid phone number').max(20),
   address: z.string().trim().max(200).optional().nullable(),
+  // Only images uploaded to our own Cloudinary account are accepted as profile photos
+  profilePhotoUrl: z.string().url().startsWith('https://res.cloudinary.com/', 'Invalid photo').optional().nullable(),
 })
 
 // PUT /parent/profile: email is the login identity, so it cannot be changed here
@@ -29,7 +31,7 @@ export async function updateProfile(req, res) {
   const data = profileSchema.parse(req.body)
   const loc = data.address ? findLocation(data.address) : null
   const [user, parent] = await prisma.$transaction([
-    prisma.user.update({ where: { id: req.user.id }, data: { fullName: data.fullName, phone: data.phone } }),
+    prisma.user.update({ where: { id: req.user.id }, data: { fullName: data.fullName, phone: data.phone, ...(data.profilePhotoUrl !== undefined && { profilePhotoUrl: data.profilePhotoUrl }) } }),
     // Known areas also store coordinates, which the matching distance score uses
     prisma.parentProfile.update({
       where: { id: req.parent.id },

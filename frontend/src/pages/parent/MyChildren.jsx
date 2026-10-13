@@ -3,11 +3,12 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import api, { errorMessage } from '../../api/client'
 import { useMatching } from '../../assistant/MatchingContext'
 import Avatar from '../../components/ui/Avatar'
+import PhotoPicker from '../../components/PhotoPicker'
 import Icon from '../../components/ui/Icon'
 import { EmptyState, ErrorBox, Modal, PageTitle, SelectBox, Spinner } from '../../components/ui/Common'
 import { GRADE_GROUPS, gradeLabel, parseGrade } from '../../lib/education'
 
-const blank = { name: '', grade: 'PRIMARY:1', subject: '', notes: '' }
+const blank = { name: '', grade: 'PRIMARY:1', subject: '', notes: '', photoUrl: null }
 
 // My Children: add / edit / remove child profiles (name, education level, grade, subject, notes)
 export default function MyChildren() {
@@ -38,7 +39,7 @@ export default function MyChildren() {
   function openForm(c) {
     setError('')
     setEditing(c)
-    setForm(c === 'new' ? blank : { name: c.name, grade: `${c.educationLevel}:${c.grade}`, subject: c.subject || '', notes: c.notes || '' })
+    setForm(c === 'new' ? blank : { name: c.name, grade: `${c.educationLevel}:${c.grade}`, subject: c.subject || '', notes: c.notes || '', photoUrl: c.photoUrl })
   }
   function closeForm() {
     setEditing(null)
@@ -50,7 +51,7 @@ export default function MyChildren() {
     setError('')
     if (!form.name.trim()) return setError('Child name is required')
     const { level, grade } = parseGrade(form.grade)
-    const body = { name: form.name, educationLevel: level, grade, subject: form.subject || null, notes: form.notes || null }
+    const body = { name: form.name, educationLevel: level, grade, subject: form.subject || null, notes: form.notes || null, photoUrl: form.photoUrl }
     setBusy(true)
     try {
       if (editing === 'new') await api.post('/parent/children', body)
@@ -118,6 +119,7 @@ export default function MyChildren() {
       <Modal open={!!editing} onClose={closeForm} title={editing === 'new' ? 'Add a child' : 'Edit child'}>
         <form onSubmit={save} className="space-y-4">
           <ErrorBox>{error}</ErrorBox>
+          <PhotoPicker value={form.photoUrl} name={form.name || 'Child'} onChange={(url) => setForm({ ...form, photoUrl: url })} />
           <label className="block"><span className="mb-1.5 block text-sm font-bold text-navy">Child's Name <span className="text-red-500">*</span></span>
             <input autoFocus className="input h-11" maxLength={60} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Sarah Tan" /></label>
           <label className="block"><span className="mb-1.5 block text-sm font-bold text-navy">Education Level <span className="text-red-500">*</span></span>
