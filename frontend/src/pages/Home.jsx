@@ -60,8 +60,9 @@ export default function Home() {
   return (
     <div className="space-y-8 pt-4">
       {/* ── Hero: full width, no card border (breaks out of the page container) ── */}
-      <section className="relative left-1/2 -mt-4 w-screen -translate-x-1/2 overflow-hidden bg-gradient-to-r from-white via-white to-brand-50">
-        <img src="/img/art/hero-blob.png" alt="" aria-hidden="true" className="pointer-events-none absolute -left-14 top-0 hidden h-full w-auto opacity-90 md:block xl:left-2" />
+      <section className="relative left-1/2 -mt-4 w-screen -translate-x-1/2 overflow-hidden bg-gradient-to-r from-brand-100/80 via-brand-50 to-brand-50">
+        <img src="/img/art/hero-blob.png" alt="" aria-hidden="true" className="pointer-events-none absolute -left-10 top-[14%] hidden h-[72%] w-auto opacity-80 md:block xl:left-0"
+          style={{ maskImage: 'linear-gradient(to right, #000 55%, transparent)', WebkitMaskImage: 'linear-gradient(to right, #000 55%, transparent)' }} />
         <img
           src="/img/art/hero-girl.jpg"
           alt=""
@@ -69,7 +70,7 @@ export default function Home() {
           style={{ maskImage: 'linear-gradient(to right, transparent 0%, #000 32%)', WebkitMaskImage: 'linear-gradient(to right, transparent 0%, #000 32%)' }}
         />
         <div className="relative mx-auto max-w-[1300px] px-4 py-7 md:px-8 md:py-9">
-          <div className="lg:w-[56%] lg:pl-16">
+          <div className="lg:w-[56%] lg:pl-14">
             <div className="text-xs font-bold uppercase tracking-[0.18em] text-navy">Personalised tutor matching</div>
             <h1 className="mt-2 text-4xl font-extrabold leading-[1.08] tracking-tight text-navy md:text-[2.6rem]">
               Find the right tutor for your{' '}
