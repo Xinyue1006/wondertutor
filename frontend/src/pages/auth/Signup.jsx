@@ -192,9 +192,10 @@ export default function Signup() {
       )}
 
       {step === 1 && (
-        <div className="mx-auto mt-6 grid max-w-[68.75rem] gap-6 md:grid-cols-[260px_1fr]">
+        <div className="mx-auto mt-6 grid max-w-[68.75rem] overflow-hidden rounded-2xl border border-brand-100 bg-white shadow-card md:grid-cols-[260px_1fr]">
+          {/* one card: the menu panel and the form share a single box, separated only by a thin divider */}
           {/* The side panel is as tall as the form next to it: the menu stays on top and the picture fills the rest, anchored to the bottom */}
-          <aside className="flex flex-col overflow-hidden rounded-2xl border border-brand-100 bg-white/70 p-3 shadow-card">
+          <aside className="flex flex-col overflow-hidden border-b border-brand-100 bg-brand-25 p-3 md:border-b-0 md:border-r">
            <div className="space-y-1.5">
             {sections.map((s) => (
               <button
@@ -217,12 +218,12 @@ export default function Signup() {
               <img
                 src={role === 'PARENT' ? '/img/art/signup-parent.jpg' : '/img/art/signup-tutor.jpg'}
                 alt="" aria-hidden="true"
-                className="-mx-3 -mb-3 block w-[calc(100%+1.5rem)] max-w-none rounded-b-2xl [mask-image:linear-gradient(to_top,black_72%,transparent)]"
+                className="-mx-3 -mb-3 block w-[calc(100%+1.5rem)] max-w-none [mask-image:linear-gradient(to_top,black_72%,transparent)]"
               />
             </div>
           </aside>
 
-          <form onSubmit={next} noValidate className="rounded-2xl border border-brand-100 bg-white p-6 shadow-card md:p-8">
+          <form onSubmit={next} noValidate className="p-6 md:p-8">
             <h1 className="font-display text-3xl font-bold text-navy">Create Your {role === 'PARENT' ? 'Parent' : 'Tutor'} Account</h1>
             <p className="mt-1 text-sm text-slate-500">
               {role === 'PARENT' ? "Let's set up your profile to get started." : 'Build your profile and let parents discover your expertise.'}
