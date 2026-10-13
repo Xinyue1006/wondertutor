@@ -238,7 +238,7 @@ export default function Signup() {
                     <h2 className="mb-4 font-display text-lg font-bold text-navy">{sec.label}</h2>
               {sec.id === 'basic' && (
                 <div className="grid gap-4 md:grid-cols-2">
-                  <Input label="Full Name" required value={form.fullName} onChange={set('fullName')} placeholder="e.g. Tan Xin Yue" />
+                  <Input label="Full Name" required value={form.fullName} onChange={set('fullName')} placeholder="e.g. Miki Lim" />
                   <Input label="Email Address" required type="email" value={form.email} onChange={set('email')} placeholder="you@example.com" />
                   <Phone label="Phone Number" required value={form.phone} onChange={set('phone')} />
                   {role === 'TUTOR' && (
