@@ -1,5 +1,6 @@
 // Parent Portal API [XY]. Every route requires a logged-in PARENT, and every query is scoped to req.parent.
 import { Router } from 'express'
+import { validateIdParams } from '../middleware/params.js'
 import { requireAuth, requireRole } from '../middleware/auth.js'
 import { loadParentProfile } from '../middleware/parent.js'
 import * as children from '../controllers/parent/children.controller.js'
@@ -12,7 +13,7 @@ import * as profile from '../controllers/parent/profile.controller.js'
 import * as complaints from '../controllers/parent/complaints.controller.js'
 import { dashboard } from '../controllers/parent/dashboard.controller.js'
 
-const router = Router()
+const router = validateIdParams(Router()) // every :id in these URLs must be a positive whole number
 router.use(requireAuth, requireRole('PARENT'), loadParentProfile)
 
 router.get('/dashboard', dashboard)

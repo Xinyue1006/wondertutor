@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { prisma } from '../../config/prisma.js'
 import { AppError } from '../../utils/AppError.js'
+import { ymd } from '../../utils/validators.js'
 import { notify } from '../../services/notification.service.js'
 import { complaintInclude, toComplaintDto } from '../parent/complaints.controller.js'
 import { mytToDate, addDays } from '../../utils/time.js'
@@ -50,8 +51,10 @@ export async function updateComplaint(req, res) {
 }
 
 // ───────────── Reports ─────────────
-const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a date like 2026-10-01')
-const periodSchema = z.object({ from: ymd.optional(), to: ymd.optional(), status: z.enum(['OPEN', 'IN_PROGRESS', 'RESOLVED', 'DISMISSED']).optional() })
+const day = ymd('Use a real date like 2026-10-01')
+const periodSchema = z
+  .object({ from: day.optional(), to: day.optional(), status: z.enum(['OPEN', 'IN_PROGRESS', 'RESOLVED', 'DISMISSED']).optional() })
+  .refine((p) => !p.from || !p.to || p.from <= p.to, { message: 'The start date must be on or before the end date', path: ['to'] })
 
 // Complaints filed inside [from, to] (Malaysia dates, both days included). No dates = everything.
 function periodWhere({ from, to, status }) {

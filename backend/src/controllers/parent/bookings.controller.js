@@ -6,15 +6,17 @@ import { bookingInclude, toBookingDto } from '../../services/booking.dto.js'
 import { notify } from '../../services/notification.service.js'
 import { requestReschedule as askReschedule, respondReschedule, withdrawReschedule } from '../../services/reschedule.service.js'
 import { fromMinutes, mytToDate, toMinutes } from '../../utils/time.js'
+import { hhmm, id, ringgit, ymd } from '../../utils/validators.js'
+import { SUBJECTS } from '../../data/catalog.js'
 
 const createSchema = z.object({
-  tutorId: z.number().int(),
-  childId: z.number().int(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Choose a date'),
-  startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Choose a time'),
-  teachingMode: z.enum(['ONLINE', 'PHYSICAL']),
-  proposedPrice: z.number({ message: 'Enter your proposed price' }).positive('Proposed price must be more than 0').max(1000, 'Proposed price is too high'),
-  subject: z.string().optional(),
+  tutorId: id('Tutor'),
+  childId: id('Child'),
+  date: ymd('Choose a date'),
+  startTime: hhmm('Choose a time'),
+  teachingMode: z.enum(['ONLINE', 'PHYSICAL'], { message: 'Choose online or physical' }),
+  proposedPrice: ringgit('Proposed price'),
+  subject: z.enum(SUBJECTS, { message: 'Choose a subject from the list' }).optional(),
   messageToTutor: z.string().trim().max(200, 'Message must be 200 characters or fewer').optional(),
   isTrial: z.boolean().optional(),
 })
@@ -27,6 +29,23 @@ async function ownBooking(req) {
   })
   if (!booking) throw new AppError(404, 'Booking not found')
   return booking
+}
+
+// Changes a booking only if it is still in the status it was loaded in. If the tutor, the expiry scheduler or a
+// second click changed it in the meantime, nothing is written and the parent is asked to refresh, so an action
+// can never be applied twice or to a booking that has already moved on.
+async function changeStatus(db, booking, data) {
+  const { count } = await db.booking.updateMany({ where: { id: booking.id, status: booking.status }, data })
+  if (!count) throw new AppError(409, 'This booking has just been updated. Please refresh the page and try again.')
+}
+
+const reload = (id) => prisma.booking.findUnique({ where: { id }, include: bookingInclude })
+
+// Locks the payment row until the transaction ends, then counts its open refund requests. Two refund requests sent
+// at the same moment (double click, two tabs) are handled one after the other, so only the first one is created.
+async function lockPaymentAndCountOpenRefunds(tx, paymentId) {
+  await tx.$queryRaw`SELECT id FROM Payment WHERE id = ${paymentId} FOR UPDATE`
+  return tx.refund.count({ where: { paymentId, status: { in: ['PENDING', 'APPROVED'] } } })
 }
 
 // POST /parent/bookings: send a booking request (PENDING)
@@ -55,6 +74,12 @@ export async function createBooking(req, res) {
   const endAt = mytToDate(data.date, fromMinutes(toMinutes(data.startTime) + 60))
   await assertSlotBookable({ tutorId: tutor.id, startAt, endAt })
   await assertChildFree({ childId: child.id, startAt, endAt })
+
+  // A trial is the child's first lesson with this tutor (paid like any lesson, only marked so both sides know)
+  if (data.isTrial) {
+    const before = await prisma.booking.count({ where: { childId: child.id, tutorId: tutor.id, status: { notIn: ['REJECTED', 'CANCELLED'] } } })
+    if (before) throw new AppError(400, `${child.name} has already had a lesson booked with this tutor, so this cannot be a trial lesson`)
+  }
 
   const booking = await prisma.booking.create({
     data: {
@@ -111,11 +136,8 @@ export async function acceptCounter(req, res) {
   const b = await ownBooking(req)
   if (b.status !== 'COUNTER_OFFERED' || b.counterPrice == null) throw new AppError(400, 'There is no counter offer to accept')
   await assertSlotBookable({ tutorId: b.tutorId, startAt: b.startAt, endAt: b.endAt })
-  const updated = await prisma.booking.update({
-    where: { id: b.id },
-    data: { status: 'AWAITING_PAYMENT', agreedPrice: b.counterPrice },
-    include: bookingInclude,
-  })
+  await changeStatus(prisma, b, { status: 'AWAITING_PAYMENT', agreedPrice: b.counterPrice })
+  const updated = await reload(b.id)
   await notify(b.tutor.userId, {
     type: 'COUNTER_ACCEPTED',
     title: 'Counter offer accepted',
@@ -129,11 +151,8 @@ export async function acceptCounter(req, res) {
 export async function declineCounter(req, res) {
   const b = await ownBooking(req)
   if (b.status !== 'COUNTER_OFFERED') throw new AppError(400, 'There is no counter offer to decline')
-  const updated = await prisma.booking.update({
-    where: { id: b.id },
-    data: { status: 'CANCELLED', cancelReason: 'Parent declined the counter offer', cancelledById: req.user.id },
-    include: bookingInclude,
-  })
+  await changeStatus(prisma, b, { status: 'CANCELLED', cancelReason: 'Parent declined the counter offer', cancelledById: req.user.id })
+  const updated = await reload(b.id)
   await notify(b.tutor.userId, {
     type: 'COUNTER_DECLINED',
     title: 'Counter offer declined',
@@ -158,16 +177,21 @@ export async function requestRefund(req, res) {
   const b = await ownBooking(req)
   if (!b.payment || b.payment.status !== 'PAID') throw new AppError(400, 'Only paid lessons can be refunded')
   if (!['CONFIRMED', 'COMPLETED'].includes(b.status)) throw new AppError(400, 'This booking is not eligible for a refund request')
-  if (b.payment.refunds.some((r) => r.status === 'PENDING' || r.status === 'APPROVED'))
-    throw new AppError(409, 'A refund request for this lesson is already being handled')
+  // Money back for a lesson that has not started yet goes through Cancel (which also sends the refund to Admin),
+  // so a lesson can never stay booked while its refund is being processed
+  if (b.status === 'CONFIRMED' && b.startAt > new Date())
+    throw new AppError(400, 'This lesson has not started yet. To get your money back, cancel the booking instead.')
+  const alreadyAsked = () => new AppError(409, 'A refund request for this lesson is already being handled')
+  if (b.payment.refunds.some((r) => r.status === 'PENDING' || r.status === 'APPROVED')) throw alreadyAsked()
 
   const disputing = attendanceDispute && b.status === 'COMPLETED'
-  await prisma.$transaction([
-    prisma.refund.create({
+  await prisma.$transaction(async (tx) => {
+    if (await lockPaymentAndCountOpenRefunds(tx, b.payment.id)) throw alreadyAsked()
+    await tx.refund.create({
       data: { paymentId: b.payment.id, amount: b.payment.amount, type: 'ADMIN_REVIEW', reason: disputing ? `Attendance disputed: ${reason}` : reason },
-    }),
-    ...(disputing ? [prisma.booking.update({ where: { id: b.id }, data: { status: 'DISPUTED' } })] : []),
-  ])
+    })
+    if (disputing) await changeStatus(tx, b, { status: 'DISPUTED' })
+  })
   if (disputing) {
     await notify(b.tutor.userId, { type: 'BOOKING_DISPUTED', title: 'Lesson disputed', message: `The parent disputed the attendance for the ${b.subject} lesson. Our admin team will review it.`, link: '/tutor/bookings' })
   }
@@ -194,23 +218,18 @@ export async function cancelBooking(req, res) {
     throw new AppError(400, 'This booking can no longer be cancelled')
   if (b.status === 'CONFIRMED' && b.startAt <= new Date()) throw new AppError(400, 'This lesson has already started')
 
-  const updated = await prisma.$transaction(async (tx) => {
-    if (b.status === 'CONFIRMED' && b.payment?.status === 'PAID') {
+  await prisma.$transaction(async (tx) => {
+    await changeStatus(tx, b, { status: 'CANCELLED', cancelReason: reason || 'Cancelled by parent', cancelledById: req.user.id })
+    // A paid lesson goes to Admin for a refund decision, unless a refund request for it is already open
+    if (b.status === 'CONFIRMED' && b.payment?.status === 'PAID' && !(await lockPaymentAndCountOpenRefunds(tx, b.payment.id))) {
       await tx.refund.create({
-        data: {
-          paymentId: b.payment.id,
-          amount: b.payment.amount,
-          type: 'ADMIN_REVIEW',
-          reason: reason || 'Parent cancelled the booking',
-        },
+        data: { paymentId: b.payment.id, amount: b.payment.amount, type: 'ADMIN_REVIEW', reason: reason || 'Parent cancelled the booking' },
       })
     }
-    return tx.booking.update({
-      where: { id: b.id },
-      data: { status: 'CANCELLED', cancelReason: reason || 'Cancelled by parent', cancelledById: req.user.id },
-      include: bookingInclude,
-    })
+    // A checkout that was started but not finished can never be completed for a cancelled lesson
+    if (b.payment?.status === 'PENDING') await tx.payment.update({ where: { id: b.payment.id }, data: { status: 'FAILED' } })
   })
+  const updated = await reload(b.id)
 
   await notify(b.tutor.userId, {
     type: 'BOOKING_CANCELLED',
@@ -225,14 +244,14 @@ export async function cancelBooking(req, res) {
 // bookingInclude carries both user ids (parent.userId, tutor.userId), which the service needs to notify the right person
 const withParties = ownBooking
 
-const reloadDto = async (id) => toBookingDto(await prisma.booking.findUnique({ where: { id }, include: bookingInclude }))
+const reloadDto = async (id) => toBookingDto(await reload(id))
 
 // POST /parent/bookings/:id/reschedule { date, startTime, reason? }
 export async function requestReschedule(req, res) {
   const data = z
     .object({
-      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Choose a date'),
-      startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Choose a time'),
+      date: ymd('Choose a date'),
+      startTime: hhmm('Choose a time'),
       reason: z.string().trim().max(200, 'Reason must be 200 characters or fewer').optional(),
     })
     .parse(req.body)

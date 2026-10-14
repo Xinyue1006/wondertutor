@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { validateIdParams } from '../middleware/params.js'
 import authRoutes from './auth.routes.js'
 import parentRoutes from './parent.routes.js'
 import adminRoutes from './admin.routes.js'
@@ -7,7 +8,7 @@ import { homeData } from '../controllers/public.controller.js'
 import { requireAuth } from '../middleware/auth.js'
 import * as notifications from '../controllers/notifications.controller.js'
 
-const router = Router()
+const router = validateIdParams(Router()) // every :id in these URLs must be a positive whole number
 
 router.get('/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }))
 router.use('/auth', authRoutes)

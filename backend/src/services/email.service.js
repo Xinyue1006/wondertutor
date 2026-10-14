@@ -13,7 +13,9 @@ const transporter = env.smtp.user
 
 export async function sendEmail({ to, subject, html }) {
   if (!transporter) {
-    console.log(`\n📧 [DEV EMAIL] To: ${to}\n   Subject: ${subject}\n   ${html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()}\n`)
+    const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+      .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')
+    console.log(`\n📧 [DEV EMAIL] To: ${to}\n   Subject: ${subject}\n   ${text}\n`)
     return
   }
   await transporter.sendMail({ from: env.smtp.from, to, subject, html })

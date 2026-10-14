@@ -2,7 +2,7 @@ import { useId, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { errorMessage } from '../../api/client'
-import { homeFor } from '../../components/ProtectedRoute'
+import { afterLogin } from '../../components/ProtectedRoute'
 import GoogleButton from '../../components/GoogleButton'
 import Icon from '../../components/ui/Icon'
 import { ErrorBox } from '../../components/ui/Common'
@@ -29,7 +29,7 @@ function LoginField({ label, icon, error, children }) {
 }
 
 export default function Login() {
-  const { login } = useAuth()
+  const { login, googleLogin, notice } = useAuth()
   const navigate = useNavigate()
   const { state } = useLocation()
   const [form, setForm] = useState({ email: state?.email || '', password: '', remember: true })
@@ -37,6 +37,23 @@ export default function Login() {
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
   const [busy, setBusy] = useState(false)
+  // Set when someone uses "Continue with Google" without an account: we ask Parent or Tutor, then create it
+  const [newGoogle, setNewGoogle] = useState(null)
+
+  async function finishGoogleSignup(role) {
+    setBusy(true)
+    setError('')
+    try {
+      const user = await googleLogin(newGoogle, role)
+      navigate(afterLogin(user, state?.from))
+    } catch (err) {
+      // Google's credential is short-lived; if it has expired the person simply clicks the Google button again
+      setNewGoogle(null)
+      setError(`${errorMessage(err)} Please click “Continue with Google” again.`)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const set = (field) => (e) => {
     setForm({ ...form, [field]: e.target.value })
@@ -60,7 +77,7 @@ export default function Login() {
     setBusy(true)
     try {
       const user = await login(form.email, form.password, form.remember)
-      navigate(homeFor(user.role))
+      navigate(afterLogin(user, state?.from))
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -117,6 +134,8 @@ export default function Login() {
             <h2 className="font-display text-3xl font-bold text-navy">Welcome Back</h2>
             <p className="mt-1 text-sm text-slate-600">Log in to continue your learning journey.</p>
           </div>
+          {/* Why the user is here again (expired session, deactivated account) */}
+          {notice && <p role="status" className="flex gap-2 rounded-lg bg-accent-50 px-3 py-2.5 text-sm text-amber-900"><Icon name="info" className="mt-0.5 h-4 w-4 shrink-0" /> {notice}</p>}
 
           <LoginField label="Email Address" icon="mail" error={fieldErrors.email}>
             {(id, err) => (
@@ -157,7 +176,19 @@ export default function Login() {
           <div className="flex items-center gap-3 text-sm text-slate-500">
             <span className="h-px flex-1 bg-slate-200" /> or <span className="h-px flex-1 bg-slate-200" />
           </div>
-          <GoogleButton onError={setError} />
+          {newGoogle ? (
+            <div role="group" aria-labelledby="new-google-title" className="rounded-xl border border-brand-100 bg-brand-25 p-4 text-center">
+              <p id="new-google-title" className="text-sm font-semibold text-navy">No WonderTutor account uses this Google email yet.</p>
+              <p className="mt-0.5 text-sm text-slate-600">Create one now. Which describes you?</p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button type="button" disabled={busy} onClick={() => finishGoogleSignup('PARENT')} className="btn-primary h-11">I'm a Parent</button>
+                <button type="button" disabled={busy} onClick={() => finishGoogleSignup('TUTOR')} className="btn-primary h-11">I'm a Tutor</button>
+              </div>
+              <button type="button" onClick={() => setNewGoogle(null)} className="mt-2 min-h-10 text-sm font-semibold text-brand-600 hover:underline">Cancel</button>
+            </div>
+          ) : (
+            <GoogleButton onError={setError} onNeedsRole={(credential) => { setError(''); setNewGoogle(credential) }} />
+          )}
           <p className="text-center text-sm text-slate-600">
             Don't have an account? <Link to="/signup" className="inline-flex min-h-11 items-center font-semibold text-brand-600 hover:underline">Sign Up</Link>
           </p>

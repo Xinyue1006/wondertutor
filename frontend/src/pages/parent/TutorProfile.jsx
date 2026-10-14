@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import api, { errorMessage } from '../../api/client'
 import { useMatching } from '../../assistant/MatchingContext'
 import Avatar from '../../components/ui/Avatar'
@@ -7,6 +7,7 @@ import Icon from '../../components/ui/Icon'
 import { ErrorBox, ModePills, SelectBox, Spinner, Stars, VerifiedTick } from '../../components/ui/Common'
 import { dateLabel, dayMonth, fmtShortDate, hhmmLabel, weekdayName } from '../../lib/format'
 import { gradeLabel } from '../../lib/education'
+import { checkRinggit } from '../../lib/validation'
 
 const TABS = [['about', 'About', 'user'], ['teaching', 'Teaching Information', 'book'], ['availability', 'Availability', 'calendar'], ['reviews', 'Reviews', 'star']]
 
@@ -24,9 +25,12 @@ export function mergeSlots(slots) {
 export default function TutorProfile() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const { kids, kidsLoaded } = useMatching()
   const [tutor, setTutor] = useState(null)
   const [error, setError] = useState('')
+  const [favError, setFavError] = useState('')
+  const [favBusy, setFavBusy] = useState(false)
   const [tab, setTab] = useState('about')
   const refs = { about: useRef(), teaching: useRef(), availability: useRef(), reviews: useRef() }
 
@@ -39,14 +43,25 @@ export default function TutorProfile() {
   if (!tutor || !kidsLoaded) return <Spinner />
 
   async function toggleFav() {
-    const r = await api.post(`/parent/favourites/${tutor.id}`)
-    setTutor({ ...tutor, isFavourite: r.data.isFavourite })
+    if (favBusy) return
+    setFavBusy(true)
+    setFavError('')
+    try {
+      const r = await api.post(`/parent/favourites/${tutor.id}`)
+      setTutor((t) => ({ ...t, isFavourite: r.data.isFavourite }))
+    } catch (err) {
+      setFavError(errorMessage(err))
+    } finally {
+      setFavBusy(false)
+    }
   }
+  // Opened from a link or a new tab there is no previous page in the app, so "Back" goes to the search instead
+  const goBack = () => (location.key === 'default' ? navigate('/parent/find-tutor') : navigate(-1))
   const goTab = (key) => { setTab(key); refs[key].current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
 
   return (
     <div>
-      <button onClick={() => navigate(-1)} className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-brand-500 hover:underline">
+      <button onClick={goBack} className="mb-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-brand-600 hover:underline">
         <Icon name="arrow-left" className="h-4 w-4" /> Back to Find Tutors
       </button>
 
@@ -60,11 +75,12 @@ export default function TutorProfile() {
                 <h1 className="flex items-center gap-2 text-3xl font-extrabold text-navy">{tutor.name} {tutor.verified && <VerifiedTick className="h-6 w-6" />}</h1>
                 <div className="flex items-center gap-3">
                   <span className="text-xl font-extrabold text-navy">RM {tutor.hourlyRate} / hour</span>
-                  <button onClick={toggleFav} aria-label="Favourite" className={`flex h-11 w-11 items-center justify-center rounded-lg border ${tutor.isFavourite ? 'border-red-300 bg-red-50 text-red-500' : 'border-slate-200 text-brand-500'} hover:bg-brand-50`}>
+                  <button onClick={toggleFav} disabled={favBusy} aria-pressed={tutor.isFavourite} aria-label={tutor.isFavourite ? `Remove ${tutor.name} from saved tutors` : `Save ${tutor.name}`} className={`flex h-11 w-11 items-center justify-center rounded-lg border ${tutor.isFavourite ? 'border-red-300 bg-red-50 text-red-500' : 'border-slate-200 text-brand-500'} hover:bg-brand-50`}>
                     <Icon name="heart" fill={tutor.isFavourite} className="h-5 w-5" />
                   </button>
                 </div>
               </div>
+              {favError && <p role="alert" className="mt-1 text-sm text-red-700">{favError}</p>}
               <div className="mt-1 flex items-center gap-1.5 text-sm">
                 <Icon name="star" fill className="h-4 w-4 text-accent" /> <b className="text-navy">{tutor.rating.toFixed(1)}</b> <span className="text-slate-500">({tutor.reviewCount} reviews)</span>
               </div>
@@ -81,7 +97,7 @@ export default function TutorProfile() {
           {/* tabs (scroll to the matching section) */}
           <nav className="card sticky top-[84px] z-20 flex overflow-x-auto px-2">
             {TABS.map(([key, label, icon]) => (
-              <button key={key} onClick={() => goTab(key)} className={`flex shrink-0 items-center gap-2 border-b-[3px] px-5 py-3.5 text-sm font-semibold ${tab === key ? 'border-brand-500 text-brand-500' : 'border-transparent text-navy hover:text-brand-500'}`}>
+              <button key={key} onClick={() => goTab(key)} aria-current={tab === key ? 'true' : undefined} className={`flex shrink-0 items-center gap-2 border-b-[3px] px-5 py-3.5 text-sm font-semibold ${tab === key ? 'border-brand-500 text-brand-500' : 'border-transparent text-navy hover:text-brand-500'}`}>
                 <Icon name={icon} className="h-[18px] w-[18px]" /> {label}
               </button>
             ))}
@@ -112,7 +128,7 @@ export default function TutorProfile() {
                   {tutor.qualifications.length === 0 && <div className="text-sm text-slate-500">Not provided yet</div>}
                   {tutor.qualifications.map((q) => (
                     <div key={q.id} className="mb-1 text-sm text-slate-600">
-                      {q.title}<br />{q.institution}{q.year && <><br />Graduated: {q.year}</>}
+                      {q.title}{q.status === 'PENDING' && <span className="ml-1 text-xs text-amber-700">(awaiting verification)</span>}<br />{q.institution}{q.year && <><br />Graduated: {q.year}</>}
                     </div>
                   ))}
                 </div>
@@ -128,7 +144,9 @@ export default function TutorProfile() {
                 <Icon name="trophy" className="h-6 w-6 shrink-0 text-brand-500" />
                 <div>
                   <div className="font-bold text-navy">Relevant Achievements</div>
-                  <ul className="list-disc pl-4 text-sm text-slate-600">{tutor.achievements.map((a) => <li key={a}>{a}</li>)}</ul>
+                  {tutor.achievements.length === 0 ? <div className="text-sm text-slate-500">Not provided yet</div> : (
+                    <ul className="list-disc pl-4 text-sm text-slate-600">{tutor.achievements.map((a) => <li key={a}>{a}</li>)}</ul>
+                  )}
                 </div>
               </div>
             </div>
@@ -186,12 +204,14 @@ function Reviews({ tutor, reference }) {
   const [page, setPage] = useState(1)
   const [list, setList] = useState([])
   const [more, setMore] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
+    setError('')
     api.get(`/parent/tutors/${tutor.id}/reviews`, { params: { sort, page } }).then((r) => {
       setList((prev) => (page === 1 ? r.data.reviews : [...prev, ...r.data.reviews]))
       setMore(r.data.hasMore)
-    })
+    }).catch((e) => setError(errorMessage(e)))
   }, [tutor.id, sort, page])
 
   const total = tutor.ratingDistribution.reduce((s, d) => s + d.count, 0) || 1
@@ -223,7 +243,8 @@ function Reviews({ tutor, reference }) {
         </div>
       </div>
       <ul className="divide-y divide-slate-100 rounded-xl border border-slate-100">
-        {list.length === 0 && <li className="p-6 text-center text-sm text-slate-500">No reviews yet.</li>}
+        {error && <li role="alert" className="p-4 text-sm text-red-700">Reviews could not be loaded: {error}</li>}
+        {list.length === 0 && !error && <li className="p-6 text-center text-sm text-slate-500">No reviews yet.</li>}
         {list.map((r) => (
           <li key={r.id} className="flex gap-3 p-4">
             <Avatar name={r.parentName} className="h-11 w-11" text="text-base" />
@@ -233,6 +254,11 @@ function Reviews({ tutor, reference }) {
                 <div className="flex items-center gap-2 text-xs text-slate-400"><Stars value={r.rating} size="h-3.5 w-3.5" /> {fmtShortDate(r.createdAt)}</div>
               </div>
               {r.comment && <p className="mt-1 text-sm text-slate-600">{r.comment}</p>}
+              {r.photoUrl && (
+                <a href={r.photoUrl} target="_blank" rel="noreferrer" className="mt-2 inline-block">
+                  <img src={r.photoUrl} alt={`Photo shared by ${r.parentName}`} loading="lazy" className="h-20 w-20 rounded-lg object-cover" />
+                </a>
+              )}
             </div>
           </li>
         ))}
@@ -260,7 +286,7 @@ function BookingPanel({ tutor, kids }) {
   const [error, setError] = useState('')
 
   const child = kids.find((k) => k.id === Number(childId))
-  const teachesChild = !child || tutor.grades.includes(gradeLabel(child.educationLevel, child.grade).replace('Form', 'Form'))
+  const teachesChild = !child || tutor.grades.includes(gradeLabel(child.educationLevel, child.grade))
 
   function onDate(v) {
     setDate(v)
@@ -270,7 +296,8 @@ function BookingPanel({ tutor, kids }) {
   function onContinue() {
     if (!childId) return setError('Add a child first so we can match the lesson to their level.')
     if (!date || !time) return setError('Please choose an available date and time.')
-    if (!(Number(price) > 0)) return setError('Enter your proposed price per hour.')
+    const badPrice = checkRinggit(price, 'Proposed price')
+    if (badPrice) return setError(badPrice)
     navigate(`/parent/tutors/${tutor.id}/book`, { state: { date, time, childId: Number(childId), mode, price, msg } })
   }
 

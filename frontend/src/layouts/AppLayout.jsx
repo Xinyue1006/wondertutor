@@ -156,7 +156,8 @@ function NotificationBell() {
   const load = useCallback(() => api.get('/notifications').then((r) => setData(r.data)).catch(() => {}), [])
   useEffect(() => {
     load()
-    const t = setInterval(load, 60000) // light polling: new booking replies show up without a refresh
+    // Light polling so new booking replies show up without a refresh; skipped while the tab is in the background
+    const t = setInterval(() => { if (!document.hidden) load() }, 60000)
     return () => clearInterval(t)
   }, [load])
 
@@ -168,14 +169,19 @@ function NotificationBell() {
   }
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative" ref={ref} onKeyDown={(e) => { if (e.key === 'Escape' && open) setOpen(false) }}>
       <button
         onClick={() => { setOpen((o) => !o); if (!open) load() }}
         className="relative rounded-full p-2 text-brand-500 hover:bg-brand-50"
-        aria-label="Notifications"
+        aria-label={data.unread ? `Notifications, ${data.unread} unread` : 'Notifications'}
+        aria-expanded={open}
       >
         <Icon name="bell" className="h-6 w-6" />
-        {data.unread > 0 && <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" />}
+        {data.unread > 0 && (
+          <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[11px] font-bold leading-none text-white ring-2 ring-white" aria-hidden="true">
+            {data.unread > 9 ? '9+' : data.unread}
+          </span>
+        )}
       </button>
       {open && (
         <div className="pop-in absolute right-0 top-12 z-40 w-[22rem] max-w-[calc(100vw-1.5rem)] rounded-xl border border-brand-100 bg-white shadow-xl">
@@ -184,7 +190,7 @@ function NotificationBell() {
             {data.unread > 0 && (
               <button
                 className="text-xs font-semibold text-brand-500 hover:underline"
-                onClick={() => api.post('/notifications/read-all').then(load)}
+                onClick={() => api.post('/notifications/read-all').then(load).catch(() => {})}
               >
                 Mark all as read
               </button>
@@ -201,7 +207,7 @@ function NotificationBell() {
                 <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${n.isRead ? 'bg-transparent' : 'bg-brand-500'}`} />
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-semibold text-navy">{n.title}</span>
-                  <span className="block truncate text-xs text-slate-500">{n.message}</span>
+                  <span className="line-clamp-3 block text-xs text-slate-600">{n.message}</span>
                   <span className="mt-0.5 block text-[11px] text-slate-400">{timeAgo(n.createdAt)}</span>
                 </span>
               </button>

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import Icon from './Icon'
 
 // ───────────── small display pieces ─────────────
@@ -64,9 +64,22 @@ export function Spinner({ className = '' }) {
   )
 }
 
+// role="alert": screen readers read the problem out as soon as it appears
 export function ErrorBox({ children, className = '' }) {
   if (!children) return null
-  return <div className={`rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-600 ${className}`}>{children}</div>
+  return <div role="alert" className={`rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-700 ${className}`}>{children}</div>
+}
+
+// Shown instead of an endless spinner when a page's data could not be loaded (server down, no internet)
+export function LoadError({ message, onRetry }) {
+  return (
+    <div role="alert" className="card mx-auto my-6 flex max-w-md flex-col items-center gap-3 p-8 text-center">
+      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-red-600"><Icon name="info" className="h-7 w-7" /></span>
+      <div className="font-bold text-navy">We couldn't load this page</div>
+      <p className="text-sm text-slate-600">{message || 'Please check your internet connection and try again.'}</p>
+      {onRetry && <button onClick={onRetry} className="btn-primary mt-1 px-6"><Icon name="refresh" className="h-4 w-4" /> Try again</button>}
+    </div>
+  )
 }
 
 export function PageTitle({ title, subtitle, icon, right, sparkle = true }) {
@@ -139,9 +152,12 @@ export function FilterDropdown({ label, active, children, width = 'w-64' }) {
   const ref = useRef(null)
   useClickOutside(ref, () => setOpen(false))
   return (
-    <div className="relative" ref={ref}>
+    // Escape closes the panel, and screen readers are told whether it is open
+    <div className="relative" ref={ref} onKeyDown={(e) => { if (e.key === 'Escape' && open) { e.stopPropagation(); setOpen(false) } }}>
       <button
         type="button"
+        aria-expanded={open}
+        aria-haspopup="true"
         onClick={() => setOpen((o) => !o)}
         className={`flex h-10 items-center gap-2 rounded-lg border bg-white px-4 text-sm font-medium transition hover:border-brand-500 ${
           active ? 'border-brand-500 text-brand-500' : 'border-slate-200 text-navy'
@@ -161,20 +177,47 @@ export function FilterDropdown({ label, active, children, width = 'w-64' }) {
 
 // ───────────── modal ─────────────
 
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+// Accessible dialog: announced as a dialog with its title, keyboard focus moves into it and stays inside
+// (Tab cycles), Escape closes it, focus returns to the button that opened it, and the page behind does not scroll.
 export function Modal({ open, onClose, title, children, width = 'max-w-lg', footer }) {
+  const titleId = useId()
+  const box = useRef(null)
+  const closeRef = useRef(onClose)
+  closeRef.current = onClose
+
   useEffect(() => {
     if (!open) return
-    const onKey = (e) => e.key === 'Escape' && onClose()
+    const opener = document.activeElement
+    const first = box.current?.querySelector(`${FOCUSABLE}:not([aria-label="Close"])`) || box.current
+    first?.focus()
+    const { overflow } = document.body.style
+    document.body.style.overflow = 'hidden'
+    const onKey = (e) => {
+      if (e.key === 'Escape') return closeRef.current()
+      if (e.key !== 'Tab' || !box.current) return
+      const items = [...box.current.querySelectorAll(FOCUSABLE)]
+      if (!items.length) return
+      const [head, tail] = [items[0], items[items.length - 1]]
+      if (e.shiftKey && document.activeElement === head) { e.preventDefault(); tail.focus() }
+      else if (!e.shiftKey && document.activeElement === tail) { e.preventDefault(); head.focus() }
+    }
     document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [open, onClose])
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = overflow
+      opener?.focus?.()
+    }
+  }, [open])
   if (!open) return null
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy/40 p-4 backdrop-blur-[2px]" onMouseDown={onClose}>
-      <div className={`pop-in max-h-[90vh] w-full ${width} overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl`} onMouseDown={(e) => e.stopPropagation()}>
+      <div ref={box} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}
+        className={`pop-in max-h-[90vh] w-full ${width} overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl outline-none`} onMouseDown={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-start justify-between gap-4">
-          <h2 className="text-xl font-bold text-navy">{title}</h2>
-          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100" aria-label="Close">
+          <h2 id={titleId} className="text-xl font-bold text-navy">{title}</h2>
+          <button onClick={onClose} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Close">
             <Icon name="x" />
           </button>
         </div>

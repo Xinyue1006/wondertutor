@@ -4,9 +4,10 @@ import { AppError } from '../../utils/AppError.js'
 import { CHARACTERISTICS, LOCATIONS, MAX_GRADE, SUBJECTS, findLocation } from '../../data/catalog.js'
 import { rankTutors, distanceKm } from '../../services/matching.service.js'
 import { tutorInclude, toTutorCard, toTutorProfile } from '../../services/tutor.service.js'
-import { getTutorSlots } from '../../services/booking.service.js'
+import { SLOT_BLOCKING, getTutorSlots } from '../../services/booking.service.js'
 import { addDays, mondayOf, mytParts, mytToDate, toMinutes, todayMyt } from '../../utils/time.js'
 import { preferencesToCriteria } from '../../utils/preferences.js'
+import { hhmm, ymd } from '../../utils/validators.js'
 
 // GET /parent/catalog: option lists for the filter bar, wizard and chatbot
 export function catalog(req, res) {
@@ -24,23 +25,26 @@ export function catalog(req, res) {
 
 // Query params -> matching criteria (also the browse filter set)
 const browseSchema = z.object({
-  subject: z.string().min(1, 'Subject is required'),
+  subject: z.string().trim().min(1, 'Subject is required').max(60),
   level: z.enum(['KINDERGARTEN', 'PRIMARY', 'SECONDARY'], { message: 'Education level is required' }),
-  grade: z.coerce.number().int().optional(),
-  location: z.string().optional(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  time: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  grade: z.coerce.number().int().min(1).optional(),
+  location: z.string().trim().max(100).optional(),
+  date: ymd().optional(),
+  time: hhmm().optional(),
   mode: z.enum(['ONLINE', 'PHYSICAL']).optional(),
-  minPrice: z.coerce.number().optional(),
-  maxPrice: z.coerce.number().optional(),
-  minRating: z.coerce.number().optional(),
-  days: z.string().optional(), // "1,3,5" (0 = Sunday)
-  maxDistance: z.coerce.number().optional(), // km
-  characteristics: z.string().optional(), // "Structured,Interactive"
+  minPrice: z.coerce.number().min(0).max(1000).optional(),
+  maxPrice: z.coerce.number().min(0).max(1000).optional(),
+  minRating: z.coerce.number().min(0).max(5).optional(),
+  days: z.string().regex(/^[0-6](,[0-6])*$/, 'Invalid days').optional(), // "1,3,5" (0 = Sunday)
+  maxDistance: z.coerce.number().positive().max(500).optional(), // km
+  characteristics: z.string().max(200).optional() // "Structured,Interactive"
+    .refine((s) => !s || s.split(',').every((c) => CHARACTERISTICS.includes(c)), 'Unknown teaching style'),
   sort: z.enum(['recommended', 'price_asc', 'price_desc', 'rating', 'experience', 'nearest']).default('recommended'),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(30).default(9),
 })
+  .refine((q) => !q.grade || q.grade <= MAX_GRADE[q.level], { message: 'That grade does not exist for the chosen level', path: ['grade'] })
+  .refine((q) => q.minPrice == null || q.maxPrice == null || q.minPrice <= q.maxPrice, { message: 'The minimum price cannot be more than the maximum', path: ['maxPrice'] })
 
 // Tutors whose account is active and who teach the subject at the level (the DB-side part of the mandatory filter)
 export async function activeTutors(subject, level) {
@@ -53,19 +57,22 @@ export async function activeTutors(subject, level) {
   })
 }
 
-// Is the tutor free for a 1-hour lesson at date+time? (date & time filter on the search bar)
-async function isFreeAt(tutor, date, time) {
+// Which of these tutors are free for a 1-hour lesson at date+time? (date & time filter on the search bar)
+// One query for the clashing bookings of all candidates, instead of one query per tutor.
+async function freeAt(tutors, date, time) {
   const start = mytToDate(date, time)
   const end = new Date(start.getTime() + 3600000)
+  if (start <= new Date()) return new Set()
   const { dow } = mytParts(start)
-  const covers = tutor.availability.some(
-    (a) => a.dayOfWeek === dow && toMinutes(a.startTime) <= toMinutes(time) && toMinutes(a.endTime) >= toMinutes(time) + 60,
+  const covering = tutors.filter((t) =>
+    t.availability.some((a) => a.dayOfWeek === dow && toMinutes(a.startTime) <= toMinutes(time) && toMinutes(a.endTime) >= toMinutes(time) + 60),
   )
-  if (!covers) return false
-  const clash = await prisma.booking.findFirst({
-    where: { tutorId: tutor.id, status: { in: ['AWAITING_PAYMENT', 'CONFIRMED'] }, startAt: { lt: end }, endAt: { gt: start } },
+  const busy = await prisma.booking.findMany({
+    where: { tutorId: { in: covering.map((t) => t.id) }, status: { in: SLOT_BLOCKING }, startAt: { lt: end }, endAt: { gt: start } },
+    select: { tutorId: true },
   })
-  return !clash
+  const busyIds = new Set(busy.map((b) => b.tutorId))
+  return new Set(covering.filter((t) => !busyIds.has(t.id)).map((t) => t.id))
 }
 
 // GET /parent/tutors: browse + filter + sort + page
@@ -119,8 +126,8 @@ export async function browseTutors(req, res) {
   })
 
   if (q.date && q.time) {
-    const free = await Promise.all(ranked.map(({ tutor }) => isFreeAt(tutor, q.date, q.time)))
-    ranked = ranked.filter((_, i) => free[i])
+    const free = await freeAt(ranked.map((r) => r.tutor), q.date, q.time)
+    ranked = ranked.filter(({ tutor }) => free.has(tutor.id))
   }
 
   // "Recommended" keeps the score order; the other sorts re-order the same list (ties fall back to the score)
@@ -215,6 +222,7 @@ export async function tutorReviews(req, res) {
       id: r.id,
       rating: r.rating,
       comment: r.comment,
+      photoUrl: r.photoUrl,
       createdAt: r.createdAt,
       parentName: r.parent.user.fullName,
       // "Parent of Primary 5 student": shown instead of the child's name to protect the child's privacy
@@ -228,7 +236,7 @@ export async function tutorSlots(req, res) {
   const id = Number(req.params.id)
   const exists = await prisma.tutorProfile.findFirst({ where: { id, user: { status: 'ACTIVE' } }, select: { id: true } })
   if (!exists) throw new AppError(404, 'Tutor not found')
-  const from = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).default(mondayOf(todayMyt())).parse(req.query.from)
+  const from = ymd().default(mondayOf(todayMyt())).parse(req.query.from)
   res.json({ from, to: addDays(from, 6), days: await getTutorSlots(id, from, 7) })
 }
 
@@ -246,13 +254,12 @@ export async function listFavourites(req, res) {
 export async function toggleFavourite(req, res) {
   const tutorId = Number(req.params.tutorId)
   const key = { parentId_tutorId: { parentId: req.parent.id, tutorId } }
-  const existing = await prisma.favouriteTutor.findUnique({ where: key })
-  if (existing) {
-    await prisma.favouriteTutor.delete({ where: key })
-    return res.json({ isFavourite: false })
-  }
-  const tutor = await prisma.tutorProfile.findUnique({ where: { id: tutorId } })
+  // deleteMany (not delete) so a double click that already removed it is not an error
+  const removed = await prisma.favouriteTutor.deleteMany({ where: { parentId: req.parent.id, tutorId } })
+  if (removed.count) return res.json({ isFavourite: false })
+  const tutor = await prisma.tutorProfile.findFirst({ where: { id: tutorId, user: { status: 'ACTIVE' } }, select: { id: true } })
   if (!tutor) throw new AppError(404, 'Tutor not found')
-  await prisma.favouriteTutor.create({ data: { parentId: req.parent.id, tutorId } })
+  // upsert: if a second click saved it a moment ago, it simply stays saved
+  await prisma.favouriteTutor.upsert({ where: key, update: {}, create: { parentId: req.parent.id, tutorId } })
   res.json({ isFavourite: true })
 }

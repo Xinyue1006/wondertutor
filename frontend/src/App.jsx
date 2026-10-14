@@ -1,7 +1,7 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import PublicLayout from './layouts/PublicLayout'
 import AppLayout from './layouts/AppLayout'
-import ProtectedRoute, { homeFor } from './components/ProtectedRoute'
+import ProtectedRoute, { afterLogin } from './components/ProtectedRoute'
 import Placeholder from './components/Placeholder'
 import { useAuth } from './context/AuthContext'
 
@@ -30,8 +30,9 @@ import AdminComplaints from './pages/admin/AdminComplaints'
 // Redirect logged-in users away from login/signup
 function GuestOnly({ children }) {
   const { user, loading } = useAuth()
+  const { state } = useLocation()
   if (loading) return null
-  return user ? <Navigate to={homeFor(user.role)} replace /> : children
+  return user ? <Navigate to={afterLogin(user, state?.from)} replace /> : children
 }
 
 export default function App() {

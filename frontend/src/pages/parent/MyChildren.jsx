@@ -5,8 +5,9 @@ import { useMatching } from '../../assistant/MatchingContext'
 import Avatar from '../../components/ui/Avatar'
 import PhotoPicker from '../../components/PhotoPicker'
 import Icon from '../../components/ui/Icon'
-import { EmptyState, ErrorBox, Modal, PageTitle, SelectBox, Spinner } from '../../components/ui/Common'
+import { EmptyState, ErrorBox, LoadError, Modal, PageTitle, SelectBox, Spinner } from '../../components/ui/Common'
 import { GRADE_GROUPS, gradeLabel, parseGrade } from '../../lib/education'
+import { checkName, checkText } from '../../lib/validation'
 
 const blank = { name: '', grade: 'PRIMARY:1', subject: '', notes: '', photoUrl: null }
 
@@ -21,8 +22,13 @@ export default function MyChildren() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [removing, setRemoving] = useState(null)
+  const [removeBusy, setRemoveBusy] = useState(false)
 
-  const load = () => api.get('/parent/children').then((r) => { setKids(r.data.children); return r.data.children })
+  const [loadError, setLoadError] = useState('')
+  const load = () => {
+    setLoadError('')
+    return api.get('/parent/children').then((r) => { setKids(r.data.children); return r.data.children }).catch((e) => { setLoadError(errorMessage(e)); return [] })
+  }
   useEffect(() => { load() }, [])
 
   // Deep links from the dashboard: ?add=1 / ?edit=<id>
@@ -49,7 +55,8 @@ export default function MyChildren() {
   async function save(e) {
     e.preventDefault()
     setError('')
-    if (!form.name.trim()) return setError('Child name is required')
+    const problem = checkName(form.name, "Child's name", 60) || (!form.grade && 'Choose the education level and grade') || checkText(form.notes, { label: 'Notes', max: 500 })
+    if (problem) return setError(problem)
     const { level, grade } = parseGrade(form.grade)
     const body = { name: form.name, educationLevel: level, grade, subject: form.subject || null, notes: form.notes || null, photoUrl: form.photoUrl }
     setBusy(true)
@@ -66,16 +73,20 @@ export default function MyChildren() {
   }
 
   async function remove() {
+    if (removeBusy) return
+    setRemoveBusy(true)
     try {
       await api.delete(`/parent/children/${removing.id}`)
       await load(); await refreshChildren()
       setRemoving(null)
     } catch (err) {
       setError(errorMessage(err))
+    } finally {
+      setRemoveBusy(false)
     }
   }
 
-  if (!kids) return <Spinner />
+  if (!kids) return loadError ? <LoadError message={loadError} onRetry={load} /> : <Spinner />
 
   return (
     <div>
@@ -103,8 +114,9 @@ export default function MyChildren() {
             <div className="mt-3 grid grid-cols-2 gap-2">
               <button onClick={() => { applyChild(c); navigate('/parent/find-tutor/match') }} className="btn-primary col-span-2"><Icon name="search" className="h-4 w-4" /> Find a Tutor</button>
               <Link to={`/parent/children/${c.id}/progress`} className="btn-outline col-span-2"><Icon name="chart" className="h-4 w-4" /> View Learning Progress</Link>
-              <button onClick={() => openForm(c)} className="btn-outline"><Icon name="edit" className="h-4 w-4" /> Edit</button>
-              <button onClick={() => { setError(''); setRemoving(c) }} className="btn-danger"><Icon name="trash" className="h-4 w-4" /> Remove</button>
+              {/* A child with lessons keeps their profile: bookings, payments and progress refer to it */}
+              <button onClick={() => openForm(c)} className={`btn-outline ${c.bookingCount ? 'col-span-2' : ''}`}><Icon name="edit" className="h-4 w-4" /> Edit</button>
+              {!c.bookingCount && <button onClick={() => { setError(''); setRemoving(c) }} className="btn-danger"><Icon name="trash" className="h-4 w-4" /> Remove</button>}
             </div>
           </article>
         ))}
@@ -140,8 +152,8 @@ export default function MyChildren() {
       </Modal>
 
       <Modal open={!!removing} onClose={() => setRemoving(null)} title={`Remove ${removing?.name}?`}
-        footer={<><button onClick={() => setRemoving(null)} className="btn-outline">Cancel</button><button onClick={remove} className="btn bg-red-500 text-white hover:bg-red-600">Remove</button></>}>
-        <p className="text-sm text-slate-600">This removes the profile. Children with lesson history cannot be removed.</p>
+        footer={<><button onClick={() => setRemoving(null)} className="btn-outline">Cancel</button><button disabled={removeBusy} onClick={remove} className="btn bg-red-600 text-white hover:bg-red-700">{removeBusy ? 'Removing…' : 'Remove'}</button></>}>
+        <p className="text-sm text-slate-600">This removes {removing?.name}'s profile. It cannot be undone.</p>
         <ErrorBox className="mt-3">{removing && error}</ErrorBox>
       </Modal>
     </div>

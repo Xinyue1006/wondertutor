@@ -2,13 +2,14 @@ import { z } from 'zod'
 import { prisma } from '../../config/prisma.js'
 import { AppError } from '../../utils/AppError.js'
 import { notify } from '../../services/notification.service.js'
+import { id } from '../../utils/validators.js'
 
 export const COMPLAINT_CATEGORIES = [
   'Tutor behaviour', 'Lesson quality', 'No-show or lateness', 'Payment or refund', 'Safety concern', 'Other',
 ]
 
 const schema = z.object({
-  bookingId: z.number().int().optional().nullable(),
+  bookingId: id('Booking').optional().nullable(),
   category: z.enum(COMPLAINT_CATEGORIES, { message: 'Choose a category' }),
   description: z.string().trim().min(10, 'Please describe the problem (at least 10 characters)').max(1000),
 })

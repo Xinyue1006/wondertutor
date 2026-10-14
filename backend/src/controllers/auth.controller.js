@@ -8,7 +8,8 @@ import { signToken } from '../services/token.service.js'
 import { issueOtp, checkOtp } from '../services/otp.service.js'
 import { verifyRecaptcha } from '../services/recaptcha.service.js'
 import { cleanPreferences, preferencesSchema } from '../utils/preferences.js'
-import { SUBJECTS, findLocation } from '../data/catalog.js'
+import { MAX_GRADE, SUBJECTS, findLocation } from '../data/catalog.js'
+import { email as emailRule, optionalText, otpCode, password as passwordRule, personName, phoneMY } from '../utils/validators.js'
 
 // Never send passwordHash etc. to the client
 export function toUserDto(u) {
@@ -27,37 +28,39 @@ export function toUserDto(u) {
 const registerSchema = z
   .object({
     role: z.enum(['PARENT', 'TUTOR'], { message: 'Role must be PARENT or TUTOR' }),
-    fullName: z.string().trim().min(2, 'Full name is required'),
-    email: z.string().trim().toLowerCase().email('Invalid email address'),
-    phone: z.string().trim().min(8, 'Phone number is required'),
-    password: z
-      .string()
-      .min(8, 'Password must be at least 8 characters')
-      .regex(/[A-Za-z]/, 'Password must contain a letter')
-      .regex(/\d/, 'Password must contain a number'),
-    recaptchaToken: z.string().optional(),
+    fullName: personName('Full name'),
+    email: emailRule,
+    phone: phoneMY('Phone number'),
+    password: passwordRule,
+    recaptchaToken: z.string().max(4000).optional(),
     // Parent-only (signup "Basic Information" + optional "My Children" sections)
-    address: z.string().trim().max(200).optional(),
+    address: optionalText(200, 'Address'),
     children: z
       .array(
         z.object({
-          name: z.string().trim().min(1),
+          name: personName("Child's name", 60),
           educationLevel: z.enum(['KINDERGARTEN', 'PRIMARY', 'SECONDARY']),
           grade: z.coerce.number().int().min(1).max(6),
           subject: z.enum(SUBJECTS, { message: 'Choose a subject from the list' }).optional(), // the subject the child needs tuition in
-          notes: z.string().trim().max(500).optional(), // learning needs or goals
-        }),
+          notes: optionalText(500, 'Notes'), // learning needs or goals
+        })
+          .refine((c) => c.grade <= MAX_GRADE[c.educationLevel], { message: 'That grade does not exist for the chosen level', path: ['grade'] }),
       )
       .max(5)
       .optional(),
     preferences: preferencesSchema.optional(),
     // Tutor-only
     gender: z.enum(['MALE', 'FEMALE', 'UNSPECIFIED']).optional(),
-    emergencyContactName: z.string().trim().optional(),
-    emergencyContactPhone: z.string().trim().optional(),
+    emergencyContactName: personName('Emergency contact name').optional(),
+    emergencyContactPhone: phoneMY('Emergency contact number').optional(),
   })
   .refine((d) => d.role !== 'TUTOR' || (d.gender && d.emergencyContactName && d.emergencyContactPhone), {
     message: 'Gender and emergency contact are required for tutors',
+  })
+  // An emergency contact is someone else: their number cannot be the tutor's own
+  .refine((d) => !d.emergencyContactPhone || d.emergencyContactPhone !== d.phone, {
+    message: 'The emergency contact number must be different from your own number',
+    path: ['emergencyContactPhone'],
   })
 
 // POST /api/auth/register
@@ -114,7 +117,7 @@ export async function register(req, res) {
 // POST /api/auth/verify-otp
 export async function verifyOtp(req, res) {
   const { email, code } = z
-    .object({ email: z.string().trim().toLowerCase().email(), code: z.string().length(6, 'Code must be 6 digits') })
+    .object({ email: emailRule, code: otpCode })
     .parse(req.body)
 
   const user = await prisma.user.findUnique({ where: { email } })
@@ -128,7 +131,7 @@ export async function verifyOtp(req, res) {
 
 // POST /api/auth/resend-otp
 export async function resendOtp(req, res) {
-  const { email } = z.object({ email: z.string().trim().toLowerCase().email() }).parse(req.body)
+  const { email } = z.object({ email: emailRule }).parse(req.body)
   const user = await prisma.user.findUnique({ where: { email } })
   if (!user || user.isEmailVerified) throw new AppError(400, 'Nothing to verify for this email')
   await issueOtp(email)
@@ -136,16 +139,12 @@ export async function resendOtp(req, res) {
 }
 
 // ───────────── Forgot / reset password ─────────────
-const newPasswordSchema = z
-  .string()
-  .min(8, 'Password must be at least 8 characters')
-  .regex(/[A-Za-z]/, 'Password must contain a letter')
-  .regex(/\d/, 'Password must contain a number')
+const newPasswordSchema = passwordRule
 
 // POST /api/auth/forgot-password { email }
 // Always gives the same answer, so nobody can use this form to find out which emails have an account.
 export async function forgotPassword(req, res) {
-  const { email } = z.object({ email: z.string().trim().toLowerCase().email('Enter a valid email address') }).parse(req.body)
+  const { email } = z.object({ email: emailRule }).parse(req.body)
   const user = await prisma.user.findUnique({ where: { email } })
   if (user && user.status !== 'DEACTIVATED') {
     try {
@@ -161,8 +160,8 @@ export async function forgotPassword(req, res) {
 export async function resetPassword(req, res) {
   const { email, code, newPassword } = z
     .object({
-      email: z.string().trim().toLowerCase().email('Enter a valid email address'),
-      code: z.string().length(6, 'Code must be 6 digits'),
+      email: emailRule,
+      code: otpCode,
       newPassword: newPasswordSchema,
     })
     .parse(req.body)
@@ -177,7 +176,8 @@ export async function resetPassword(req, res) {
 // POST /api/auth/login
 export async function login(req, res) {
   const { email, password } = z
-    .object({ email: z.string().trim().toLowerCase().email(), password: z.string().min(1) })
+    // No strength rules at login (old passwords stay valid), only a cap so nobody can post megabytes to bcrypt
+    .object({ email: emailRule, password: z.string().min(1, 'Enter your password').max(200, 'Incorrect email or password') })
     .parse(req.body)
 
   const user = await prisma.user.findUnique({ where: { email } })
@@ -195,7 +195,7 @@ const googleClient = new OAuth2Client()
 export async function googleLogin(req, res) {
   if (!env.googleClientId) throw new AppError(501, 'Google login is not configured')
   const { credential, role } = z
-    .object({ credential: z.string(), role: z.enum(['PARENT', 'TUTOR']).optional() })
+    .object({ credential: z.string().min(1).max(4096), role: z.enum(['PARENT', 'TUTOR']).optional() })
     .parse(req.body)
 
   const ticket = await googleClient.verifyIdToken({ idToken: credential, audience: env.googleClientId })

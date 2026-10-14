@@ -2,7 +2,7 @@
 // Both entry points fill the SAME criteria object and call the SAME backend matching service,
 // so a parent can start in the chatbot and finish in the wizard (or the other way round).
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import api from '../api/client'
+import api, { errorMessage } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { preferencesToCriteria } from '../lib/preferences'
 
@@ -54,6 +54,8 @@ export function MatchingProvider({ children }) {
   const [criteria, setCriteria] = useState(EMPTY_CRITERIA)
   const [result, setResult] = useState(null)
   const [chatOpen, setChatOpen] = useState(false)
+  // Set when the option lists or the children could not be loaded, so pages can offer "Try again" instead of spinning
+  const [loadError, setLoadError] = useState('')
 
   const refreshChildren = useCallback(async () => {
     const res = await api.get('/parent/children')
@@ -62,15 +64,22 @@ export function MatchingProvider({ children }) {
     return res.data.children
   }, [])
 
-  useEffect(() => {
-    if (user?.role !== 'PARENT') return
+  const loadShared = useCallback(() => {
+    setLoadError('')
     api.get('/parent/catalog').then((r) => {
       setCatalog(r.data)
       // The parent's saved preferences (signup / My Profile) are the starting point of every search
       setCriteria((c) => ({ ...c, ...preferencesToCriteria(r.data.preferences) }))
-    }).catch(() => {})
-    refreshChildren().catch(() => {})
-  }, [user, refreshChildren])
+    }).catch((e) => setLoadError(errorMessage(e)))
+    refreshChildren().catch((e) => setLoadError(errorMessage(e)))
+  }, [refreshChildren])
+
+  // Keyed on who is logged in (not the user object), so editing the profile name does not reload everything
+  const userId = user?.id
+  const isParent = user?.role === 'PARENT'
+  useEffect(() => {
+    if (isParent) loadShared()
+  }, [userId, isParent, loadShared])
 
   const patchCriteria = useCallback((patch) => setCriteria((c) => ({ ...c, ...patch })), [])
 
@@ -97,9 +106,9 @@ export function MatchingProvider({ children }) {
   const value = useMemo(
     () => ({
       catalog, kids, kidsLoaded, refreshChildren, criteria, setCriteria, patchCriteria, applyChild,
-      result, setResult, runMatching, chatOpen, setChatOpen,
+      result, setResult, runMatching, chatOpen, setChatOpen, loadError, reloadShared: loadShared,
     }),
-    [catalog, kids, kidsLoaded, refreshChildren, criteria, patchCriteria, applyChild, result, runMatching, chatOpen],
+    [catalog, kids, kidsLoaded, refreshChildren, criteria, patchCriteria, applyChild, result, runMatching, chatOpen, loadError, loadShared],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

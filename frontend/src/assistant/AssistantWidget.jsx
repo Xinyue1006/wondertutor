@@ -139,13 +139,23 @@ export default function AssistantWidget() {
 function ChatPanel() {
   const m = useMatching()
   const navigate = useNavigate()
-  const { catalog, kids, kidsLoaded, criteria, setCriteria, setChatOpen } = m
+  const { catalog, kids, kidsLoaded, criteria, setCriteria, setChatOpen, loadError, reloadShared } = m
   const [messages, setMessages] = useState([])
   const [asked, setAsked] = useState({})
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const scroller = useRef(null)
+  const input = useRef(null)
   const started = useRef(false)
+
+  // Opening the panel puts the cursor in the message box; Escape closes it again
+  useEffect(() => {
+    input.current?.focus()
+    // A dialog open on top (e.g. lesson details) gets the Escape key first
+    const onKey = (e) => e.key === 'Escape' && !document.querySelector('[role=dialog]') && setChatOpen(false)
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [setChatOpen])
 
   // The conversation lives for as long as the portal is open; closing the panel just hides it
   useEffect(() => {
@@ -235,7 +245,7 @@ function ChatPanel() {
   }
 
   return (
-    <aside className="pop-in fixed bottom-28 right-4 top-24 z-40 flex w-[min(390px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-brand-100">
+    <aside aria-label="AI Tutor Assistant" className="pop-in fixed bottom-28 right-4 top-24 z-40 flex w-[min(390px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-brand-100">
       <header className="flex items-center gap-3 bg-gradient-to-r from-brand-50 to-white px-4 py-3">
         <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow ring-1 ring-brand-100">
           <Robot className="h-10 w-10" sparkles={false} />
@@ -244,18 +254,25 @@ function ChatPanel() {
           <div className="text-lg font-extrabold text-navy">AI Tutor Assistant</div>
           <div className="text-xs text-slate-500">Your learning matchmaker</div>
         </div>
-        <button onClick={restart} title="Start over" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100" aria-label="Start over">
+        <button onClick={restart} title="Start over" className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Start over">
           <Icon name="refresh" className="h-[18px] w-[18px]" />
         </button>
-        <button onClick={() => setChatOpen(false)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100" aria-label="Minimise">
+        <button onClick={() => setChatOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Minimise">
           <Icon name="minus" className="h-[18px] w-[18px]" />
         </button>
-        <button onClick={() => setChatOpen(false)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100" aria-label="Close">
+        <button onClick={() => setChatOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Close">
           <Icon name="x" className="h-[18px] w-[18px]" />
         </button>
       </header>
 
-      <div ref={scroller} className="flex-1 space-y-3 overflow-y-auto bg-brand-25 px-4 py-4">
+      {/* aria-live: each new message from the assistant is read out by screen readers */}
+      <div ref={scroller} aria-live="polite" className="flex-1 space-y-3 overflow-y-auto bg-brand-25 px-4 py-4">
+        {!catalog && loadError && (
+          <div role="alert" className="rounded-xl bg-white p-3 text-sm text-slate-700">
+            I couldn't load the subjects and areas: {loadError}
+            <button onClick={reloadShared} className="mt-2 block min-h-10 font-semibold text-brand-600 hover:underline">Try again</button>
+          </div>
+        )}
         {messages.map((msg) => (
           <Message key={msg.id} msg={msg} c={criteria} catalog={catalog} kids={kids} onAnswer={answer} onFind={findMatches} onEdit={edit} busy={busy} setCriteria={setCriteria} />
         ))}
@@ -263,6 +280,9 @@ function ChatPanel() {
 
       <form onSubmit={onSend} className="flex items-center gap-2 border-t border-slate-100 bg-white p-3">
         <input
+          ref={input}
+          aria-label="Message to the AI Tutor Assistant"
+          maxLength={300}
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Type your message..."

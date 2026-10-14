@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import api, { errorMessage } from '../../api/client'
 import Icon from '../../components/ui/Icon'
-import { EmptyState, ErrorBox, Modal, PageTitle, Spinner } from '../../components/ui/Common'
+import { EmptyState, ErrorBox, LoadError, Modal, PageTitle, Spinner } from '../../components/ui/Common'
 import { ComplaintPill } from '../parent/Complaints'
 import { fmtDate, fmtShortDate } from '../../lib/format'
 import ComplaintsReport from '../../components/ComplaintsReport'
@@ -13,8 +13,14 @@ export default function AdminComplaints() {
   const [status, setStatus] = useState('')
   const [data, setData] = useState(null)
   const [sel, setSel] = useState(null)
+  // Bumped after every status change so the report above recounts
+  const [reportVersion, setReportVersion] = useState(0)
 
-  const load = useCallback(() => api.get('/admin/complaints', { params: { status } }).then((r) => setData(r.data)), [status])
+  const [loadError, setLoadError] = useState('')
+  const load = useCallback(() => {
+    setLoadError('')
+    return api.get('/admin/complaints', { params: { status } }).then((r) => setData(r.data)).catch((e) => setLoadError(errorMessage(e)))
+  }, [status])
   useEffect(() => { load() }, [load])
 
   const total = data ? Object.values(data.counts).reduce((a, b) => a + b, 0) : 0
@@ -22,7 +28,7 @@ export default function AdminComplaints() {
   return (
     <div>
       <PageTitle title="Complaints & Reports" subtitle="Review complaints from parents and respond to them." />
-      <ComplaintsReport />
+      <ComplaintsReport refreshKey={reportVersion} />
       <div className="card mb-4 flex flex-wrap gap-2 p-3">
         {TABS.map(([v, l]) => (
           <button key={l} onClick={() => setStatus(v)} className={`rounded-lg border px-4 py-2 text-sm font-semibold ${status === v ? 'border-brand-500 bg-brand-500 text-white' : 'border-brand-200 bg-white text-navy hover:border-brand-500'}`}>
@@ -30,7 +36,7 @@ export default function AdminComplaints() {
           </button>))}
       </div>
 
-      {!data ? <Spinner /> : data.complaints.length === 0 ? (
+      {!data ? (loadError ? <LoadError message={loadError} onRetry={load} /> : <Spinner />) : data.complaints.length === 0 ? (
         <div className="card"><EmptyState icon="shield" title="No complaints here">Nothing to review in this list.</EmptyState></div>
       ) : (
         <div className="space-y-3">
@@ -50,7 +56,7 @@ export default function AdminComplaints() {
         </div>
       )}
 
-      <ReviewModal complaint={sel} onClose={() => setSel(null)} onDone={() => { setSel(null); load() }} />
+      <ReviewModal complaint={sel} onClose={() => setSel(null)} onDone={() => { setSel(null); load(); setReportVersion((v) => v + 1) }} />
     </div>
   )
 }
@@ -64,8 +70,10 @@ function ReviewModal({ complaint: c, onClose, onDone }) {
   const closed = ['RESOLVED', 'DISMISSED'].includes(c.status)
 
   async function act(status) {
-    setBusy(true)
     setError('')
+    // The parent reads this response, so a closed complaint always says what was done or why
+    if (status !== 'IN_PROGRESS' && response.trim().length < 3) return setError('Write a response to the parent before resolving or dismissing.')
+    setBusy(true)
     try {
       await api.patch(`/admin/complaints/${c.id}`, { status, adminResponse: response || undefined })
       onDone()

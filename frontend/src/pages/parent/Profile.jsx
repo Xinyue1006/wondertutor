@@ -6,7 +6,8 @@ import PhotoPicker from '../../components/PhotoPicker'
 import PreferencesFields from '../../components/PreferencesFields'
 import { fromApiPreferences, toApiPreferences } from '../../lib/preferences'
 import Icon from '../../components/ui/Icon'
-import { ErrorBox, PageTitle, Spinner } from '../../components/ui/Common'
+import { ErrorBox, LoadError, PageTitle, Spinner } from '../../components/ui/Common'
+import { checkName, checkPassword, checkPhone, checkText, normalizePhone } from '../../lib/validation'
 
 // My Profile: edit contact details + address (used for tutor distance), change password
 export default function Profile() {
@@ -24,23 +25,30 @@ export default function Profile() {
   const [pw, setPw] = useState({ currentPassword: '', newPassword: '', confirm: '' })
   const [pwMsg, setPwMsg] = useState('')
   const [pwError, setPwError] = useState('')
+  const [pwBusy, setPwBusy] = useState(false)
 
-  useEffect(() => {
+  const [loadError, setLoadError] = useState('')
+  const load = () => {
+    setLoadError('')
     api.get('/parent/profile').then((r) => {
       const p = r.data.profile
       setForm({ fullName: p.fullName, phone: p.phone || '', address: p.address || '', profilePhotoUrl: p.profilePhotoUrl })
       setHasPassword(p.hasPassword)
       setPrefs(fromApiPreferences(p.preferences))
-    })
-  }, [])
+    }).catch((e) => setLoadError(errorMessage(e)))
+  }
+  useEffect(() => { load() }, [])
 
-  if (!form || !prefs) return <Spinner />
+  if (!form || !prefs) return loadError ? <LoadError message={loadError} onRetry={load} /> : <Spinner />
 
   async function save(e) {
     e.preventDefault()
-    setMsg(''); setError(''); setBusy(true)
+    setMsg(''); setError('')
+    const problem = checkName(form.fullName) || checkPhone(form.phone) || checkText(form.address, { label: 'Address', max: 200 })
+    if (problem) return setError(problem)
+    setBusy(true)
     try {
-      const r = await api.put('/parent/profile', form)
+      const r = await api.put('/parent/profile', { ...form, phone: normalizePhone(form.phone) })
       setUser({ ...user, fullName: r.data.profile.fullName, phone: r.data.profile.phone, profilePhotoUrl: r.data.profile.profilePhotoUrl })
       setMsg('Profile saved.')
     } catch (err) {
@@ -67,13 +75,20 @@ export default function Profile() {
   async function changePw(e) {
     e.preventDefault()
     setPwMsg(''); setPwError('')
+    if (!pw.currentPassword) return setPwError('Enter your current password')
+    const weak = checkPassword(pw.newPassword)
+    if (weak) return setPwError(weak)
     if (pw.newPassword !== pw.confirm) return setPwError('New passwords do not match')
+    if (pw.newPassword === pw.currentPassword) return setPwError('Choose a password different from the current one')
+    setPwBusy(true)
     try {
       await api.post('/parent/profile/password', { currentPassword: pw.currentPassword, newPassword: pw.newPassword })
       setPw({ currentPassword: '', newPassword: '', confirm: '' })
       setPwMsg('Password updated.')
     } catch (err) {
       setPwError(errorMessage(err))
+    } finally {
+      setPwBusy(false)
     }
   }
 
@@ -112,7 +127,7 @@ export default function Profile() {
                   <input type="password" className="input h-11" value={pw[k]} onChange={(e) => setPw({ ...pw, [k]: e.target.value })} autoComplete={k === 'currentPassword' ? 'current-password' : 'new-password'} /></label>
               ))}
               <p className="text-xs text-slate-500">At least 8 characters with a letter and a number.</p>
-              <button className="btn-outline h-11 w-full">Update Password</button>
+              <button disabled={pwBusy} className="btn-outline h-11 w-full">{pwBusy ? 'Updating…' : 'Update Password'}</button>
             </>
           )}
         </form>

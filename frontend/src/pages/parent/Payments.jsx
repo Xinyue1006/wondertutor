@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react'
 import api, { errorMessage } from '../../api/client'
 import Avatar from '../../components/ui/Avatar'
 import Icon from '../../components/ui/Icon'
-import { EmptyState, ErrorBox, Modal, PageTitle, SelectBox, Spinner, StatusPill } from '../../components/ui/Common'
+import { EmptyState, ErrorBox, LoadError, Modal, PageTitle, SelectBox, Spinner, StatusPill } from '../../components/ui/Common'
 import LessonDetails from '../../components/LessonDetails'
-import { fmtDate, fmtTimeRange, money } from '../../lib/format'
+import { fmtDate, fmtTime, fmtTimeRange, money } from '../../lib/format'
 import { gradeLabel } from '../../lib/education'
 
 const lessonTitle = (b) => `${b.subject}${b.isTrial ? ' Trial' : ''} Lesson`
+// Unpaid bookings are released 1 hour before the lesson (the backend scheduler uses the same rule)
+const payBy = (b) => new Date(new Date(b.startAt).getTime() - 60 * 60_000)
 const BANK_KEY = 'wt_preferred_bank'
 const savedBank = () => { try { return localStorage.getItem(BANK_KEY) || '' } catch { return '' } }
 
@@ -19,9 +21,10 @@ export default function Payments() {
   const [methodOpen, setMethodOpen] = useState(false)
   const [bank, setBank] = useState(savedBank())
 
-  const load = () => api.get('/parent/payments').then((r) => setData(r.data))
+  const [loadError, setLoadError] = useState('')
+  const load = () => { setLoadError(''); return api.get('/parent/payments').then((r) => setData(r.data)).catch((e) => setLoadError(errorMessage(e))) }
   useEffect(() => { load() }, [])
-  if (!data) return <Spinner />
+  if (!data) return loadError ? <LoadError message={loadError} onRetry={load} /> : <Spinner />
 
   const { required, summary, transactions, banks } = data
   const rows = showAll ? transactions : transactions.slice(0, 5)
@@ -52,6 +55,7 @@ export default function Payments() {
                 <div className="space-y-2 md:border-l md:border-slate-100 md:pl-6 md:text-left">
                   <StatusPill status="AWAITING_PAYMENT" label="Payment Pending" />
                   <div className="text-3xl font-extrabold text-navy">{money(b.totalAmount)}</div>
+                  <div className="text-xs text-slate-600">Pay by <b className="text-navy">{fmtDate(payBy(b))}, {fmtTime(payBy(b))}</b> or the slot is released.</div>
                   <button onClick={() => setPayFor(b)} className="btn-primary h-12 w-full px-8 text-base md:w-48">Pay Now <Icon name="arrow-right" className="h-4 w-4" /></button>
                 </div>
               </div>
@@ -91,12 +95,11 @@ export default function Payments() {
                 <div key={l} className={`flex items-center gap-4 rounded-xl p-4 ${bg}`}>
                   <span className={`flex h-12 w-12 items-center justify-center rounded-full ${tone}`}><Icon name={icon} className="h-6 w-6" /></span>
                   <div className="flex-1"><div className="text-2xl font-extrabold text-navy">{v}</div><div className="text-sm text-slate-600">{l}</div></div>
-                  <Icon name="right" className="h-4 w-4 text-slate-400" />
                 </div>))}
             </div>
           </section>
           <section className="card p-5">
-            <div className="mb-3 flex items-center justify-between"><h2 className="text-xl font-extrabold text-navy">Payment Method</h2><Icon name="more" className="h-5 w-5 text-slate-400" /></div>
+            <h2 className="mb-3 text-xl font-extrabold text-navy">Payment Method</h2>
             <div className="rounded-xl border border-slate-100 p-4">
               <div className="flex items-center gap-4">
                 <span className="text-3xl font-black italic tracking-tight text-navy"><span className="text-brand-500">❯</span>FPX</span>
@@ -108,7 +111,8 @@ export default function Payments() {
         </aside>
       </div>
 
-      <PayModal booking={payFor} banks={banks} defaultBank={bank} onClose={() => setPayFor(null)} onDone={() => { setPayFor(null); load() }} />
+      {/* Reload on every close: even a failed attempt can change things (e.g. the booking expired meanwhile) */}
+      <PayModal booking={payFor} banks={banks} defaultBank={bank} onClose={() => { setPayFor(null); load() }} onDone={() => { setPayFor(null); load() }} />
       <LessonDetails booking={detail} onClose={() => setDetail(null)} onChanged={load} />
       <Modal open={methodOpen} onClose={() => setMethodOpen(false)} title="Payment Method">
         <p className="mb-3 text-sm text-slate-500">Lessons are paid by FPX online banking. Choose the bank you'd like pre-selected at checkout.</p>

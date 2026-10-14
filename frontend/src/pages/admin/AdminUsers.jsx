@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import api, { errorMessage } from '../../api/client'
 import Avatar from '../../components/ui/Avatar'
 import Icon from '../../components/ui/Icon'
-import { EmptyState, ErrorBox, Modal, PageTitle, Spinner, VerifiedTick } from '../../components/ui/Common'
+import { EmptyState, ErrorBox, LoadError, Modal, PageTitle, Spinner, VerifiedTick } from '../../components/ui/Common'
 import { fmtShortDate } from '../../lib/format'
 import { gradeLabel } from '../../lib/education'
 
@@ -18,8 +18,10 @@ export default function AdminUsers() {
   const flagged = params.get('flagged') || ''
   const pending = params.get('pending') || ''
 
+  const [loadError, setLoadError] = useState('')
   const load = useCallback(() => {
-    api.get('/admin/users', { params: { role, status, flagged, q } }).then((r) => setData(r.data))
+    setLoadError('')
+    api.get('/admin/users', { params: { role, status, flagged, q } }).then((r) => setData(r.data)).catch((e) => setLoadError(errorMessage(e)))
   }, [role, status, flagged, q])
   useEffect(() => {
     const t = setTimeout(load, 250) // wait for the admin to stop typing
@@ -54,7 +56,7 @@ export default function AdminUsers() {
         </label>
       </div>
 
-      {!data ? <Spinner /> : users.length === 0 ? (
+      {!data ? (loadError ? <LoadError message={loadError} onRetry={load} /> : <Spinner />) : users.length === 0 ? (
         <div className="card"><EmptyState icon="user" title="No users found">Try different filters.</EmptyState></div>
       ) : (
         <div className="card overflow-x-auto p-2">
@@ -71,7 +73,7 @@ export default function AdminUsers() {
                     {u.tutor && (<div className="space-y-0.5">
                       <div className="flex items-center gap-1"><Icon name="star" fill className="h-3.5 w-3.5 text-accent" /> {u.tutor.ratingAvg.toFixed(1)} ({u.tutor.ratingCount})</div>
                       {u.tutor.flagged && <span className="pill bg-red-50 py-0.5 text-red-600">Below threshold</span>}
-                      {u.tutor.pendingQualifications > 0 && <span className="pill bg-accent-100 py-0.5 text-amber-700">{u.tutor.pendingQualifications} qualification to approve</span>}
+                      {u.tutor.pendingQualifications > 0 && <span className="pill bg-accent-100 py-0.5 text-amber-700">{u.tutor.pendingQualifications} qualification{u.tutor.pendingQualifications === 1 ? '' : 's'} to approve</span>}
                     </div>)}
                   </td>
                   <td className="px-3 text-xs text-slate-500">{fmtShortDate(u.createdAt)}</td>
@@ -93,22 +95,30 @@ function UserModal({ id, onClose, onChanged }) {
   const [rejecting, setRejecting] = useState(null) // qualification being rejected
   const [note, setNote] = useState('')
   const [confirm, setConfirm] = useState(false)
+  // One action at a time: a double click on Approve or Deactivate must not send it twice
+  const [busy, setBusy] = useState(false)
 
-  const load = useCallback(() => api.get(`/admin/users/${id}`).then((r) => setUser(r.data.user)), [id])
+  const load = useCallback(() => api.get(`/admin/users/${id}`).then((r) => setUser(r.data.user)).catch((e) => setError(errorMessage(e))), [id])
   useEffect(() => { setUser(null); setError(''); setConfirm(false); if (id) load() }, [id, load])
   if (!id) return null
 
   async function run(fn) {
+    if (busy) return
     setError('')
-    try { await fn(); await load(); onChanged() } catch (err) { setError(errorMessage(err)) }
+    setBusy(true)
+    try { await fn(); await load(); onChanged() } catch (err) { setError(errorMessage(err)) } finally { setBusy(false) }
   }
 
-  const review = (qid, status, n) => run(() => api.post(`/admin/qualifications/${qid}/review`, { status, note: n }).then(() => { setRejecting(null); setNote('') }))
+  const review = (qid, status, n) => {
+    // The tutor is told this reason, so a rejection always explains itself
+    if (status === 'REJECTED' && !n?.trim()) return setError('Please give a reason for rejecting this qualification.')
+    run(() => api.post(`/admin/qualifications/${qid}/review`, { status, note: n }).then(() => { setRejecting(null); setNote('') }))
+  }
   const setStatus = (action) => run(() => api.post(`/admin/users/${id}/${action}`).then(() => setConfirm(false)))
 
   return (
     <Modal open onClose={onClose} title={user ? user.fullName : 'Loading…'} width="max-w-2xl">
-      {!user ? <Spinner /> : (
+      {!user ? (error ? <ErrorBox>{error}</ErrorBox> : <Spinner />) : (
         <div className="space-y-4">
           <ErrorBox>{error}</ErrorBox>
           <div className="grid gap-2 rounded-xl bg-brand-25 p-4 text-sm sm:grid-cols-2">
@@ -134,17 +144,22 @@ function UserModal({ id, onClose, onChanged }) {
                 {user.qualifications.map((q) => (
                   <li key={q.id} className="rounded-xl border border-slate-100 p-3 text-sm">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div><div className="font-bold text-navy">{q.title}</div><div className="text-xs text-slate-500">{q.institution}{q.year && ` · ${q.year}`}</div></div>
+                      <div>
+                        <div className="font-bold text-navy">{q.title}</div>
+                        <div className="text-xs text-slate-500">{q.institution}{q.year && ` · ${q.year}`}</div>
+                        {/* Admin checks the uploaded certificate before granting the verified badge */}
+                        {/^https?:\/\//i.test(q.documentUrl || '') && <a href={q.documentUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex min-h-9 items-center gap-1 text-xs font-semibold text-brand-600 hover:underline"><Icon name="file" className="h-3.5 w-3.5" /> View uploaded document</a>}
+                      </div>
                       <span className={`pill ${q.status === 'APPROVED' ? 'bg-ok-50 text-ok' : q.status === 'REJECTED' ? 'bg-red-50 text-red-600' : 'bg-accent-100 text-amber-700'}`}>{q.status.charAt(0) + q.status.slice(1).toLowerCase()}</span>
                     </div>
                     {q.reviewNote && <div className="mt-1 text-xs text-slate-500">Note: {q.reviewNote}</div>}
                     {q.status === 'PENDING' && (rejecting === q.id ? (
                       <div className="mt-2 space-y-2">
                         <textarea rows={2} maxLength={300} className="input resize-none" placeholder="Reason for rejecting (required)" value={note} onChange={(e) => setNote(e.target.value)} />
-                        <div className="flex gap-2"><button className="btn bg-red-500 px-4 py-1.5 text-white hover:bg-red-600" onClick={() => review(q.id, 'REJECTED', note)}>Confirm reject</button><button className="btn-outline px-4 py-1.5" onClick={() => setRejecting(null)}>Cancel</button></div>
+                        <div className="flex gap-2"><button disabled={busy} className="btn bg-red-600 px-4 py-1.5 text-white hover:bg-red-700" onClick={() => review(q.id, 'REJECTED', note)}>Confirm reject</button><button className="btn-outline px-4 py-1.5" onClick={() => setRejecting(null)}>Cancel</button></div>
                       </div>
                     ) : (
-                      <div className="mt-2 flex gap-2"><button className="btn-primary px-4 py-1.5" onClick={() => review(q.id, 'APPROVED')}>Approve</button><button className="btn-danger px-4 py-1.5" onClick={() => { setRejecting(q.id); setNote('') }}>Reject</button></div>
+                      <div className="mt-2 flex gap-2"><button disabled={busy} className="btn-primary px-4 py-1.5" onClick={() => review(q.id, 'APPROVED')}>Approve</button><button disabled={busy} className="btn-danger px-4 py-1.5" onClick={() => { setRejecting(q.id); setNote(''); setError('') }}>Reject</button></div>
                     ))}
                   </li>))}
               </ul>
@@ -152,13 +167,21 @@ function UserModal({ id, onClose, onChanged }) {
           )}
 
           {user.role !== 'ADMIN' && (
-            <div className="flex items-center justify-between rounded-xl border border-slate-100 p-3">
-              <div className="text-sm"><b className="text-navy">Account status:</b> {user.status === 'ACTIVE' ? 'Active' : 'Deactivated'}
-                <div className="text-xs text-slate-500">{user.status === 'ACTIVE' ? 'A deactivated user cannot log in. Only an Admin can reactivate them.' : 'Reactivating lets the user log in again.'}</div></div>
-              {user.status === 'ACTIVE' ? (confirm ? (
-                <div className="flex gap-2"><button className="btn bg-red-500 px-4 py-1.5 text-white hover:bg-red-600" onClick={() => setStatus('deactivate')}>Yes, deactivate</button><button className="btn-outline px-4 py-1.5" onClick={() => setConfirm(false)}>No</button></div>
-              ) : <button className="btn-danger px-4 py-1.5" onClick={() => setConfirm(true)}>Deactivate</button>)
-                : <button className="btn-primary px-4 py-1.5" onClick={() => setStatus('reactivate')}>Reactivate</button>}
+            <div className="rounded-xl border border-slate-100 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="text-sm"><b className="text-navy">Account status:</b> {user.status === 'ACTIVE' ? 'Active' : 'Deactivated'}
+                  <div className="text-xs text-slate-500">{user.status === 'ACTIVE' ? 'A deactivated user cannot log in. Only an Admin can reactivate them.' : 'Reactivating lets the user log in again.'}</div></div>
+                {user.status === 'ACTIVE' ? (confirm ? (
+                  <div className="flex gap-2"><button disabled={busy} className="btn bg-red-600 px-4 py-1.5 text-white hover:bg-red-700" onClick={() => setStatus('deactivate')}>Yes, deactivate</button><button className="btn-outline px-4 py-1.5" onClick={() => setConfirm(false)}>No</button></div>
+                ) : <button className="btn-danger px-4 py-1.5" onClick={() => setConfirm(true)}>Deactivate</button>)
+                  : <button disabled={busy} className="btn-primary px-4 py-1.5" onClick={() => setStatus('reactivate')}>Reactivate</button>}
+              </div>
+              {/* Deactivating does not cancel anything by itself: the lessons stay booked until Booking Oversight handles them */}
+              {confirm && user.upcomingLessons > 0 && (
+                <p role="alert" className="mt-2 rounded-lg bg-accent-50 px-3 py-2 text-xs text-amber-900">
+                  {user.fullName} has {user.upcomingLessons} upcoming lesson{user.upcomingLessons === 1 ? '' : 's'} or request{user.upcomingLessons === 1 ? '' : 's'}. They stay booked after deactivation, so arrange them in Booking Oversight.
+                </p>
+              )}
             </div>
           )}
         </div>

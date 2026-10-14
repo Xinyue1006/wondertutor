@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import api from '../../api/client'
+import api, { errorMessage } from '../../api/client'
 import Icon from '../../components/ui/Icon'
-import { PageTitle, Spinner } from '../../components/ui/Common'
+import { LoadError, PageTitle, Spinner } from '../../components/ui/Common'
 
 // Admin home: the counts that need attention (user management + complaints). Yan Hsi adds finance/booking tiles.
 export default function AdminDashboard() {
   const [d, setD] = useState(null)
-  useEffect(() => { api.get('/admin/dashboard').then((r) => setD(r.data)) }, [])
-  if (!d) return <Spinner />
+  const [loadError, setLoadError] = useState('')
+  const load = () => { setLoadError(''); api.get('/admin/dashboard').then((r) => setD(r.data)).catch((e) => setLoadError(errorMessage(e))) }
+  useEffect(() => { load() }, [])
+  if (!d) return loadError ? <LoadError message={loadError} onRetry={load} /> : <Spinner />
 
   const tiles = [
     ['user', d.parents, 'Parents', '/admin/users?role=PARENT', 'bg-brand-50', 'bg-brand-100 text-brand-500'],

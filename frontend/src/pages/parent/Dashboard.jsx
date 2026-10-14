@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import api from '../../api/client'
+import api, { errorMessage } from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
 import { useMatching } from '../../assistant/MatchingContext'
 import Avatar from '../../components/ui/Avatar'
 import Icon from '../../components/ui/Icon'
 import Robot from '../../components/ui/Robot'
-import { SectionCard, Spinner, StatusPill } from '../../components/ui/Common'
+import { LoadError, SectionCard, Spinner, StatusPill } from '../../components/ui/Common'
 import LessonDetails from '../../components/LessonDetails'
 import { fmtDate, fmtTimeRange, greeting, timeAgo } from '../../lib/format'
 import { gradeLabel } from '../../lib/education'
@@ -26,13 +26,18 @@ export default function ParentDashboard() {
   const [data, setData] = useState(null)
   const [matching, setMatching] = useState(null)
   const [detail, setDetail] = useState(null)
+  const [loadError, setLoadError] = useState('')
 
+  const load = () => {
+    setLoadError('')
+    api.get('/parent/dashboard').then((r) => setData(r.data)).catch((e) => setLoadError(errorMessage(e)))
+  }
   useEffect(() => {
-    api.get('/parent/dashboard').then((r) => setData(r.data))
+    load()
     api.get('/parent/matching/latest').then((r) => setMatching(r.data.matching)).catch(() => {})
   }, [])
 
-  if (!data) return <Spinner />
+  if (!data) return loadError ? <LoadError message={loadError} onRetry={load} /> : <Spinner />
   const { children, counts, upcoming, activity } = data
 
   return (
@@ -75,8 +80,9 @@ export default function ParentDashboard() {
             </div>
           </section>
 
-          <SectionCard title="Your Children" action={<Link to="/parent/children" className="flex items-center gap-1 text-sm font-semibold text-brand-500 hover:underline">Manage Children <Icon name="arrow-right" className="h-4 w-4" /></Link>}>
+          <SectionCard title={children.length > 2 ? `Your Children (${children.length})` : 'Your Children'} action={<Link to="/parent/children" className="flex items-center gap-1 text-sm font-semibold text-brand-500 hover:underline">Manage Children <Icon name="arrow-right" className="h-4 w-4" /></Link>}>
             <div className="grid gap-3 sm:grid-cols-3">
+              {/* Two children fit beside the Add card; the title shows how many there are in total */}
               {children.slice(0, 2).map((c) => (
                 <div key={c.id} className="rounded-xl border border-slate-100 bg-white p-4">
                   <div className="flex items-center gap-3">
@@ -103,14 +109,22 @@ export default function ParentDashboard() {
             <ul className="divide-y divide-slate-100">
               {activity.map((a) => {
                 const [icon, tone] = ACTIVITY_ICON[a.type] || ['bell', 'bg-brand-50 text-brand-500']
-                return (
-                  <li key={a.id} className="flex items-center gap-3 py-3">
+                const body = (
+                  <>
                     <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${tone}`}><Icon name={icon} className="h-5 w-5" /></span>
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-bold text-navy">{a.title}</div>
                       <div className="truncate text-sm text-slate-500">{a.message}</div>
                     </div>
-                    <span className="shrink-0 text-xs text-slate-400">{timeAgo(a.createdAt)}</span>
+                    <span className="shrink-0 text-xs text-slate-500">{timeAgo(a.createdAt)}</span>
+                  </>
+                )
+                // Each activity opens the booking, payment or complaint it is about
+                return (
+                  <li key={a.id}>
+                    {a.link
+                      ? <Link to={a.link} className="-mx-2 flex items-center gap-3 rounded-lg px-2 py-3 hover:bg-brand-25">{body}</Link>
+                      : <div className="flex items-center gap-3 py-3">{body}</div>}
                   </li>
                 )
               })}
@@ -195,7 +209,7 @@ export default function ParentDashboard() {
         </div>
       </div>
 
-      <LessonDetails booking={detail} onClose={() => setDetail(null)} onChanged={() => api.get('/parent/dashboard').then((r) => setData(r.data))} />
+      <LessonDetails booking={detail} onClose={() => setDetail(null)} onChanged={load} />
     </div>
   )
 }
