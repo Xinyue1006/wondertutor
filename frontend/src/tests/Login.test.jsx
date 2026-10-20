@@ -27,9 +27,9 @@ beforeEach(() => { loginCalls.length = 0; loginImpl = async () => ({ role: 'PARE
 describe('Login page', () => {
   test('shows the form and the mockup headline', () => {
     renderLogin()
-    expect(screen.getByText('Welcome Back')).toBeInTheDocument()
+    expect(screen.getByText('Welcome back')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('you@example.com')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Log In' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Log in' })).toBeInTheDocument()
   })
 
   test('logs in and sends a parent to the parent portal', async () => {
@@ -37,8 +37,8 @@ describe('Login page', () => {
     renderLogin()
     await userEvent.type(screen.getByPlaceholderText('you@example.com'), 'parent@wondertutor.local')
     await userEvent.type(screen.getByPlaceholderText('Enter your password'), 'Parent1234')
-    await userEvent.click(screen.getByRole('button', { name: 'Log In' }))
-    expect(loginCalls).toEqual([['parent@wondertutor.local', 'Parent1234', true]])
+    await userEvent.click(screen.getByRole('button', { name: 'Log in' }))
+    expect(loginCalls).toEqual([['parent@wondertutor.local', 'Parent1234', true, '']])
     expect(await screen.findByText('PARENT HOME')).toBeInTheDocument()
   })
 
@@ -47,7 +47,7 @@ describe('Login page', () => {
     renderLogin()
     await userEvent.type(screen.getByPlaceholderText('you@example.com'), 'admin@wondertutor.local')
     await userEvent.type(screen.getByPlaceholderText('Enter your password'), 'Admin1234')
-    await userEvent.click(screen.getByRole('button', { name: 'Log In' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Log in' }))
     expect(await screen.findByText('ADMIN HOME')).toBeInTheDocument()
   })
 
@@ -56,7 +56,7 @@ describe('Login page', () => {
     renderLogin()
     await userEvent.type(screen.getByPlaceholderText('you@example.com'), 'a@b.com')
     await userEvent.type(screen.getByPlaceholderText('Enter your password'), 'wrong')
-    await userEvent.click(screen.getByRole('button', { name: 'Log In' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Log in' }))
     expect(await screen.findByText('Incorrect email or password')).toBeInTheDocument()
     expect(screen.queryByText('PARENT HOME')).not.toBeInTheDocument()
   })
@@ -77,13 +77,13 @@ describe('Login page', () => {
 
   test('nothing is sent when the form is empty', async () => {
     renderLogin()
-    await userEvent.click(screen.getByRole('button', { name: 'Log In' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Log in' }))
     await waitFor(() => expect(loginCalls).toHaveLength(0))
   })
 
   test('each problem is shown next to its own field and nothing is sent', async () => {
     renderLogin()
-    await userEvent.click(screen.getByRole('button', { name: 'Log In' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Log in' }))
     expect(await screen.findByText('Enter your email address.')).toBeInTheDocument()
     expect(screen.getByText('Enter your password.')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('you@example.com')).toHaveAttribute('aria-invalid', 'true')
@@ -93,7 +93,7 @@ describe('Login page', () => {
   test('keyboard focus moves to the first field that needs fixing', async () => {
     renderLogin()
     await userEvent.type(screen.getByPlaceholderText('Enter your password'), 'secret')
-    await userEvent.click(screen.getByRole('button', { name: 'Log In' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Log in' }))
     expect(screen.getByPlaceholderText('you@example.com')).toHaveFocus()
   })
 
@@ -101,7 +101,7 @@ describe('Login page', () => {
     renderLogin()
     await userEvent.type(screen.getByPlaceholderText('you@example.com'), 'not-an-email')
     await userEvent.type(screen.getByPlaceholderText('Enter your password'), 'secret')
-    await userEvent.click(screen.getByRole('button', { name: 'Log In' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Log in' }))
     expect(await screen.findByText(/Enter a valid email/)).toBeInTheDocument()
     await userEvent.type(screen.getByPlaceholderText('you@example.com'), 'x')
     expect(screen.queryByText(/Enter a valid email/)).not.toBeInTheDocument()
