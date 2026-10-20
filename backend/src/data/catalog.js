@@ -11,6 +11,9 @@ export const MAX_GRADE = { KINDERGARTEN: 3, PRIMARY: 6, SECONDARY: 5 }
 
 export const CHARACTERISTICS = ['Patient & Encouraging', 'Structured', 'Exam-Focused', 'Interactive']
 
+// Languages a tutor can teach in (tutor profile setup)
+export const LANGUAGES = ['English', 'Bahasa Melayu', 'Mandarin', 'Tamil', 'Cantonese']
+
 // Klang Valley areas with coordinates. Distance scoring (location = 15% of the match score)
 // needs lat/lng, and the client's #1 concern is "tutor close to my home".
 export const LOCATIONS = [

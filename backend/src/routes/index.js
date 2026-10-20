@@ -3,6 +3,7 @@ import { validateIdParams } from '../middleware/params.js'
 import authRoutes from './auth.routes.js'
 import parentRoutes from './parent.routes.js'
 import adminRoutes from './admin.routes.js'
+import tutorRoutes from './tutor.routes.js'
 import { uploadSignature } from '../controllers/uploads.controller.js'
 import { homeData } from '../controllers/public.controller.js'
 import { requireAuth } from '../middleware/auth.js'
@@ -19,6 +20,9 @@ router.get('/public/home', homeData)
 // [XY] Parent Portal: children, matching, bookings, payments, reviews
 router.use('/parent', parentRoutes)
 
+// [YH] Tutor Portal: profile setup and verification, then the teaching features once verified
+router.use('/tutor', tutorRoutes)
+
 // [XY] Admin: user management + complaints ([YH] adds finance/settings inside admin.routes.js)
 router.use('/admin', adminRoutes)
 
@@ -29,9 +33,5 @@ router.post('/uploads/signature', requireAuth, uploadSignature)
 router.get('/notifications', requireAuth, notifications.listNotifications)
 router.post('/notifications/read-all', requireAuth, notifications.markAllRead)
 router.post('/notifications/:id/read', requireAuth, notifications.markRead)
-
-// Add the other modules here as they are built, e.g.
-// [YH] router.use('/tutor', tutorRoutes)         — profile, availability, attendance, earnings
-// [Shared] router.use('/admin', adminRoutes)     — users, complaints (XY) / finance, settings (YH)
 
 export default router

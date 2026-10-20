@@ -69,3 +69,15 @@ export const ringgit = (label = 'Amount', max = 1000) =>
 export const optionalText = (max, label = 'Text') =>
   z.string().trim().max(max, `${label} must be ${max} characters or fewer`).optional().nullable()
     .transform((v) => (v ? v : v === '' ? null : v))
+
+// ── Tutor profile ──
+// The fee a tutor asks per hour. The ceiling keeps a typo (RM6000 for RM60) from reaching parents.
+export const HOURLY_RATE_MAX = 500
+export const hourlyRate = ringgit('Hourly rate', HOURLY_RATE_MAX)
+export const yearsExperience = z.number({ message: 'Enter your years of experience' }).int('Years of experience must be a whole number')
+  .min(0, 'Years of experience cannot be negative').max(60, 'Years of experience must be 60 or fewer')
+
+// Files are uploaded straight to our Cloudinary account (POST /uploads/signature); any other address is refused
+export const cloudinaryUrl = (label = 'File') =>
+  z.string().trim().max(500, `${label} link is too long`).url(`${label} link is invalid`)
+    .startsWith('https://res.cloudinary.com/', `${label} must be uploaded through WonderTutor`)

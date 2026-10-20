@@ -103,16 +103,21 @@ export async function reviewQualification(req, res) {
   const q = await prisma.qualification.findUnique({ where: { id: Number(req.params.id) }, include: { tutor: true } })
   if (!q) throw new AppError(404, 'Qualification not found')
 
-  await prisma.$transaction(async (tx) => {
+  const verified = await prisma.$transaction(async (tx) => {
     await tx.qualification.update({ where: { id: q.id }, data: { status, reviewNote: note || null } })
-    // A tutor is "verified" while at least one qualification is approved
-    const approved = await tx.qualification.count({ where: { tutorId: q.tutorId, status: 'APPROVED' } })
-    await tx.tutorProfile.update({ where: { id: q.tutorId }, data: { isVerified: approved > 0 } })
+    // A tutor is "verified" while an identity document AND at least one qualification are approved
+    const approved = await tx.qualification.groupBy({ by: ['kind'], where: { tutorId: q.tutorId, status: 'APPROVED' } })
+    const kinds = new Set(approved.map((r) => r.kind))
+    const isVerified = kinds.has('IDENTITY') && kinds.has('QUALIFICATION')
+    await tx.tutorProfile.update({ where: { id: q.tutorId }, data: { isVerified } })
+    return isVerified
   })
   await notify(q.tutor.userId, {
     type: 'QUALIFICATION_REVIEWED',
     title: status === 'APPROVED' ? 'Qualification approved' : 'Qualification rejected',
-    message: status === 'APPROVED' ? `"${q.title}" was approved. Your profile now shows the verified badge.` : `"${q.title}" was rejected: ${note}`,
+    message: status === 'APPROVED'
+      ? `"${q.title}" was approved.${verified ? ' Your profile now shows the verified badge.' : ''}`
+      : `"${q.title}" was rejected: ${note}. Please upload a new document.`,
     link: '/tutor',
   })
   res.json({ ok: true })

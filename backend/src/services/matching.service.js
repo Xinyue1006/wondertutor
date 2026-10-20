@@ -211,13 +211,15 @@ export function scoreTutor(tutor, c) {
   }
 }
 
-// Eligible tutors ranked by score. Ties: more approved qualifications, then more experience.
+// Eligible tutors ranked by score. Verified tutors are listed before unverified ones (the score and its
+// Form 2 weights stay the same; only the order changes). Ties: more approved qualifications, then more experience.
 export function rankTutors(tutors, c) {
   return tutors
     .map((tutor) => ({ tutor, match: scoreTutor(tutor, c) }))
     .filter((x) => x.match)
     .sort(
       (a, b) =>
+        Number(Boolean(b.tutor.isVerified)) - Number(Boolean(a.tutor.isVerified)) ||
         b.match.score - a.match.score ||
         approvedQualifications(b.tutor) - approvedQualifications(a.tutor) ||
         b.tutor.yearsExperience - a.tutor.yearsExperience,
