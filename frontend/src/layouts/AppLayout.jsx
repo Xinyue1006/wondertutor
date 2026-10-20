@@ -36,9 +36,16 @@ const NAV = {
   ],
 }
 
+// A tutor waiting for Admin verification only sees the onboarding pages (see VerifiedTutorRoute)
+const TUTOR_ONBOARDING_NAV = [
+  ['/tutor/verification', 'Verification status'],
+  ['/tutor/setup', 'Profile setup'],
+  ['/tutor/preview', 'Preview profile'],
+]
+
 export default function AppLayout() {
   const { user } = useAuth()
-  const items = NAV[user.role] || []
+  const items = user.role === 'TUTOR' && user.tutorStatus !== 'VERIFIED' ? TUTOR_ONBOARDING_NAV : NAV[user.role] || []
   const isParent = user.role === 'PARENT'
 
   const shell = (

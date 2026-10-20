@@ -1,7 +1,7 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import PublicLayout from './layouts/PublicLayout'
 import AppLayout from './layouts/AppLayout'
-import ProtectedRoute, { afterLogin } from './components/ProtectedRoute'
+import ProtectedRoute, { afterLogin, VerifiedTutorRoute } from './components/ProtectedRoute'
 import Placeholder from './components/Placeholder'
 import { useAuth } from './context/AuthContext'
 
@@ -23,6 +23,9 @@ import Complaints from './pages/parent/Complaints'
 import Profile from './pages/parent/Profile'
 import SavedTutors from './pages/parent/SavedTutors'
 import ChildProgress from './pages/parent/ChildProgress'
+import ProfileSetup from './pages/tutor/ProfileSetup'
+import VerificationStatus from './pages/tutor/VerificationStatus'
+import ProfilePreview from './pages/tutor/ProfilePreview'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import AdminUsers from './pages/admin/AdminUsers'
 import AdminComplaints from './pages/admin/AdminComplaints'
@@ -68,11 +71,18 @@ export default function App() {
       {/* Tutor Portal: Yan Hsi */}
       <Route element={<ProtectedRoute roles={['TUTOR']} />}>
         <Route path="/tutor" element={<AppLayout />}>
-          <Route index element={<Placeholder title="Tutor Dashboard" />} />
-          <Route path="availability" element={<Placeholder title="My Availability" />} />
-          <Route path="bookings" element={<Placeholder title="Booking Requests" />} />
-          <Route path="students" element={<Placeholder title="My Students" />} />
-          <Route path="earnings" element={<Placeholder title="Earnings & Withdrawals" />} />
+          {/* Onboarding: open to every tutor */}
+          <Route path="setup" element={<ProfileSetup />} />
+          <Route path="verification" element={<VerificationStatus />} />
+          <Route path="preview" element={<ProfilePreview />} />
+          {/* Teaching features: only after Admin verification */}
+          <Route element={<VerifiedTutorRoute />}>
+            <Route index element={<Placeholder title="Tutor Dashboard" />} />
+            <Route path="availability" element={<Placeholder title="My Availability" />} />
+            <Route path="bookings" element={<Placeholder title="Booking Requests" />} />
+            <Route path="students" element={<Placeholder title="My Students" />} />
+            <Route path="earnings" element={<Placeholder title="Earnings & Withdrawals" />} />
+          </Route>
         </Route>
       </Route>
 

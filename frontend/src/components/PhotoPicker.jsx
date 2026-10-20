@@ -18,6 +18,28 @@ export async function uploadImage(file) {
   return json.secure_url
 }
 
+// Verification documents (NRIC, certificates) may be a PDF or a photo. "auto" lets Cloudinary store either.
+export const DOCUMENT_TYPES = ['application/pdf', 'image/jpeg', 'image/png']
+export async function uploadDocument(file) {
+  if (!DOCUMENT_TYPES.includes(file.type)) throw new Error('Please choose a PDF, JPG or PNG file.')
+  if (file.size > 10 * 1024 * 1024) throw new Error('The file must be 10MB or smaller.')
+  const { data: sig } = await api.post('/uploads/signature')
+  const form = new FormData()
+  form.append('file', file)
+  form.append('api_key', sig.apiKey)
+  form.append('timestamp', sig.timestamp)
+  form.append('folder', sig.folder)
+  form.append('signature', sig.signature)
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${sig.cloudName}/auto/upload`, { method: 'POST', body: form })
+  const json = await res.json()
+  if (!res.ok) throw new Error(json.error?.message || 'Upload failed')
+  return json.secure_url
+}
+
+// Message for a failed upload: a missing Cloudinary setup is explained instead of showing a raw 501
+export const uploadError = (err) =>
+  err?.response?.status === 501 ? 'File upload is not set up yet (Cloudinary keys missing).' : err?.response ? errorMessage(err) : err.message
+
 // Checks the chosen file, uploads it and reports the hosted URL. Shared by every photo control.
 export async function pickImage(e, { setBusy, setError, onChange }) {
   const file = e.target.files?.[0]
