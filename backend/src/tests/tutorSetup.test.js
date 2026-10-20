@@ -185,16 +185,63 @@ describe('verification', () => {
     expect((await api(token).get('/auth/me')).user.tutorStatus).toBe('UNDER_REVIEW')
   })
 
-  test('approved documents cannot be removed, and a tutor cannot touch another tutor\'s documents', async () => {
+  test("a tutor cannot read or delete another tutor's document", async () => {
     const a = await signUpTutor()
     const b = await signUpTutor()
     await completeSetup(a.token)
-    const admin = await makeAdmin()
     const doc = await prisma.qualification.findFirst({ where: { tutor: { userId: a.user.id }, kind: 'QUALIFICATION' } })
 
     expect((await api(b.token).del(`/tutor/documents/${doc.id}`)).status).toBe(404)
+    expect((await api(b.token).get('/tutor/profile')).documents.map((d) => d.id)).not.toContain(doc.id)
+    expect(await prisma.qualification.count({ where: { id: doc.id } })).toBe(1)
+  })
+
+  test('removing an approved document takes the badge away; removing a pending one changes nothing', async () => {
+    const { token, user } = await signUpTutor()
+    await completeSetup(token)
+    await api(token).post('/tutor/submit-for-verification')
+    const admin = await makeAdmin()
+    const docs = await prisma.qualification.findMany({ where: { tutor: { userId: user.id } } })
+    for (const d of docs) await api(admin.token).post(`/admin/qualifications/${d.id}/review`, { status: 'APPROVED' })
+    expect((await api(token).get('/auth/me')).user.tutorStatus).toBe('VERIFIED')
+
+    // An extra pending certificate can come and go without touching the badge
+    await api(token).post('/tutor/documents', { kind: 'QUALIFICATION', title: 'Teaching certificate', documentUrl: DOC })
+    const extra = await prisma.qualification.findFirst({ where: { tutor: { userId: user.id }, status: 'PENDING' } })
+    expect((await api(token).del(`/tutor/documents/${extra.id}`)).isVerified).toBe(true)
+
+    const idDoc = docs.find((d) => d.kind === 'IDENTITY')
+    const removed = await api(token).del(`/tutor/documents/${idDoc.id}`)
+    expect(removed.status).toBe(200)
+    expect(removed.isVerified).toBe(false)
+    expect((await api(token).get('/auth/me')).user.tutorStatus).toBe('CHANGES_REQUESTED')
+    expect((await api(token).get('/tutor/dashboard')).status).toBe(403)
+
+    // A new identity document goes back to Admin; approving it restores the badge
+    await api(token).post('/tutor/documents', { kind: 'IDENTITY', title: 'NRIC', documentUrl: DOC })
+    expect((await api(token).get('/auth/me')).user.tutorStatus).toBe('UNDER_REVIEW')
+    const replacement = await prisma.qualification.findFirst({ where: { tutor: { userId: user.id }, kind: 'IDENTITY' } })
+    await api(admin.token).post(`/admin/qualifications/${replacement.id}/review`, { status: 'APPROVED' })
+    expect((await api(token).get('/auth/me')).user.tutorStatus).toBe('VERIFIED')
+  })
+
+  test('a photo that was not uploaded by the tutor (e.g. carried over from Google) does not count', async () => {
+    const { token, user } = await signUpTutor()
+    await completeSetup(token)
+    await prisma.user.update({ where: { id: user.id }, data: { profilePhotoUrl: 'https://lh3.googleusercontent.com/a/photo' } })
+    const res = await api(token).post('/tutor/submit-for-verification')
+    expect(res.status).toBe(400)
+    expect(res.message).toMatch(/Profile photo/)
+  })
+
+  test('the tutor is told about a review on the verification status page', async () => {
+    const { token, user } = await signUpTutor()
+    await completeSetup(token)
+    const admin = await makeAdmin()
+    const doc = await prisma.qualification.findFirst({ where: { tutor: { userId: user.id } } })
     await api(admin.token).post(`/admin/qualifications/${doc.id}/review`, { status: 'APPROVED' })
-    expect((await api(a.token).del(`/tutor/documents/${doc.id}`)).status).toBe(400)
+    const note = await prisma.notification.findFirst({ where: { userId: user.id, type: 'QUALIFICATION_REVIEWED' } })
+    expect(note.link).toBe('/tutor/verification')
   })
 })
 

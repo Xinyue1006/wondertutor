@@ -12,7 +12,7 @@ import PasswordHint from '../../components/PasswordHint'
 import { GRADE_GROUPS, parseGrade } from '../../lib/education'
 import PreferencesFields from '../../components/PreferencesFields'
 import { emptyPreferences, isEmptyPreferences, toApiPreferences } from '../../lib/preferences'
-import { checkEmail, checkName, checkPassword, checkPhone, checkText, normalizePhone } from '../../lib/validation'
+import { OTP_MINUTES, OTP_TRIES, RESEND_SECONDS, checkEmail, checkName, checkPassword, checkPhone, checkText, normalizePhone } from '../../lib/validation'
 
 // Signup: Choose role -> Create account -> Verify email. A tutor has a 4th step, "Complete profile",
 // which is the Tutor Portal setup (/tutor/setup) they are sent to once the email is verified.
@@ -20,11 +20,6 @@ const STEPS = {
   PARENT: ['Choose role', 'Create account', 'Verify email'],
   TUTOR: ['Choose role', 'Create account', 'Verify email', 'Complete profile'],
 }
-
-// Same values as backend/src/services/otp.service.js
-const OTP_MINUTES = 10
-const OTP_TRIES = 5
-const RESEND_SECONDS = 60
 
 // Parent side menu. Only what is needed to create the account is mandatory; the rest can be completed later.
 // A tutor gets one short form instead: gender, emergency contact, teaching details and documents are asked in the

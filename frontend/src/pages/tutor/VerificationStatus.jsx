@@ -11,7 +11,7 @@ import { fmtDateLong } from '../../lib/format'
 const HEADLINE = {
   NOT_SUBMITTED: ['Profile not submitted', 'bg-accent-100 text-amber-900', 'Finish setting up your profile', 'Complete the setup and submit it. Admin then checks your documents before parents can find you.'],
   UNDER_REVIEW: ['Under review', 'bg-accent-100 text-amber-900', "We're reviewing your documents", "Admin checks your identity document and qualifications. You'll get a notification when there's a decision. Until then your profile isn't open for bookings."],
-  CHANGES_REQUESTED: ['Changes requested', 'bg-red-50 text-red-700', 'Admin asked for a new document', 'One of your documents was not accepted. Read the reason below, upload a new one, and the review carries on.'],
+  CHANGES_REQUESTED: ['Changes requested', 'bg-red-50 text-red-700', 'A document is needed', 'One of your documents was not accepted or has been removed. Upload a new one and the review carries on.'],
   VERIFIED: ['Verified', 'bg-ok-50 text-green-800', "You're verified", 'Your profile shows the verified badge. Teaching features are now open.'],
 }
 
@@ -39,6 +39,10 @@ export default function VerificationStatus() {
   const [badge, badgeCls, title, text] = HEADLINE[p.status]
   const docs = p.documents
   const rejected = docs.filter((d) => d.status === 'REJECTED' && !docs.some((o) => o.kind === d.kind && o.status !== 'REJECTED'))
+  // After submitting, a kind with no usable document left (rejected or removed) has to be uploaded again
+  const missingKinds = p.submittedAt && p.status !== 'VERIFIED'
+    ? [['IDENTITY', 'Identity document (NRIC or passport)'], ['QUALIFICATION', 'Qualification']].filter(([k]) => !docs.some((d) => d.kind === k && d.status !== 'REJECTED'))
+    : []
   const firstName = p.fullName.split(' ')[0]
 
   // Review progress timeline: each line is done, current or still to come
@@ -112,7 +116,7 @@ export default function VerificationStatus() {
             </div>
           </section>
 
-          {rejected.length > 0 && (
+          {(rejected.length > 0 || missingKinds.length > 0) && (
             <section className="card border-red-200 p-6" aria-labelledby="changes-title">
               <span id="changes-title" className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700">
                 <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" /> Changes requested
@@ -120,6 +124,9 @@ export default function VerificationStatus() {
               <ul className="mt-3 space-y-2 text-sm text-navy">
                 {rejected.map((d) => (
                   <li key={d.id}><b>{d.title}</b>{d.reviewNote ? `: ${d.reviewNote}` : ''}</li>
+                ))}
+                {missingKinds.filter(([k]) => !rejected.some((d) => d.kind === k)).map(([k, label]) => (
+                  <li key={k}><b>{label}</b>: none uploaded</li>
                 ))}
               </ul>
               <p className="mt-2 text-xs text-slate-600">Upload only that document again; the review restarts from that step.</p>

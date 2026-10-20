@@ -153,7 +153,9 @@ export async function forgotPassword(req, res) {
     try {
       await issueOtp(email, 'reset')
     } catch (err) {
-      if (err.status !== 429) throw err // "wait 60 s" is not shown either: it would reveal that the account exists
+      // Neither "wait 60 s" nor a failed email is shown: both would reveal that the account exists.
+      // A failed send is already logged by issueOtp; anything else unexpected is logged here.
+      if (err.status !== 429 && err.status !== 502) console.error('Forgot password failed:', err.message)
     }
   }
   res.json({ message: 'If an account uses this email, we have sent a 6-digit code to it.' })
@@ -207,15 +209,34 @@ export async function googleLogin(req, res) {
     .object({ credential: z.string().min(1).max(4096), role: z.enum(['PARENT', 'TUTOR']).optional() })
     .parse(req.body)
 
-  const ticket = await googleClient.verifyIdToken({ idToken: credential, audience: env.googleClientId })
-  const g = ticket.getPayload()
-  if (!g?.email_verified) throw new AppError(400, 'Google account email is not verified')
+  // A bad, expired or wrong-audience token makes the library throw; its text is not shown to the user
+  let g
+  try {
+    g = (await googleClient.verifyIdToken({ idToken: credential, audience: env.googleClientId })).getPayload()
+  } catch {
+    throw new AppError(401, 'Google sign-in could not be confirmed. Please try again.')
+  }
+  if (!g?.email || !g.email_verified) throw new AppError(400, 'Google account email is not verified')
   const email = g.email.toLowerCase()
 
   let user = await prisma.user.findFirst({ where: { OR: [{ googleId: g.sub }, { email }] } })
 
+  // Checked before anything is changed, so a deactivated account is never modified
+  if (user?.status === 'DEACTIVATED') throw new AppError(403, 'Your account has been deactivated. Please contact Admin.')
+
+  // An email signup that was never verified did not prove it owns this address: whoever made it could have chosen
+  // the password. Linking Google to it would leave that password working, so the row is removed (as register does
+  // for an unverified retry) and the Google owner starts a clean account.
+  if (user && !user.isEmailVerified && !user.googleId) {
+    await prisma.$transaction([
+      prisma.emailOtp.deleteMany({ where: { email } }),
+      prisma.user.delete({ where: { id: user.id } }),
+    ])
+    user = null
+  }
+
   if (user) {
-    if (!user.googleId) user = await prisma.user.update({ where: { id: user.id }, data: { googleId: g.sub, isEmailVerified: true } })
+    if (!user.googleId) user = await prisma.user.update({ where: { id: user.id }, data: { googleId: g.sub } })
   } else {
     if (!role) throw new AppError(400, 'Please choose Parent or Tutor to sign up with Google')
     user = await prisma.user.create({
@@ -224,16 +245,16 @@ export async function googleLogin(req, res) {
         googleId: g.sub,
         role,
         fullName: g.name || email,
-        profilePhotoUrl: g.picture,
+        // The Google picture is not kept: photos are stored on our Cloudinary account only, and a tutor must upload
+        // their own photo in the profile setup (FR 1.8)
         isEmailVerified: true,
         ...(role === 'PARENT' && { parent: { create: {} } }),
-        // Tutor fills in gender / emergency contact in the profile setup afterwards
+        // Tutor fills in phone, gender and emergency contact in the profile setup afterwards
         ...(role === 'TUTOR' && { tutor: { create: {} } }),
       },
     })
   }
 
-  if (user.status === 'DEACTIVATED') throw new AppError(403, 'Your account has been deactivated. Please contact Admin.')
   res.json({ token: signToken(user), user: await userResponse(user) })
 }
 

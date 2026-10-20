@@ -80,7 +80,46 @@ describe('tutor profile setup', () => {
   })
 })
 
+describe('tutor profile setup: editing and documents', () => {
+  test('Back keeps what was typed in the step', async () => {
+    setup(COMPLETE)
+    await userEvent.clear(await screen.findByLabelText(/Emergency contact name/))
+    await userEvent.type(screen.getByLabelText(/Emergency contact name/), 'Ahmad Faiz')
+    await userEvent.click(screen.getByRole('button', { name: 'Save and continue' }))
+    await screen.findByRole('heading', { name: 'Teaching information' })
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }))
+    expect(await screen.findByLabelText(/Emergency contact name/)).toHaveValue('Ahmad Faiz')
+  })
+
+  test('a double click on submit sends one request', async () => {
+    setup(COMPLETE)
+    let release
+    api.post.mockImplementation(() => new Promise((resolve) => { release = () => resolve({ data: { ...COMPLETE, status: 'UNDER_REVIEW' } }) }))
+    await userEvent.click(await screen.findByRole('button', { name: /Review and submit/ }))
+    await userEvent.click(screen.getByRole('checkbox', { name: /I confirm the information is true/ }))
+    await userEvent.dblClick(screen.getByRole('button', { name: 'Submit for verification' }))
+    expect(api.post).toHaveBeenCalledTimes(1)
+    release()
+  })
+
+  test('removing an approved document asks first and does nothing when cancelled', async () => {
+    const approved = { ...COMPLETE, documents: COMPLETE.documents.map((d) => ({ ...d, status: 'APPROVED' })) }
+    setup(approved)
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    await userEvent.click(await screen.findByRole('button', { name: /Qualifications/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Remove NRIC' }))
+    expect(confirm).toHaveBeenCalledWith(expect.stringMatching(/verified badge is put on hold/))
+    expect(api.delete).not.toHaveBeenCalled()
+    confirm.mockRestore()
+  })
+})
+
 describe('setup step checks (mirror the server)', () => {
+  test('a photo that was not uploaded through WonderTutor does not count', () => {
+    expect(checkStep('photo', {}, { profilePhotoUrl: 'https://lh3.googleusercontent.com/a/photo' })).toMatch(/Upload a profile photo/)
+    expect(checkStep('photo', {}, COMPLETE)).toBe('')
+  })
+
   const form = { fullName: 'Daniel Tan', phone: '0123456789', gender: 'MALE', emergencyContactName: 'Lisa Tan', emergencyContactPhone: '0123456789', location: 'Kepong, Kuala Lumpur' }
   test('the emergency contact must be someone else', () => {
     expect(checkStep('basic', form, NEW_TUTOR)).toMatch(/different from your own number/)

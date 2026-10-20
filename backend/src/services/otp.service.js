@@ -30,12 +30,19 @@ export async function issueOtp(email, purpose = 'verify') {
   })
 
   const text = PURPOSE_TEXT[purpose] || PURPOSE_TEXT.verify
-  await sendEmail({
-    to: email,
-    subject: text.subject,
-    html: `<p>Your code is <b style="font-size:20px">${code}</b>.</p>
-           <p>It expires in ${OTP_TTL_MINUTES} minutes. ${text.note}</p>`,
-  })
+  try {
+    await sendEmail({
+      to: email,
+      subject: text.subject,
+      html: `<p>Your code is <b style="font-size:20px">${code}</b>.</p>
+             <p>It expires in ${OTP_TTL_MINUTES} minutes. ${text.note}</p>`,
+    })
+  } catch (err) {
+    // A code nobody received is removed, so the 60-second wait does not block an immediate retry
+    console.error('Code email failed:', err.message)
+    await prisma.emailOtp.deleteMany({ where: { email } })
+    throw new AppError(502, 'We could not send the code just now. Please try again in a minute.')
+  }
 }
 
 export async function checkOtp(email, code) {

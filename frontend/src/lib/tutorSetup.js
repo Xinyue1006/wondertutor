@@ -1,6 +1,6 @@
 // Steps of the tutor profile setup and the check each one must pass before it is saved.
 // Mirrors the server rules (controllers/tutor/profile.controller.js and missingForSubmit in tutorSetup.service.js).
-import { checkHourlyRate, checkName, checkPhone, checkText, checkYears, normalizePhone } from './validation'
+import { checkHourlyRate, checkName, checkPhone, checkText, checkYears, isOwnUpload, normalizePhone } from './validation'
 
 export const SETUP_STEPS = [
   { id: 'basic', label: 'Basic information' },
@@ -35,7 +35,7 @@ export function checkStep(id, form, profile) {
     if (!usable.some((d) => d.kind === 'IDENTITY')) return 'Upload your NRIC or passport.'
     if (!usable.some((d) => d.kind === 'QUALIFICATION')) return 'Upload at least one qualification.'
   }
-  if (id === 'photo' && !profile.profilePhotoUrl) return 'Upload a profile photo. Parents see it on your profile.'
+  if (id === 'photo' && !isOwnUpload(profile.profilePhotoUrl)) return 'Upload a profile photo. Parents see it on your profile.'
   return ''
 }
 

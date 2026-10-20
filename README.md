@@ -133,6 +133,14 @@ Matches `WonderTutor_Mockups_All.pdf` pages 1 to 7:
   Until then only setup, status and the profile preview open; every other tutor page redirects to the status page
   (`VerifiedTutorRoute` in the frontend, `requireVerifiedTutor` on the API).
 
+- **Google sign-in**: an existing verified account is linked (role unchanged); an email signup that was never verified is
+  replaced by a clean Google account, so a password chosen by someone else cannot be used; deactivated accounts are refused
+  and left untouched; a bad or expired Google token gives a plain 401. The Google picture is not kept: a tutor uploads their own photo.
+- **Email failures**: if a code email cannot be sent, the unsent code is removed. Forgot password still gives the same answer
+  for every email (the failure is only logged on the server); resend says the code could not be sent.
+- **Documents**: a tutor may remove an approved document after a warning; the verified badge is worked out again
+  (`recomputeVerified`, shared with Admin's review) and comes back when Admin approves a replacement.
+
 **Migration `tutor_profile_setup`** (pull, then `npm run db:migrate`): tutor gender and emergency contact may be empty until the
 setup is filled in, `TutorProfile.verificationSubmittedAt` records when the setup was submitted, and `Qualification.kind`
 (`QUALIFICATION` or `IDENTITY`, default `QUALIFICATION`) tells the two kinds of document apart. Re-run the seed
