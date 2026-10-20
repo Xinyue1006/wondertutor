@@ -5,11 +5,11 @@ import Icon from '../../components/ui/Icon'
 import { ErrorBox } from '../../components/ui/Common'
 import OtpInput from '../../components/OtpInput'
 import PasswordHint from '../../components/PasswordHint'
-import { checkEmail, checkPassword } from '../../lib/validation'
+import { OTP_MINUTES, OTP_TRIES, checkEmail, checkPassword } from '../../lib/validation'
 
 // Two steps: 1) email -> a 6-digit code is emailed, 2) code + new password.
 // The first answer is the same whether or not the email has an account, so the page cannot be used to probe emails.
-// (A code, not a link: the same otp.service as sign-up, valid 10 minutes, 5 tries.)
+// (A code, not a link: the same otp.service as sign-up, so the same expiry and number of tries.)
 function StepBadge({ children }) {
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
@@ -80,7 +80,7 @@ export default function ForgotPassword() {
           <form onSubmit={sendCode} noValidate className="space-y-4">
             <StepBadge>Step 1 · Request code</StepBadge>
             <h1 className="font-display text-2xl font-bold text-navy">Forgot your password?</h1>
-            <p className="text-sm text-slate-600">Enter the email you registered with. We'll send a 6-digit code that works for 10 minutes.</p>
+            <p className="text-sm text-slate-600">Enter the email you registered with. We'll send a 6-digit code that works for {OTP_MINUTES} minutes ({OTP_TRIES} tries).</p>
             <label className="block">
               <span className="mb-1 block text-sm font-semibold text-navy">Email address</span>
               <input type="email" autoComplete="email" className="input h-11" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />

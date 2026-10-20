@@ -6,7 +6,7 @@ import PhotoPicker, { uploadDocument, uploadError } from '../../components/Photo
 import Icon from '../../components/ui/Icon'
 import { ErrorBox, LoadError, Spinner } from '../../components/ui/Common'
 import { LEVELS, gradeLabel } from '../../lib/education'
-import { normalizePhone } from '../../lib/validation'
+import { isOwnUpload, normalizePhone } from '../../lib/validation'
 import { SETUP_STEPS, checkStep } from '../../lib/tutorSetup'
 
 // Tutor profile setup (mockup 06), step 4 of sign-up. Five steps, each saved to the server as a draft
@@ -210,7 +210,7 @@ export default function ProfileSetup() {
 
           {step === 'basic' && <BasicStep form={form} update={update} profile={profile} catalog={catalog} />}
           {step === 'teaching' && <TeachingStep form={form} update={update} catalog={catalog} />}
-          {step === 'documents' && <DocumentsStep profile={profile} setProfile={setProfile} />}
+          {step === 'documents' && <DocumentsStep profile={profile} setProfile={setProfile} onStatus={(s) => setUser((u) => ({ ...u, tutorStatus: s }))} />}
           {step === 'photo' && <PhotoStep profile={profile} setProfile={setProfile} name={form.fullName} />}
           {step === 'review' && <ReviewStep profile={profile} submitted={submitted} confirmed={confirmed} setConfirmed={setConfirmed} goTo={goTo} />}
 
@@ -388,7 +388,7 @@ function TeachingStep({ form, update, catalog }) {
   )
 }
 
-function DocumentsStep({ profile, setProfile }) {
+function DocumentsStep({ profile, setProfile, onStatus }) {
   const [doc, setDoc] = useState({ kind: 'IDENTITY', title: '', institution: '', year: '' })
   const [file, setFile] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -419,9 +419,14 @@ function DocumentsStep({ profile, setProfile }) {
 
   async function remove(d) {
     setError('')
+    // Removing an approved document takes the verified badge away until Admin approves a replacement
+    if (d.status === 'APPROVED' && !window.confirm(`"${d.title}" is approved. If you remove it, your verified badge is put on hold until Admin approves a replacement. Remove it?`)) return
     try {
       await api.delete(`/tutor/documents/${d.id}`)
-      setProfile((await api.get('/tutor/profile')).data)
+      const fresh = (await api.get('/tutor/profile')).data
+      setProfile(fresh)
+      // Keeps the menu and the page gate in step if the badge was just lost
+      onStatus(fresh.status)
     } catch (err) {
       setError(errorMessage(err))
     }
@@ -443,11 +448,9 @@ function DocumentsStep({ profile, setProfile }) {
                   {d.status === 'REJECTED' && d.reviewNote && <span className="block text-xs text-red-700">Admin: {d.reviewNote}</span>}
                 </span>
                 <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${cls}`}>{label}</span>
-                {d.status !== 'APPROVED' && (
-                  <button type="button" onClick={() => remove(d)} className="flex h-11 w-11 items-center justify-center rounded-lg text-red-600 hover:bg-red-50" aria-label={`Remove ${d.title}`}>
-                    <Icon name="trash" className="h-5 w-5" />
-                  </button>
-                )}
+                <button type="button" onClick={() => remove(d)} className="flex h-11 w-11 items-center justify-center rounded-lg text-red-600 hover:bg-red-50" aria-label={`Remove ${d.title}`}>
+                  <Icon name="trash" className="h-5 w-5" />
+                </button>
               </li>
             )
           })}
@@ -576,7 +579,7 @@ function ReviewStep({ profile, submitted, confirmed, setConfirmed, goTo }) {
     ['teaching', 'Hourly rate', profile.hourlyRate ? `RM ${profile.hourlyRate.toFixed(2)}` : 'Missing'],
     ['teaching', 'Teaching mode', [profile.offersPhysical && 'Physical', profile.offersOnline && 'Online'].filter(Boolean).join(' and ') || 'Missing'],
     ['documents', 'Documents', `${profile.documents.filter((d) => d.status !== 'REJECTED').length} uploaded`],
-    ['photo', 'Profile photo', profile.profilePhotoUrl ? 'Uploaded' : 'Missing'],
+    ['photo', 'Profile photo', isOwnUpload(profile.profilePhotoUrl) ? 'Uploaded' : 'Missing'],
   ]
   return (
     <div className="mt-4 space-y-5">

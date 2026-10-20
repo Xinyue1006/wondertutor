@@ -63,5 +63,12 @@ export default function GoogleButton({ role, onError, onNeedsRole, text = 'conti
         <GoogleG /> {label}
       </button>
     )
-  return <div ref={box} className={`flex min-h-[44px] w-full justify-center ${ready ? '' : 'opacity-50'}`} />
+  // Google's button does not tell the page when its window is closed or the site address is not allowed,
+  // so the likely fixes are written under it
+  return (
+    <div>
+      <div ref={box} className={`flex min-h-[44px] w-full justify-center ${ready ? '' : 'opacity-50'}`} />
+      <p className="mt-1 text-center text-xs text-slate-500">If the Google window closes without signing you in, allow pop-ups for this site and try again.</p>
+    </div>
+  )
 }

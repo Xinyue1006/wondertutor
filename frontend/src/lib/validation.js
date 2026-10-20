@@ -72,3 +72,11 @@ export function checkYears(v) {
   if (n > 60) return 'Years of experience must be 60 or fewer.'
   return ''
 }
+
+// Emailed code rules (mirror OTP_TTL_MINUTES, MAX_ATTEMPTS and RESEND_COOLDOWN_SECONDS in backend/src/services/otp.service.js)
+export const OTP_MINUTES = 10
+export const OTP_TRIES = 5
+export const RESEND_SECONDS = 60
+
+// Photos must be uploaded to our Cloudinary account (mirrors cloudinaryUrl in validators.js)
+export const isOwnUpload = (url) => typeof url === 'string' && url.startsWith('https://res.cloudinary.com/')
