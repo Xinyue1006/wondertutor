@@ -7,12 +7,14 @@ import { AppError } from '../utils/AppError.js'
 import { signToken } from '../services/token.service.js'
 import { issueOtp, checkOtp } from '../services/otp.service.js'
 import { verifyRecaptcha } from '../services/recaptcha.service.js'
+import { tutorStatusForUser } from '../services/tutorSetup.service.js'
 import { cleanPreferences, preferencesSchema } from '../utils/preferences.js'
 import { MAX_GRADE, SUBJECTS, findLocation } from '../data/catalog.js'
 import { email as emailRule, optionalText, otpCode, password as passwordRule, personName, phoneMY } from '../utils/validators.js'
 
-// Never send passwordHash etc. to the client
-export function toUserDto(u) {
+// Never send passwordHash etc. to the client.
+// tutorStatus (tutors only) tells the frontend whether to open the setup, the status page or the portal.
+export function toUserDto(u, tutorStatus = null) {
   return {
     id: u.id,
     email: u.email,
@@ -22,8 +24,11 @@ export function toUserDto(u) {
     profilePhotoUrl: u.profilePhotoUrl,
     isEmailVerified: u.isEmailVerified,
     status: u.status,
+    tutorStatus,
   }
 }
+
+const userResponse = async (u) => toUserDto(u, await tutorStatusForUser(u))
 
 const registerSchema = z
   .object({
@@ -49,13 +54,11 @@ const registerSchema = z
       .max(5)
       .optional(),
     preferences: preferencesSchema.optional(),
-    // Tutor-only
+    // Tutor-only, and optional: a tutor gives these in the profile setup after the email is verified.
+    // Still accepted here so an older form that sends them keeps working.
     gender: z.enum(['MALE', 'FEMALE', 'UNSPECIFIED']).optional(),
     emergencyContactName: personName('Emergency contact name').optional(),
     emergencyContactPhone: phoneMY('Emergency contact number').optional(),
-  })
-  .refine((d) => d.role !== 'TUTOR' || (d.gender && d.emergencyContactName && d.emergencyContactPhone), {
-    message: 'Gender and emergency contact are required for tutors',
   })
   // An emergency contact is someone else: their number cannot be the tutor's own
   .refine((d) => !d.emergencyContactPhone || d.emergencyContactPhone !== d.phone, {
@@ -100,9 +103,9 @@ export async function register(req, res) {
         ...(data.role === 'TUTOR' && {
           tutor: {
             create: {
-              gender: data.gender,
-              emergencyContactName: data.emergencyContactName,
-              emergencyContactPhone: data.emergencyContactPhone,
+              gender: data.gender ?? null,
+              emergencyContactName: data.emergencyContactName ?? null,
+              emergencyContactPhone: data.emergencyContactPhone ?? null,
             },
           },
         }),
@@ -126,7 +129,7 @@ export async function verifyOtp(req, res) {
   await checkOtp(email, code)
   const verified = await prisma.user.update({ where: { id: user.id }, data: { isEmailVerified: true } })
 
-  res.json({ token: signToken(verified), user: toUserDto(verified) })
+  res.json({ token: signToken(verified), user: await userResponse(verified) })
 }
 
 // POST /api/auth/resend-otp
@@ -173,12 +176,18 @@ export async function resetPassword(req, res) {
   res.json({ message: 'Your password has been reset. You can now log in.' })
 }
 
-// POST /api/auth/login
+// POST /api/auth/login { email, password, recaptchaToken }
+// reCAPTCHA is checked before the password, so a bot cannot use this form to try passwords
 export async function login(req, res) {
-  const { email, password } = z
+  const { email, password, recaptchaToken } = z
     // No strength rules at login (old passwords stay valid), only a cap so nobody can post megabytes to bcrypt
-    .object({ email: emailRule, password: z.string().min(1, 'Enter your password').max(200, 'Incorrect email or password') })
+    .object({
+      email: emailRule,
+      password: z.string().min(1, 'Enter your password').max(200, 'Incorrect email or password'),
+      recaptchaToken: z.string().max(4000).optional(),
+    })
     .parse(req.body)
+  await verifyRecaptcha(recaptchaToken)
 
   const user = await prisma.user.findUnique({ where: { email } })
   const ok = user?.passwordHash && (await bcrypt.compare(password, user.passwordHash))
@@ -186,7 +195,7 @@ export async function login(req, res) {
   if (!user.isEmailVerified) throw new AppError(403, 'Please verify your email before logging in')
   if (user.status === 'DEACTIVATED') throw new AppError(403, 'Your account has been deactivated. Please contact Admin.')
 
-  res.json({ token: signToken(user), user: toUserDto(user) })
+  res.json({ token: signToken(user), user: await userResponse(user) })
 }
 
 // POST /api/auth/google  { credential, role? }
@@ -218,17 +227,17 @@ export async function googleLogin(req, res) {
         profilePhotoUrl: g.picture,
         isEmailVerified: true,
         ...(role === 'PARENT' && { parent: { create: {} } }),
-        // Tutor fills in gender / emergency contact on the profile page afterwards
-        ...(role === 'TUTOR' && { tutor: { create: { gender: 'UNSPECIFIED', emergencyContactName: '', emergencyContactPhone: '' } } }),
+        // Tutor fills in gender / emergency contact in the profile setup afterwards
+        ...(role === 'TUTOR' && { tutor: { create: {} } }),
       },
     })
   }
 
   if (user.status === 'DEACTIVATED') throw new AppError(403, 'Your account has been deactivated. Please contact Admin.')
-  res.json({ token: signToken(user), user: toUserDto(user) })
+  res.json({ token: signToken(user), user: await userResponse(user) })
 }
 
 // GET /api/auth/me
 export async function me(req, res) {
-  res.json({ user: toUserDto(req.user) })
+  res.json({ user: await userResponse(req.user) })
 }
