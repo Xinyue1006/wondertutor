@@ -266,10 +266,15 @@ async function seedTutors(hash) {
             offersOnline: t.online,
             offersPhysical: t.physical,
             isVerified: t.verified,
+            verificationSubmittedAt: new Date(),
             subjects: { create: t.subjects.map(([subject, educationLevel, minGrade, maxGrade]) => ({ subject, educationLevel, minGrade, maxGrade })) },
             availability: { create: slots(t.avail) },
             qualifications: {
-              create: [{ title: t.qual[0], institution: t.qual[1], year: t.qual[2], documentUrl: 'seed://sample-certificate', status: 'APPROVED' }],
+              // Verified tutors have an approved identity document and qualification, the two things Admin checks
+              create: [
+                { kind: 'IDENTITY', title: 'NRIC', documentUrl: 'seed://sample-nric', status: t.verified ? 'APPROVED' : 'PENDING' },
+                { title: t.qual[0], institution: t.qual[1], year: t.qual[2], documentUrl: 'seed://sample-certificate', status: 'APPROVED' },
+              ],
             },
           },
         },

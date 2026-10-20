@@ -20,10 +20,11 @@ function GoogleG() {
 
 // "Continue with Google". Uses Google's own button when VITE_GOOGLE_CLIENT_ID is set; the credential is verified
 // by the backend (POST /api/auth/google). Without a client id it shows the same-looking button with a friendly message.
-// `role` is only needed when Google creates a brand-new account (signup page).
+// `role` is only needed when Google creates a brand-new account (signup page). `text` picks Google's wording
+// ("continue_with" or "signup_with") and `label` is the same wording on the stand-in button.
 // `onNeedsRole(credential)`: on the login page a new Google user has no role yet, so the page can ask for one
 // and finish sign-up with the same Google credential instead of showing a dead-end error.
-export default function GoogleButton({ role, onError, onNeedsRole }) {
+export default function GoogleButton({ role, onError, onNeedsRole, text = 'continue_with', label = 'Continue with Google' }) {
   const { googleLogin } = useAuth()
   const navigate = useNavigate()
   const from = useLocation().state?.from
@@ -48,7 +49,7 @@ export default function GoogleButton({ role, onError, onNeedsRole }) {
           }
         },
       })
-      window.google.accounts.id.renderButton(box.current, { theme: 'outline', size: 'large', text: 'continue_with', shape: 'rectangular', width: box.current.offsetWidth })
+      window.google.accounts.id.renderButton(box.current, { theme: 'outline', size: 'large', text, shape: 'rectangular', width: box.current.offsetWidth })
       setReady(true)
     }).catch(() => onError?.('Could not load Google sign-in. Check your internet connection.'))
     return () => { cancelled = true }
@@ -59,7 +60,7 @@ export default function GoogleButton({ role, onError, onNeedsRole }) {
     return (
       <button type="button" onClick={() => onError?.('Google sign-in is not configured yet. Please use your email and password.')}
         className="flex h-12 w-full items-center justify-center gap-3 rounded-lg border border-slate-200 bg-white text-sm font-semibold text-navy hover:bg-slate-50">
-        <GoogleG /> Continue with Google
+        <GoogleG /> {label}
       </button>
     )
   return <div ref={box} className={`flex min-h-[44px] w-full justify-center ${ready ? '' : 'opacity-50'}`} />

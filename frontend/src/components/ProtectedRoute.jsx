@@ -16,10 +16,25 @@ export function homeFor(role) {
   return { PARENT: '/parent', TUTOR: '/tutor', ADMIN: '/admin' }[role] || '/'
 }
 
+// A tutor who is not verified yet can only use the onboarding pages (the server enforces the same rule)
+export const TUTOR_ONBOARDING = ['/tutor/setup', '/tutor/verification', '/tutor/preview']
+export const isUnverifiedTutor = (user) => user?.role === 'TUTOR' && user.tutorStatus !== 'VERIFIED'
+const tutorStart = (user) => (user.tutorStatus === 'NOT_SUBMITTED' ? '/tutor/setup' : '/tutor/verification')
+
 // Where to go after logging in: the page the user was trying to open, but only inside their own portal
 // (a parent is never sent to /admin) and only a path on this site; otherwise their home page.
+// An unverified tutor goes to the setup (draft) or the verification status page instead of the dashboard.
 export function afterLogin(user, from) {
   const home = homeFor(user.role)
   const ok = typeof from === 'string' && from.startsWith('/') && !from.startsWith('//') && (from === home || from.startsWith(`${home}/`) || from.startsWith(`${home}?`))
+  if (isUnverifiedTutor(user)) return ok && TUTOR_ONBOARDING.some((p) => from.startsWith(p)) ? from : tutorStart(user)
   return ok ? from : home
+}
+
+// Wraps the tutor pages that need Admin verification (dashboard, availability, bookings, earnings).
+// An unverified tutor is sent to the verification status page, which explains what is still locked and why.
+export function VerifiedTutorRoute() {
+  const { user } = useAuth()
+  if (isUnverifiedTutor(user)) return <Navigate to="/tutor/verification" replace />
+  return <Outlet />
 }

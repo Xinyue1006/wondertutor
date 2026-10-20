@@ -59,3 +59,16 @@ export function checkText(v, { label = 'This field', min = 0, max }) {
   if (max && s.length > max) return `${label} must be ${max} characters or fewer.`
   return ''
 }
+
+// Tutor profile (mirrors hourlyRate / yearsExperience in validators.js)
+export const HOURLY_RATE_MAX = 500
+export const checkHourlyRate = (v) => checkRinggit(v, 'Hourly rate', HOURLY_RATE_MAX)
+
+export function checkYears(v) {
+  if (v === '' || v == null) return 'Enter your years of experience.'
+  const n = Number(v)
+  if (!Number.isInteger(n)) return 'Years of experience must be a whole number.'
+  if (n < 0) return 'Years of experience cannot be negative.'
+  if (n > 60) return 'Years of experience must be 60 or fewer.'
+  return ''
+}

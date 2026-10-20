@@ -40,6 +40,12 @@ enum TeachingMode {
   ONLINE // online = tutor only pastes a meeting link; no in-system video / no-show automation
 }
 
+// What an uploaded verification document is. Admin needs both kinds approved before a tutor is verified.
+enum DocumentKind {
+  QUALIFICATION // degree, diploma, teaching certificate
+  IDENTITY      // NRIC or passport
+}
+
 enum VerificationStatus {
   PENDING
   APPROVED
@@ -181,9 +187,10 @@ model TutorProfile {
   id                    Int       @id @default(autoincrement())
   userId                Int       @unique
   user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  gender                Gender
-  emergencyContactName  String
-  emergencyContactPhone String
+  // Asked in the profile setup, not at sign-up, so they stay empty until the tutor fills them in
+  gender                Gender?
+  emergencyContactName  String?
+  emergencyContactPhone String?
   bio                   String?   @db.Text
   teachingApproach      String?   @db.Text
   characteristics       Json?     // e.g. ["Patient & Encouraging", "Structured"]
@@ -198,6 +205,7 @@ model TutorProfile {
   offersOnline          Boolean   @default(false)
   commissionRate        Decimal?  @db.Decimal(5, 2) // per-tutor override; null = use platform base rate
   isVerified            Boolean   @default(false)
+  verificationSubmittedAt DateTime? // set when the tutor submits the setup for Admin review; null = still a draft
   ratingAvg             Float     @default(0)
   ratingCount           Int       @default(0)
 
@@ -228,6 +236,7 @@ model Qualification {
   id          Int                @id @default(autoincrement())
   tutorId     Int
   tutor       TutorProfile       @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  kind        DocumentKind       @default(QUALIFICATION)
   title       String
   institution String?
   year        Int?

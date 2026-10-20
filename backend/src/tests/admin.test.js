@@ -54,8 +54,9 @@ describe('user management', () => {
     expect((await api(admin.token).post(`/admin/users/${admin.user.id}/deactivate`)).status).toBe(400)
   })
 
-  test('approving a qualification grants the verified badge; rejecting the only one removes it', async () => {
+  test('approving a qualification grants the verified badge once the identity document is approved; rejecting the only one removes it', async () => {
     const t = await makeTutor()
+    await prisma.qualification.create({ data: { tutorId: t.tutor.id, kind: 'IDENTITY', title: 'NRIC', documentUrl: 'x', status: 'APPROVED' } })
     const q = await prisma.qualification.create({ data: { tutorId: t.tutor.id, title: 'BSc Maths', documentUrl: 'x' } })
 
     expect((await api(admin.token).post(`/admin/qualifications/${q.id}/review`, { status: 'APPROVED' })).status).toBe(200)
