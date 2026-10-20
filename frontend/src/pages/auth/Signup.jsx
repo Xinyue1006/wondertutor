@@ -2,22 +2,33 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import api, { errorMessage } from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
-import { homeFor } from '../../components/ProtectedRoute'
+import { afterLogin } from '../../components/ProtectedRoute'
 import Icon from '../../components/ui/Icon'
 import GoogleButton from '../../components/GoogleButton'
 import Recaptcha, { RECAPTCHA_SITE_KEY } from '../../components/Recaptcha'
 import { ErrorBox } from '../../components/ui/Common'
+import OtpInput from '../../components/OtpInput'
+import PasswordHint from '../../components/PasswordHint'
 import { GRADE_GROUPS, parseGrade } from '../../lib/education'
 import PreferencesFields from '../../components/PreferencesFields'
 import { emptyPreferences, isEmptyPreferences, toApiPreferences } from '../../lib/preferences'
 import { checkEmail, checkName, checkPassword, checkPhone, checkText, normalizePhone } from '../../lib/validation'
 
-// 3-step signup (UI_v1): Choose Role -> Account Details (side menu of sections) -> Complete (email OTP)
-const STEPS = ['Choose Role', 'Account Details', 'Complete']
+// Signup: Choose role -> Create account -> Verify email. A tutor has a 4th step, "Complete profile",
+// which is the Tutor Portal setup (/tutor/setup) they are sent to once the email is verified.
+const STEPS = {
+  PARENT: ['Choose role', 'Create account', 'Verify email'],
+  TUTOR: ['Choose role', 'Create account', 'Verify email', 'Complete profile'],
+}
 
-// Side-menu sections. Only what is needed to create the account is mandatory; the rest can be completed later.
-// The Tutor Portal sections after "Contact Details" (teaching information, availability, qualifications, review) belong to
-// the Tutor Portal and are completed after the email is verified, so they are shown locked, as in the mockup menu.
+// Same values as backend/src/services/otp.service.js
+const OTP_MINUTES = 10
+const OTP_TRIES = 5
+const RESEND_SECONDS = 60
+
+// Parent side menu. Only what is needed to create the account is mandatory; the rest can be completed later.
+// A tutor gets one short form instead: gender, emergency contact, teaching details and documents are asked in the
+// profile setup after the email is verified, so the account itself takes one screen.
 const SECTIONS = {
   PARENT: [
     { id: 'basic', label: 'Basic Information', icon: 'user' },
@@ -25,14 +36,7 @@ const SECTIONS = {
     { id: 'children', label: 'My Children', icon: 'user', optional: true },
     { id: 'preferences', label: 'Preferences', icon: 'sliders', optional: true },
   ],
-  TUTOR: [
-    { id: 'basic', label: 'Basic Information', icon: 'user' },
-    { id: 'contact', label: 'Contact Details', icon: 'phone' },
-    { id: 'teaching', label: 'Teaching Information', icon: 'book', locked: true },
-    { id: 'availability', label: 'Availability', icon: 'calendar', locked: true },
-    { id: 'quals', label: 'Qualifications', icon: 'award', locked: true },
-    { id: 'review', label: 'Review & Submit', icon: 'check-circle', locked: true },
-  ],
+  TUTOR: [{ id: 'account', label: 'Create your account', icon: 'user' }],
 }
 
 // Progress is kept for this browser session (never the passwords), so a refresh or a trip back to the role step does not lose it
@@ -41,40 +45,49 @@ function loadDraft() {
   try { return JSON.parse(sessionStorage.getItem(DRAFT_KEY) || 'null') } catch { return null }
 }
 
-const emptyForm = {
-  fullName: '', email: '', phone: '', address: '', password: '', confirmPassword: '',
-  gender: '', emergencyContactName: '', emergencyContactPhone: '',
-}
+const emptyForm = { fullName: '', email: '', phone: '', address: '', password: '', confirmPassword: '' }
 
 export default function Signup() {
   const navigate = useNavigate()
   const { saveSession } = useAuth()
-  const draft = useRef(loadDraft()).current
+  const [draft] = useState(loadDraft)
   const [step, setStep] = useState(0)
   const [role, setRole] = useState(draft?.role || 'PARENT')
-  const [section, setSection] = useState('basic')
+  const [section, setSection] = useState(SECTIONS[draft?.role || 'PARENT'][0].id)
   const [form, setForm] = useState({ ...emptyForm, ...(draft?.form || {}) })
   const [kids, setKids] = useState(draft?.kids || [])
   const [prefs, setPrefs] = useState({ ...emptyPreferences(), ...(draft?.prefs || {}) })
   const [subjects, setSubjects] = useState([])
   const [photo, setPhoto] = useState(null)
   const [captcha, setCaptcha] = useState('')
+  const [terms, setTerms] = useState(false)
   const [otp, setOtp] = useState('')
-  // Seconds until another code can be requested (the server allows one every 60 s)
+  // Seconds until another code can be requested, and until the current code expires
   const [cooldown, setCooldown] = useState(0)
+  const [expiresIn, setExpiresIn] = useState(0)
   const [resent, setResent] = useState(false)
   useEffect(() => {
-    if (!cooldown) return
-    const t = setTimeout(() => setCooldown((s) => s - 1), 1000)
+    if (!cooldown && !expiresIn) return
+    const t = setTimeout(() => {
+      setCooldown((s) => Math.max(0, s - 1))
+      setExpiresIn((s) => Math.max(0, s - 1))
+    }, 1000)
     return () => clearTimeout(t)
-  }, [cooldown])
+  }, [cooldown, expiresIn])
+  const codeSent = () => {
+    setCooldown(RESEND_SECONDS)
+    setExpiresIn(OTP_MINUTES * 60)
+  }
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value })
-  const sections = SECTIONS[role]
-  const active = sections.filter((s) => !s.locked)
+  const active = SECTIONS[role]
   const idx = active.findIndex((s) => s.id === section)
+  const chooseRole = (r) => {
+    setRole(r)
+    setSection(SECTIONS[r][0].id)
+  }
 
   // The subject list comes from the public endpoint (the same list the tutors teach), so children are never saved with a subject nobody teaches
   useEffect(() => {
@@ -93,19 +106,17 @@ export default function Signup() {
       const problem = checkName(form.fullName) || checkEmail(form.email) || checkPassword(form.password)
       if (problem) return problem
       if (form.password !== form.confirmPassword) return 'Passwords do not match'
-      if (role === 'TUTOR') {
-        const contact = checkName(form.emergencyContactName, 'Emergency contact name') || checkPhone(form.emergencyContactPhone, 'Emergency contact number')
-        if (contact) return contact
-        if (!form.gender) return 'Please select your gender'
-      }
     }
     if (id === 'contact') {
       const problem = checkPhone(form.phone)
       if (problem) return problem
-      // An emergency contact is someone else, so it cannot be the tutor's own number
-      if (role === 'TUTOR' && normalizePhone(form.phone) === normalizePhone(form.emergencyContactPhone))
-        return 'Your phone number must be different from your emergency contact number'
       if (form.address.length > 200) return 'Address must be 200 characters or fewer'
+    }
+    if (id === 'account') {
+      const problem = checkName(form.fullName) || checkEmail(form.email) || checkPhone(form.phone) || checkPassword(form.password)
+      if (problem) return problem
+      if (form.password !== form.confirmPassword) return 'Passwords do not match'
+      if (!terms) return 'Please agree to the Terms of Use and Privacy Policy'
     }
     if (id === 'children') {
       // A child is only useful for matching with a level and a subject, so both are required for every row that is added
@@ -158,14 +169,10 @@ export default function Signup() {
           children: kids.map((k) => ({ name: k.name, educationLevel: k.level, grade: k.grade, subject: k.subject, ...(k.notes?.trim() && { notes: k.notes.trim() }) })),
           preferences: toApiPreferences(prefs) ?? undefined,
         }),
-        ...(role === 'TUTOR' && {
-          gender: form.gender,
-          emergencyContactName: form.emergencyContactName,
-          emergencyContactPhone: normalizePhone(form.emergencyContactPhone),
-        }),
       })
+      setOtp('')
       setStep(2)
-      setCooldown(60) // a code was just sent
+      codeSent()
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -181,7 +188,8 @@ export default function Signup() {
       const res = await api.post('/auth/verify-otp', { email: form.email, code: otp })
       try { sessionStorage.removeItem(DRAFT_KEY) } catch { /* ignore */ }
       saveSession(res.data.token, res.data.user, true)
-      navigate(homeFor(res.data.user.role))
+      // A new tutor goes on to the profile setup (step 4); a parent goes to their dashboard
+      navigate(afterLogin(res.data.user))
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -196,7 +204,8 @@ export default function Signup() {
     try {
       await api.post('/auth/resend-otp', { email: form.email })
       setResent(true)
-      setCooldown(60)
+      setOtp('')
+      codeSent()
     } catch (err) {
       setError(errorMessage(err))
     }
@@ -215,11 +224,11 @@ export default function Signup() {
     <div className="relative mx-auto max-w-[81.25rem] px-4 md:px-8">
       <div className="relative">
         {step < 2 && (
-          <button onClick={() => (step === 1 ? setStep(0) : navigate('/'))} className="absolute left-0 top-0 flex min-h-11 items-center gap-2 text-sm font-medium text-navy hover:text-brand-600">
-            <Icon name="arrow-left" className="h-4 w-4" /> Back
+          <button onClick={() => (step === 1 ? setStep(0) : navigate('/login'))} className="flex min-h-11 items-center gap-2 text-sm font-semibold text-brand-600 hover:underline md:absolute md:left-0 md:top-0">
+            <Icon name="arrow-left" className="h-4 w-4" /> {step === 1 ? 'Back' : 'Back to login'}
           </button>
         )}
-        <Stepper step={step} />
+        <Stepper steps={STEPS[role]} step={step} />
       </div>
 
       {step === 0 && (
@@ -227,40 +236,44 @@ export default function Signup() {
           <h1 className="font-display text-3xl font-bold text-navy md:text-4xl">
             Join WonderTutor <Icon name="sparkle" fill className="mb-2 inline h-5 w-5 text-accent" />
           </h1>
-          <p className="mt-1 text-base text-slate-700">Choose how you will use WonderTutor.</p>
-          <p className="text-sm text-slate-700">
-            Already have an account? <Link to="/login" className="inline-flex min-h-11 items-center font-semibold text-brand-600 hover:underline">Log In</Link>
-          </p>
+          <p className="mt-1 text-base text-slate-700">Tell us how you'll use the platform. You can't change this later, so choose carefully.</p>
           <div role="radiogroup" aria-label="I am joining as" className="mt-6 grid gap-5 text-left md:grid-cols-2">
             <RoleCard
-              active={role === 'PARENT'} onClick={() => setRole('PARENT')} img="/img/art/role-parent.jpg" tone="blue"
-              title="I'm a Parent" desc="Find and book suitable tutors for your child."
-              points={['Browse qualified tutors', 'Track lessons and bookings', 'Manage multiple children', 'Leave reviews and feedback']}
+              active={role === 'PARENT'} onClick={() => chooseRole('PARENT')} img="/img/art/role-parent.jpg" tone="blue"
+              title="I'm a Parent" desc="Find the right tutor for your child."
+              points={['Browse and book verified tutors', 'Pay securely before each session', 'Track lessons and progress reports', 'Manage multiple children']}
             />
             <RoleCard
-              active={role === 'TUTOR'} onClick={() => setRole('TUTOR')} img="/img/art/role-tutor.jpg" tone="yellow"
-              title="I'm a Tutor" desc="Share your knowledge and teaching experience."
-              points={['Set your availability', 'Manage your bookings', 'Track your earnings', 'Build your teaching profile']}
+              active={role === 'TUTOR'} onClick={() => chooseRole('TUTOR')} img="/img/art/role-tutor.jpg" tone="yellow"
+              title="I'm a Tutor" desc="Teach, set your schedule and earn."
+              points={['Set your own availability and rate', 'Get paid per completed session', 'Profile reviewed by Admin before going live', 'Build your teaching profile']}
             />
           </div>
-          <button onClick={() => { setSection('basic'); setStep(1) }} className="btn-primary mx-auto mt-5 h-12 w-full max-w-[560px] text-base">
-            Next <Icon name="arrow-right" className="h-4 w-4" />
-          </button>
-          <div className="mx-auto mt-4 max-w-[560px]">
-            <div className="mb-3 flex items-center gap-3 text-xs text-slate-400"><span className="h-px flex-1 bg-slate-200" /> or sign up with <span className="h-px flex-1 bg-slate-200" /></div>
-            <GoogleButton role={role} onError={setError} />
-            {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+          <div className="mx-auto mt-5 grid max-w-[560px] gap-3 sm:grid-cols-2">
+            <button onClick={() => { setError(''); setSection(active[0].id); setStep(1) }} className="btn-primary h-12 w-full text-base">
+              Continue as {role === 'PARENT' ? 'Parent' : 'Tutor'}
+            </button>
+            <GoogleButton role={role} onError={setError} text="signup_with" label={`Sign up with Google as ${role === 'PARENT' ? 'Parent' : 'Tutor'}`} />
           </div>
+          {error && <p role="alert" className="mt-2 text-sm text-red-700">{error}</p>}
+          <p className="mt-3 text-sm text-slate-700">
+            Already have an account? <Link to="/login" className="inline-flex min-h-11 items-center font-semibold text-brand-600 hover:underline">Log in</Link>
+          </p>
         </div>
       )}
 
-      {step === 1 && (
+      {step === 1 && role === 'TUTOR' && (
+        <TutorAccount form={form} set={set} terms={terms} setTerms={setTerms} setCaptcha={setCaptcha}
+          error={error} setError={setError} busy={busy} onSubmit={next} />
+      )}
+
+      {step === 1 && role === 'PARENT' && (
         <div className="mx-auto mt-6 grid max-w-[68.75rem] overflow-hidden rounded-2xl border border-brand-100 bg-white shadow-card md:grid-cols-[260px_1fr]">
           {/* one card: the menu panel and the form share a single box, separated only by a thin divider */}
           {/* The side panel is as tall as the form next to it: the menu stays on top and the picture fills the rest, anchored to the bottom */}
           <aside className="flex flex-col overflow-hidden border-b border-brand-100 bg-brand-25 p-3 md:border-b-0 md:border-r">
            <div className="space-y-1.5">
-            {sections.map((s) => (
+            {active.map((s) => (
               <button
                 key={s.id}
                 type="button"
@@ -379,11 +392,6 @@ export default function Signup() {
               {busy ? 'Creating account…' : idx < active.length - 1 ? 'Next' : 'Create Account'}
               {!busy && <Icon name="arrow-right" className="h-4 w-4" />}
             </button>
-            {role === 'TUTOR' && (
-              <p className="mt-3 text-center text-xs text-slate-500">
-                Teaching information, qualifications and portfolio are added in your Tutor Portal after your email is verified.
-              </p>
-            )}
           </form>
         </div>
       )}
@@ -391,16 +399,26 @@ export default function Signup() {
       {step === 2 && (
         <form onSubmit={submitOtp} className="mx-auto mt-8 max-w-md space-y-4 rounded-2xl border border-brand-100 bg-white p-8 text-center shadow-card">
           <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand-50 text-brand-500"><Icon name="mail" className="h-7 w-7" /></span>
-          <h1 className="font-display text-2xl font-bold text-navy">Verify your email</h1>
-          <p className="text-sm text-slate-500">We sent a 6-digit code to <b className="text-navy">{form.email}</b>.</p>
+          <h1 className="font-display text-2xl font-bold text-navy">Check your email</h1>
+          <p className="text-sm text-slate-600">We sent a 6-digit code to<br /><b className="text-navy">{form.email}</b></p>
+          <OtpInput value={otp} onChange={setOtp} label="6-digit verification code" />
+          <p className={`mx-auto w-fit rounded-full px-3 py-1 text-xs font-semibold ${expiresIn ? 'bg-accent-50 text-amber-900' : 'bg-red-50 text-red-700'}`}>
+            {expiresIn ? `Code expires in ${clock(expiresIn)}` : 'This code has expired. Please request a new one.'}
+          </p>
           <ErrorBox className="text-left">{error}</ErrorBox>
           {resent && <p role="status" className="rounded-lg bg-brand-50 px-3 py-2 text-sm text-slate-700">A new code has been sent. Check your spam folder too.</p>}
-          <input required maxLength={6} inputMode="numeric" autoComplete="one-time-code" aria-label="6-digit verification code" autoFocus className="input h-14 text-center text-2xl tracking-[0.6em]"
-            value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))} />
-          <button disabled={busy || otp.length < 6} className="btn-primary h-12 w-full text-base">{busy ? 'Verifying…' : 'Verify & Continue'}</button>
-          <button type="button" onClick={resendOtp} disabled={cooldown > 0} className="min-h-11 text-sm font-semibold text-brand-600 hover:underline disabled:text-slate-500 disabled:no-underline">
-            {cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend code'}
-          </button>
+          <button disabled={busy || otp.length < 6} className="btn-primary h-12 w-full text-base">{busy ? 'Verifying…' : 'Verify and continue'}</button>
+          <p className="text-sm text-slate-600">
+            Didn't get it?{' '}
+            <button type="button" onClick={resendOtp} disabled={cooldown > 0} className="min-h-11 font-semibold text-brand-600 hover:underline disabled:text-slate-500 disabled:no-underline">
+              {cooldown > 0 ? `Resend code in ${clock(cooldown)}` : 'Resend code'}
+            </button>
+            {' · '}
+            <button type="button" onClick={() => { setError(''); setStep(1) }} className="min-h-11 font-semibold text-brand-600 hover:underline">Change email</button>
+          </p>
+          <p className="rounded-lg bg-brand-50 px-4 py-3 text-left text-sm text-navy">
+            The code works for {OTP_MINUTES} minutes. After {OTP_TRIES} wrong tries it stops working and you need to request a new one. Check your spam folder if the email is slow.
+          </p>
         </form>
       )}
     </div>
@@ -408,10 +426,13 @@ export default function Signup() {
   )
 }
 
-function Stepper({ step }) {
+// 600 -> "10:00", 45 -> "0:45"
+const clock = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+
+function Stepper({ steps, step }) {
   return (
-    <ol className="mx-auto flex max-w-md items-start justify-between">
-      {STEPS.map((s, i) => (
+    <ol aria-label="Sign-up steps" className={`mx-auto flex items-start justify-between ${steps.length > 3 ? 'max-w-xl' : 'max-w-md'}`}>
+      {steps.map((s, i) => (
         <li key={s} className="relative flex flex-1 flex-col items-center">
           {i > 0 && <span className={`absolute right-1/2 top-[15px] h-0.5 w-full ${i <= step ? 'bg-brand-500' : 'bg-brand-200'}`} />}
           <span className={`relative z-10 flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${
@@ -419,10 +440,82 @@ function Stepper({ step }) {
           }`}>
             {i < step ? <Icon name="check" className="h-4 w-4" strokeWidth={3} /> : i + 1}
           </span>
-          <span className={`mt-1 text-xs ${i === step ? 'font-bold text-navy' : 'text-slate-500'}`}>{s}</span>
+          <span className={`mt-1 text-center text-xs ${i === step ? 'font-bold text-navy' : 'text-slate-500'}`} aria-current={i === step ? 'step' : undefined}>{s}</span>
         </li>
       ))}
     </ol>
+  )
+}
+
+// Tutor account step (mockup 03): only what is needed to log in. Teaching details, documents and photo come in the
+// profile setup after the email is verified, so the left panel tells the tutor what happens next.
+function TutorAccount({ form, set, terms, setTerms, setCaptcha, error, setError, busy, onSubmit }) {
+  const mismatch = form.confirmPassword && form.password !== form.confirmPassword
+  return (
+    <div className="mx-auto mt-6 grid max-w-[68.75rem] gap-5 md:grid-cols-[300px_1fr]">
+      <aside className="space-y-4">
+        <div className="rounded-2xl bg-navy p-6 text-white">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-100 px-3 py-1 text-xs font-semibold text-amber-900">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-700" /> Tutor account
+          </span>
+          <h1 className="mt-3 font-display text-2xl font-bold">Create your account</h1>
+          <p className="mt-2 text-sm text-brand-100">Just the essentials for now. You'll build your teaching profile after your email is verified.</p>
+        </div>
+        <div className="rounded-2xl border border-brand-100 bg-white p-6 shadow-card">
+          <h2 className="font-display text-base font-bold text-navy">What happens next</h2>
+          <ol className="mt-3 space-y-4 text-sm">
+            {[
+              ['bg-brand-500', 'Verify your email', `6-digit code, valid ${OTP_MINUTES} minutes`],
+              ['bg-accent', 'Set up your profile', 'Subjects, rate, photo, documents'],
+              ['bg-ok', 'Admin review', 'Go live once your documents are approved'],
+            ].map(([dot, title, sub]) => (
+              <li key={title} className="flex gap-3">
+                <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${dot}`} aria-hidden="true" />
+                <span><b className="block text-navy">{title}</b><span className="text-slate-600">{sub}</span></span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </aside>
+
+      <form onSubmit={onSubmit} noValidate aria-label="Create your tutor account" className="rounded-2xl border border-brand-100 bg-white p-6 shadow-card md:p-8">
+        <GoogleButton role="TUTOR" onError={setError} text="signup_with" label="Sign up with Google" />
+        <div className="my-4 flex items-center gap-3 text-xs text-slate-500"><span className="h-px flex-1 bg-slate-200" /> or use your email <span className="h-px flex-1 bg-slate-200" /></div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="md:col-span-2">
+            <Input label="Full name" required value={form.fullName} onChange={set('fullName')} placeholder="e.g. Daniel Tan" autoComplete="name" />
+          </div>
+          <Input label="Email address" required type="email" value={form.email} onChange={set('email')} placeholder="you@example.com" autoComplete="email" />
+          <Phone label="Phone number" required value={form.phone} onChange={set('phone')} />
+          <div>
+            <Input label="Password" required type="password" value={form.password} onChange={set('password')} placeholder="At least 8 characters" autoComplete="new-password" />
+            <PasswordHint value={form.password} />
+          </div>
+          <div>
+            <Input label="Confirm password" required type="password" value={form.confirmPassword} onChange={set('confirmPassword')} placeholder="Re-enter your password" autoComplete="new-password" />
+            {form.confirmPassword && (
+              <p className={`mt-1 text-xs font-medium ${mismatch ? 'text-red-700' : 'text-ok'}`}>{mismatch ? 'Passwords do not match' : 'Passwords match'}</p>
+            )}
+          </div>
+        </div>
+        <div className="mt-4"><Recaptcha onToken={setCaptcha} /></div>
+        <label className="mt-3 flex min-h-11 cursor-pointer items-center gap-2 text-sm text-navy">
+          <input type="checkbox" className="h-4 w-4 accent-brand-500" checked={terms} onChange={(e) => setTerms(e.target.checked)} />
+          I agree to the Terms of Use and Privacy Policy (PDPA)
+        </label>
+        <div className="mt-2 min-h-6 text-sm" aria-live="polite">
+          {error && (
+            <p role="alert" className="flex items-start gap-1.5 font-medium text-red-700">
+              <Icon name="info" className="mt-0.5 h-4 w-4 shrink-0" /> {error}
+            </p>
+          )}
+        </div>
+        <button disabled={busy} className="btn-primary mt-2 h-12 w-full text-base">{busy ? 'Creating account…' : 'Create account and send code'}</button>
+        <p className="mt-3 text-center text-xs text-slate-600">
+          Google sign-up skips the CAPTCHA and email code because Google has already verified your email.
+        </p>
+      </form>
+    </div>
   )
 }
 
