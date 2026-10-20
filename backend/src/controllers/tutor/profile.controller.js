@@ -78,10 +78,10 @@ export async function addDocument(req, res) {
   res.status(201).json({ id: doc.id })
 }
 
-// DELETE /tutor/documents/:id
+// DELETE /tutor/documents/:id -> { ok, isVerified } (isVerified turns false when the last approved ID or qualification goes)
 export async function removeDocument(req, res) {
-  await setup.removeDocument(req.tutor, Number(req.params.id))
-  res.json({ ok: true })
+  const { isVerified } = await setup.removeDocument(req.tutor, Number(req.params.id))
+  res.json({ ok: true, isVerified })
 }
 
 const portfolioSchema = z.object({

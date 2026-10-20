@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { prisma } from '../../config/prisma.js'
 import { AppError } from '../../utils/AppError.js'
 import { notify } from '../../services/notification.service.js'
+import { recomputeVerified } from '../../services/tutorSetup.service.js'
 
 const dto = (u, threshold) => ({
   id: u.id,
@@ -106,11 +107,7 @@ export async function reviewQualification(req, res) {
   const verified = await prisma.$transaction(async (tx) => {
     await tx.qualification.update({ where: { id: q.id }, data: { status, reviewNote: note || null } })
     // A tutor is "verified" while an identity document AND at least one qualification are approved
-    const approved = await tx.qualification.groupBy({ by: ['kind'], where: { tutorId: q.tutorId, status: 'APPROVED' } })
-    const kinds = new Set(approved.map((r) => r.kind))
-    const isVerified = kinds.has('IDENTITY') && kinds.has('QUALIFICATION')
-    await tx.tutorProfile.update({ where: { id: q.tutorId }, data: { isVerified } })
-    return isVerified
+    return recomputeVerified(tx, q.tutorId)
   })
   await notify(q.tutor.userId, {
     type: 'QUALIFICATION_REVIEWED',
@@ -118,7 +115,7 @@ export async function reviewQualification(req, res) {
     message: status === 'APPROVED'
       ? `"${q.title}" was approved.${verified ? ' Your profile now shows the verified badge.' : ''}`
       : `"${q.title}" was rejected: ${note}. Please upload a new document.`,
-    link: '/tutor',
+    link: '/tutor/verification', // shows the decision and, after a rejection, the reason and the re-upload button
   })
   res.json({ ok: true })
 }

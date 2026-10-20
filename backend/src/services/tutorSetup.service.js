@@ -30,6 +30,19 @@ export function tutorStatus(t) {
   return TUTOR_STATUS.UNDER_REVIEW
 }
 
+// The verified badge rule, used by Admin's review and when a tutor removes a document:
+// an approved identity document AND at least one approved qualification. `db` may be a transaction.
+export async function recomputeVerified(db, tutorId) {
+  const approved = await db.qualification.groupBy({ by: ['kind'], where: { tutorId, status: 'APPROVED' } })
+  const kinds = new Set(approved.map((r) => r.kind))
+  const isVerified = kinds.has('IDENTITY') && kinds.has('QUALIFICATION')
+  await db.tutorProfile.update({ where: { id: tutorId }, data: { isVerified } })
+  return isVerified
+}
+
+// A photo the tutor uploaded themselves (FR 1.8), not one carried over from elsewhere
+const ownPhoto = (url) => typeof url === 'string' && url.startsWith('https://res.cloudinary.com/')
+
 // Status for the logged-in user (GET /auth/me, login), so the frontend can route a tutor without another call
 export async function tutorStatusForUser(user) {
   if (user.role !== 'TUTOR') return null
@@ -54,7 +67,7 @@ export function missingForSubmit(t) {
   if (!t.bio || t.bio.trim().length < 30) missing.push('About me (at least 30 characters)')
   if (!docs.some((d) => d.kind === 'IDENTITY')) missing.push('Identity document (NRIC or passport)')
   if (!docs.some((d) => d.kind === 'QUALIFICATION')) missing.push('At least one qualification')
-  if (!t.user.profilePhotoUrl) missing.push('Profile photo')
+  if (!ownPhoto(t.user.profilePhotoUrl)) missing.push('Profile photo')
   return missing
 }
 
@@ -125,12 +138,16 @@ export async function addDocument(tutor, data) {
   return prisma.qualification.create({ data: { ...data, tutorId: tutor.id } })
 }
 
-// Approved documents stay: they are what the verified badge rests on
+// Removing an approved document puts the verified badge on hold until Admin approves a replacement:
+// the badge is worked out again from what is left. Pending or rejected documents never affect it.
 export async function removeDocument(tutor, id) {
   const doc = await prisma.qualification.findFirst({ where: { id, tutorId: tutor.id } })
   if (!doc) throw new AppError(404, 'Document not found')
-  if (doc.status === 'APPROVED') throw new AppError(400, 'An approved document cannot be removed')
-  await prisma.qualification.delete({ where: { id: doc.id } })
+  const isVerified = await prisma.$transaction(async (tx) => {
+    await tx.qualification.delete({ where: { id: doc.id } })
+    return doc.status === 'APPROVED' ? recomputeVerified(tx, tutor.id) : tutor.isVerified
+  })
+  return { isVerified }
 }
 
 export async function addPortfolioItem(tutor, data) {
