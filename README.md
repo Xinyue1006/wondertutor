@@ -111,6 +111,32 @@ Also built for the Parent Portal and Admin (Xin Yue):
 
 Matching is **rule-based weighted scoring** (`backend/src/services/matching.service.js`, weights from Form 2), not machine learning.
 The chatbot is a guided quick-reply flow that fills the same criteria and calls the same service.
+Verified tutors are listed before unverified ones in Find a Tutor (Recommended), the matching wizard and the chatbot;
+the score and its weights are unchanged.
+
+## What is built in the Tutor Portal (Yan Hsi)
+
+Matches `WonderTutor_Mockups_All.pdf` pages 1 to 7:
+- **Log in**: reCAPTCHA on login as well as sign-up (checked by the server when `RECAPTCHA_SECRET` is set, skipped when empty),
+  "Remember me on this device", Show/Hide password, Google sign-in.
+- **Sign up**: Choose role, Create account, Verify email, and for tutors a 4th step, Complete profile. A tutor account needs only
+  name, email, phone and password (plus terms); gender and emergency contact moved to the profile setup. The parent form is unchanged.
+  The email code screen has 6 boxes (typing moves on, paste fills all), the real rules (10 minutes, 5 tries, 60 s before a resend),
+  and a Change email link.
+- **Forgot password**: still an emailed 6-digit code (not a link), restyled in two steps; the same message is shown whether
+  or not the email has an account.
+- **Profile setup** (`/tutor/setup`): basic information (gender, emergency contact, home area), teaching information
+  (subjects and grades, hourly rate, experience, mode, languages, teaching style, about me), qualifications and an identity
+  document (PDF/JPG/PNG to Cloudinary), profile photo and portfolio, review and submit. Each step saves a draft.
+- **Verification status** (`/tutor/verification`): not submitted, under review, changes requested (with Admin's reason),
+  or verified. A tutor is verified once Admin approves **an identity document and a qualification**.
+  Until then only setup, status and the profile preview open; every other tutor page redirects to the status page
+  (`VerifiedTutorRoute` in the frontend, `requireVerifiedTutor` on the API).
+
+**Migration `tutor_profile_setup`** (pull, then `npm run db:migrate`): tutor gender and emergency contact may be empty until the
+setup is filled in, `TutorProfile.verificationSubmittedAt` records when the setup was submitted, and `Qualification.kind`
+(`QUALIFICATION` or `IDENTITY`, default `QUALIFICATION`) tells the two kinds of document apart. Re-run the seed
+(`npx prisma migrate reset`) so the seeded verified tutors also get an approved identity document.
 
 ## Project structure
 
@@ -121,10 +147,11 @@ backend/
   src/
     app.js, server.js
     config/              # env, prisma client
-    middleware/          # requireAuth, requireRole, error handler
-    routes/              # one file per module, registered in routes/index.js
-    controllers/         # request handlers
-    services/            # email, OTP, JWT, reCAPTCHA, matching, booking (slots + conflicts), notifications
+    middleware/          # requireAuth, requireRole, loadParentProfile / loadTutorProfile, requireVerifiedTutor, error handler
+    routes/              # one file per module (auth, parent, tutor, admin), registered in routes/index.js
+    controllers/         # request handlers: Zod validation + ownership, then a service (parent/, tutor/, admin/)
+    services/            # email, OTP, JWT, reCAPTCHA, matching, booking (slots + conflicts), notifications,
+                         # tutorSetup (setup draft, submit for verification, verification status)
     data/catalog.js      # subjects, Klang Valley locations (lat/lng), teaching styles
     tests/               # Jest unit tests
 frontend/src/
@@ -157,7 +184,8 @@ frontend/src/
 | What | Command | Notes |
 |---|---|---|
 | Backend (Jest): matching scoring, booking rules, payments + commission snapshot, refunds, reviews, admin, complaints, security, parent signup and saved preferences, input validation, double-submit and stale-page races | `cd backend && npm test` | Uses a **separate** database `wondertutor_test`, created and migrated automatically (`pretest`). Your dev data is never touched. MySQL must be running. |
-| Frontend (Vitest + React Testing Library): login, route protection and return-to page, matching wizard, tutor card, chatbot text reader, date helpers, form validation rules | `cd frontend && npm test` | Runs in a simulated browser, no servers needed. |
+| Backend tutor onboarding (`tutorSetup.test.js`): reCAPTCHA on login, tutor sign-up without profile details, setup drafts and bad input, submit rules, identity + qualification approval, changes requested, the verification gate | `cd backend && npm test` | Same test database. |
+| Frontend (Vitest + React Testing Library): login (with reCAPTCHA), sign-up (parent sections, tutor form, code boxes), route protection, the tutor verification gate, profile setup steps, matching wizard, tutor card, chatbot text reader, date helpers, form validation rules | `cd frontend && npm test` | Runs in a simulated browser, no servers needed. |
 | API demo (Postman) | Import `docs/WonderTutor.postman_collection.json` | Run *Login (parent)* and *Login (admin)* first; they store the tokens. |
 
 Vitest is used instead of Jest on the frontend because it reads the Vite config directly (Jest needs extra setup for `import.meta.env`). The test syntax is the same.
@@ -170,7 +198,7 @@ Each one switches on only when its keys are filled in. Without keys the app stil
 |---|---|---|---|
 | Google sign-in | `GOOGLE_CLIENT_ID` | `VITE_GOOGLE_CLIENT_ID` (same value) | Google Cloud Console > APIs & Services > Credentials > OAuth client ID (Web). Add `http://localhost:5173` under *Authorised JavaScript origins*. |
 | reCAPTCHA v2 checkbox | `RECAPTCHA_SECRET` | `VITE_RECAPTCHA_SITE_KEY` | google.com/recaptcha/admin > create a **v2 "I'm not a robot"** key for `localhost`. |
-| Photo upload | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | none | cloudinary.com dashboard (free plan). Photos upload straight from the browser using a signature from `POST /api/uploads/signature`. |
+| Photo and document upload | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | none | cloudinary.com dashboard (free plan). Photos and tutor documents upload straight from the browser using a signature from `POST /api/uploads/signature`. Needed to finish the tutor profile setup locally. |
 | Real email | `SMTP_USER`, `SMTP_PASS` | none | Gmail App Password. |
 
 Restart both servers after changing `.env` files.
