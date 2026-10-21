@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import api, { errorMessage } from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
+import PrivacyAccountCard from '../../components/PrivacyAccountCard'
 import { useMatching } from '../../assistant/MatchingContext'
 import PhotoPicker from '../../components/PhotoPicker'
 import PreferencesFields from '../../components/PreferencesFields'
@@ -19,6 +20,7 @@ export default function Profile() {
   const [prefError, setPrefError] = useState('')
   const [prefBusy, setPrefBusy] = useState(false)
   const [hasPassword, setHasPassword] = useState(true)
+  const [account, setAccount] = useState(null) // reminder-email choice and when the Privacy Notice was accepted
   const [msg, setMsg] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -34,12 +36,13 @@ export default function Profile() {
       const p = r.data.profile
       setForm({ fullName: p.fullName, phone: p.phone || '', address: p.address || '', profilePhotoUrl: p.profilePhotoUrl })
       setHasPassword(p.hasPassword)
+      setAccount({ emailReminders: p.emailReminders, privacyAcceptedAt: p.privacyAcceptedAt })
       setPrefs(fromApiPreferences(p.preferences))
     }).catch((e) => setLoadError(errorMessage(e)))
   }
   useEffect(() => { load() }, [])
 
-  if (!form || !prefs) return loadError ? <LoadError message={loadError} onRetry={load} /> : <Spinner />
+  if (!form || !prefs || !account) return loadError ? <LoadError message={loadError} onRetry={load} /> : <Spinner />
 
   async function save(e) {
     e.preventDefault()
@@ -143,6 +146,10 @@ export default function Profile() {
         <PreferencesFields value={prefs} onChange={setPrefs} />
         <button disabled={prefBusy} className="btn-primary h-11 w-full sm:w-56">{prefBusy ? 'Saving…' : 'Save Preferences'}</button>
       </form>
+
+      <div className="mt-6">
+        <PrivacyAccountCard emailReminders={account.emailReminders} privacyAcceptedAt={account.privacyAcceptedAt} email={user.email} />
+      </div>
     </div>
   )
 }

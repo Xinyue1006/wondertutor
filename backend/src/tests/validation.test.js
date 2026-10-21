@@ -27,7 +27,7 @@ describe('IDs in the URL', () => {
 })
 
 describe('signup fields', () => {
-  const base = (n, extra = {}) => ({ role: 'PARENT', fullName: 'Miki Lim', email: `v${n}@test.local`, phone: '012-345 6789', password: 'Parent1234', ...extra })
+  const base = (n, extra = {}) => ({ role: 'PARENT', fullName: 'Miki Lim', email: `v${n}@test.local`, phone: '012-345 6789', password: 'Parent1234', acceptedPrivacy: true, ...extra })
 
   test('a Malaysian phone in any common format is stored as +60…, and extra spaces in the name are removed', async () => {
     expect((await api().post('/auth/register', base(1, { fullName: '  Miki   Lim ' }))).status).toBe(201)

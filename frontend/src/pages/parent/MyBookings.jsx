@@ -7,6 +7,7 @@ import { EmptyState, ErrorBox, LoadError, Modal, PageTitle, Spinner, StatusPill,
 import LessonDetails from '../../components/LessonDetails'
 import RescheduleModal from '../../components/RescheduleModal'
 import { pickImage } from '../../components/PhotoPicker'
+import { downloadFile } from '../../lib/download'
 import { daysUntil, fmtDate, fmtDateLong, fmtTime, fmtTimeRange, money } from '../../lib/format'
 import { gradeLabel } from '../../lib/education'
 
@@ -28,6 +29,7 @@ export default function MyBookings() {
   const [reviewFor, setReviewFor] = useState(null)
   const [rescheduleFor, setRescheduleFor] = useState(null)
   const [notice, setNotice] = useState('')
+  const [calendarBusy, setCalendarBusy] = useState(false)
   // One action at a time: a double click on Accept/Decline must not send the request twice
   const inFlight = useRef(false)
   const [acting, setActing] = useState(false)
@@ -114,6 +116,15 @@ export default function MyBookings() {
               {l} ({counts[k]})
             </button>))}
         </div>
+        {counts.upcoming > 0 && (
+          <button
+            type="button" disabled={calendarBusy}
+            onClick={async () => { setCalendarBusy(true); setNotice(await downloadFile('/parent/bookings/calendar.ics', 'wondertutor-upcoming-lessons.ics')); setCalendarBusy(false) }}
+            className="btn-outline min-h-10 px-4 text-sm"
+          >
+            <Icon name="calendar" className="h-4 w-4" /> {calendarBusy ? 'Preparing…' : 'Add all upcoming lessons to my calendar'}
+          </button>
+        )}
         <label className="flex items-center gap-2 text-sm text-slate-600">Sort by:
           <select className="input h-10 w-52 font-medium text-navy" value={sortNewest ? 'new' : 'old'} onChange={(e) => setSortNewest(e.target.value === 'new')}>
             <option value="new">Date (Newest First)</option><option value="old">Date (Oldest First)</option>

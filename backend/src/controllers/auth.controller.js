@@ -38,6 +38,8 @@ const registerSchema = z
     phone: phoneMY('Phone number'),
     password: passwordRule,
     recaptchaToken: z.string().max(4000).optional(),
+    // PDPA: nobody gets an account without accepting the Privacy Notice, and the time is kept as the record
+    acceptedPrivacy: z.literal(true, { message: 'Please agree to the Privacy Notice to create an account' }),
     // Parent-only (signup "Basic Information" + optional "My Children" sections)
     address: optionalText(200, 'Address'),
     children: z
@@ -88,6 +90,7 @@ export async function register(req, res) {
         role: data.role,
         fullName: data.fullName,
         phone: data.phone,
+        privacyAcceptedAt: new Date(),
         ...(data.role === 'PARENT' && {
           parent: {
             create: {
@@ -205,8 +208,13 @@ export async function login(req, res) {
 const googleClient = new OAuth2Client()
 export async function googleLogin(req, res) {
   if (!env.googleClientId) throw new AppError(501, 'Google login is not configured')
-  const { credential, role } = z
-    .object({ credential: z.string().min(1).max(4096), role: z.enum(['PARENT', 'TUTOR']).optional() })
+  const { credential, role, acceptedPrivacy } = z
+    .object({
+      credential: z.string().min(1).max(4096),
+      role: z.enum(['PARENT', 'TUTOR']).optional(),
+      // Only needed when this Google sign-in creates a new account (see the Privacy Notice)
+      acceptedPrivacy: z.boolean().optional(),
+    })
     .parse(req.body)
 
   // A bad, expired or wrong-audience token makes the library throw; its text is not shown to the user
@@ -239,12 +247,14 @@ export async function googleLogin(req, res) {
     if (!user.googleId) user = await prisma.user.update({ where: { id: user.id }, data: { googleId: g.sub } })
   } else {
     if (!role) throw new AppError(400, 'Please choose Parent or Tutor to sign up with Google')
+    if (acceptedPrivacy !== true) throw new AppError(400, 'Please agree to the Privacy Notice to create an account')
     user = await prisma.user.create({
       data: {
         email,
         googleId: g.sub,
         role,
         fullName: g.name || email,
+        privacyAcceptedAt: new Date(),
         // The Google picture is not kept: photos are stored on our Cloudinary account only, and a tutor must upload
         // their own photo in the profile setup (FR 1.8)
         isEmailVerified: true,

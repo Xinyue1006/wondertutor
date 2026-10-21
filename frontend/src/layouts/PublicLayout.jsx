@@ -97,6 +97,7 @@ export default function PublicLayout() {
               <ul className="space-y-1">
                 <li><Link to="/login" className={footerLink}>Log In</Link></li>
                 <li><Link to="/signup" className={footerLink}>Sign Up</Link></li>
+                <li><Link to="/privacy" className={footerLink}>Privacy Notice</Link></li>
               </ul>
             </nav>
             <div>

@@ -85,12 +85,13 @@ describe('signup: parent sections', () => {
     await userEvent.click(screen.getByRole('checkbox', { name: 'Sat' }))
     await userEvent.click(screen.getByRole('checkbox', { name: 'Structured' }))
     await userEvent.selectOptions(screen.getByLabelText(/Maximum budget per hour/), '60')
+    await userEvent.click(screen.getByRole('checkbox', { name: /Privacy Notice/ })) // the PDPA consent
     await next()
 
     const [url, body] = api.post.mock.calls.find(([u]) => u === '/auth/register')
     expect(url).toBe('/auth/register')
     expect(body).toMatchObject({
-      role: 'PARENT', fullName: 'Miki Lim', email: 'miki@example.com', phone: '+60123456789',
+      role: 'PARENT', fullName: 'Miki Lim', email: 'miki@example.com', phone: '+60123456789', acceptedPrivacy: true,
       children: [{ name: 'Sarah', educationLevel: 'PRIMARY', grade: 5, subject: 'Mathematics', notes: 'Faster at word problems' }],
       preferences: { mode: 'PHYSICAL', gender: 'ANY', characteristics: ['Structured'], days: [6], timePreset: 'EVENING', budgetMax: 60 },
     })
@@ -105,10 +106,27 @@ describe('signup: parent sections', () => {
     await userEvent.type(screen.getByLabelText(/Phone Number/), '123456789')
     await next()
     await next() // children are optional
+    await userEvent.click(screen.getByRole('checkbox', { name: /Privacy Notice/ }))
     await next() // preferences are optional: Create Account
     const [, body] = api.post.mock.calls.find(([u]) => u === '/auth/register')
     expect(body.preferences).toBeUndefined()
     expect(body.children).toEqual([])
+  })
+
+  test('without ticking the Privacy Notice no account is created, and the notice opens in a new tab', async () => {
+    setup()
+    await userEvent.click(screen.getByRole('button', { name: /^Continue as/ }))
+    await fillBasic()
+    await next()
+    await userEvent.type(screen.getByLabelText(/Phone Number/), '123456789')
+    await next()
+    await next() // children are optional
+    await next() // preferences are optional: Create Account, but the box is not ticked
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Privacy Notice/)
+    expect(api.post.mock.calls.find(([u]) => u === '/auth/register')).toBeUndefined()
+    const link = screen.getByRole('link', { name: /Terms of Use and Privacy Notice/ })
+    expect(link).toHaveAttribute('href', '/privacy')
+    expect(link).toHaveAttribute('target', '_blank')
   })
 
   test('progress is remembered for the session but the password never is', async () => {
@@ -160,7 +178,7 @@ describe('signup: tutor', () => {
     await userEvent.click(screen.getByRole('checkbox', { name: /Terms of Use/ }))
     await create()
     const [, body] = api.post.mock.calls.find(([u]) => u === '/auth/register')
-    expect(body).toEqual({ role: 'TUTOR', fullName: 'Daniel Tan', email: 'daniel@example.com', phone: '+60123456789', password: 'Tutor1234' })
+    expect(body).toEqual({ role: 'TUTOR', fullName: 'Daniel Tan', email: 'daniel@example.com', phone: '+60123456789', password: 'Tutor1234', acceptedPrivacy: true })
     expect(await screen.findByText('Check your email')).toBeInTheDocument()
     expect(screen.getByText(/works for 10 minutes/)).toBeInTheDocument()
     expect(screen.getByText(/After 5 wrong tries/)).toBeInTheDocument()

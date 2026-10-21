@@ -100,6 +100,15 @@ Also built for the Parent Portal and Admin (Xin Yue):
 - **Reviews** may carry an optional photo; **trial lessons** can be marked (only a child's first lesson with that tutor).
 - **Refunds**: Cancel is the way to get money back for a lesson that has not started (Admin decides the refund);
   a refund request is for a lesson that has started or finished (e.g. the tutor did not come).
+- **Add to calendar**: a confirmed lesson can be added to Google Calendar or downloaded as an `.ics` file (Apple / Outlook),
+  one lesson or all upcoming ones (`backend/src/services/calendar.service.js`). Importing again after a reschedule updates the event.
+- **Reminder emails**: the day before a lesson, and once when a payment is due within 24 hours (the booking is released
+  1 hour before the lesson). Parents can switch them off in My Profile; payment and refund emails are always sent.
+- **Privacy (PDPA)**: a Privacy Notice page (`/privacy`), a required consent tick at sign-up (email and Google) that records the
+  time, and *Privacy & account* in My Profile: reminder emails on/off, **download my data** (JSON) and **delete my account**
+  (personal details are removed; lesson and payment records stay without a name; refused while a booking, refund request or
+  complaint is still open). The notice text is a draft: the centre should confirm the wording, the retention period and a contact address
+  (`VITE_PRIVACY_EMAIL`).
 - **Input validation** everywhere (`backend/src/utils/validators.js`, mirrored in `frontend/src/lib/validation.js`):
   Malaysian phone numbers (stored as +60…), real names, passwords (8–72 characters), real dates and times, RM amounts
   with at most 2 decimals, and every ID in a URL.

@@ -68,7 +68,7 @@ export default function AdminUsers() {
                   <td className="px-4 py-3"><div className="flex items-center gap-3"><Avatar src={u.profilePhotoUrl} name={u.fullName} className="h-10 w-10" />
                     <div><div className="flex items-center gap-1.5 font-bold text-navy">{u.fullName} {u.tutor?.isVerified && <VerifiedTick />}</div><div className="text-xs text-slate-500">{u.email}</div></div></div></td>
                   <td className="px-3 capitalize">{u.role.toLowerCase()}</td>
-                  <td className="px-3"><span className={`pill ${u.status === 'ACTIVE' ? 'bg-ok-50 text-ok' : 'bg-red-50 text-red-600'}`}>{u.status === 'ACTIVE' ? 'Active' : 'Deactivated'}</span></td>
+                  <td className="px-3"><span className={`pill ${u.status === 'ACTIVE' ? 'bg-ok-50 text-ok' : 'bg-red-50 text-red-600'}`}>{u.deleted ? 'Deleted by owner' : u.status === 'ACTIVE' ? 'Active' : 'Deactivated'}</span></td>
                   <td className="px-3 text-xs text-slate-600">
                     {u.tutor && (<div className="space-y-0.5">
                       <div className="flex items-center gap-1"><Icon name="star" fill className="h-3.5 w-3.5 text-accent" /> {u.tutor.ratingAvg.toFixed(1)} ({u.tutor.ratingCount})</div>
@@ -166,7 +166,10 @@ function UserModal({ id, onClose, onChanged }) {
             </div>
           )}
 
-          {user.role !== 'ADMIN' && (
+          {user.role !== 'ADMIN' && user.deleted && (
+            <p className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-sm text-slate-700">This account was deleted by its owner. Their personal details are gone; lesson and payment records remain without a name.</p>
+          )}
+          {user.role !== 'ADMIN' && !user.deleted && (
             <div className="rounded-xl border border-slate-100 p-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="text-sm"><b className="text-navy">Account status:</b> {user.status === 'ACTIVE' ? 'Active' : 'Deactivated'}

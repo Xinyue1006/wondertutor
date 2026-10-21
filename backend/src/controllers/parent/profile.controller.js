@@ -15,6 +15,8 @@ const toDto = (user, parent) => ({
   address: parent.address,
   preferences: parent.preferences ?? null,
   hasPassword: Boolean(user.passwordHash), // Google-only accounts have no password to change
+  emailReminders: user.emailReminders,
+  privacyAcceptedAt: user.privacyAcceptedAt,
 })
 
 // GET /parent/profile

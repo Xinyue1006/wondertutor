@@ -279,6 +279,7 @@ function AppFooter({ items }) {
       <div className="mx-auto max-w-[81.25rem] px-4 md:px-8">
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-brand-200/70 py-4 text-xs text-slate-600">
           <span>&copy; {new Date().getFullYear()} WonderTutor. All rights reserved.</span>
+          <Link to="/privacy" className="inline-flex min-h-9 items-center font-semibold text-brand-700 hover:underline">Privacy Notice</Link>
           <span>Signed in as {user.fullName} ({user.role.charAt(0) + user.role.slice(1).toLowerCase()})</span>
         </div>
       </div>

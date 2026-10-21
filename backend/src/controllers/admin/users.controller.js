@@ -13,6 +13,7 @@ const dto = (u, threshold) => ({
   status: u.status,
   profilePhotoUrl: u.profilePhotoUrl,
   createdAt: u.createdAt,
+  deleted: Boolean(u.deletedAt), // the owner deleted the account: personal details are gone, records remain
   tutor: u.tutor && {
     id: u.tutor.id,
     isVerified: u.tutor.isVerified,
@@ -87,6 +88,8 @@ export async function setStatus(req, res) {
   const user = await prisma.user.findUnique({ where: { id: Number(req.params.id) } })
   if (!user) throw new AppError(404, 'User not found')
   if (user.role === 'ADMIN') throw new AppError(400, 'Admin accounts cannot be deactivated here')
+  // Nothing is left to switch back on: the name, email and password were removed when the owner deleted it
+  if (user.deletedAt) throw new AppError(400, 'This account was deleted by its owner and cannot be changed')
   if (user.status === status) throw new AppError(400, `This account is already ${status.toLowerCase()}`)
   await prisma.user.update({ where: { id: user.id }, data: { status } })
   if (status === 'ACTIVE')

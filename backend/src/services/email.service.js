@@ -11,7 +11,11 @@ const transporter = env.smtp.user
     })
   : null
 
+// In tests every email that would have been sent is kept here, so a test can check who got what
+export const outbox = []
+
 export async function sendEmail({ to, subject, html }) {
+  if (process.env.NODE_ENV === 'test') outbox.push({ to, subject, html })
   if (!transporter) {
     const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
       .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')

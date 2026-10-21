@@ -57,7 +57,7 @@ describe('learning progress', () => {
 describe('signup subject list', () => {
   test('a child subject that is not on the list is rejected at signup', async () => {
     const r = await api().post('/auth/register', {
-      role: 'PARENT', fullName: 'Miki Lim', email: 'miki.subject@test.local', phone: '+60123456789', password: 'Parent1234',
+      role: 'PARENT', fullName: 'Miki Lim', email: 'miki.subject@test.local', phone: '+60123456789', password: 'Parent1234', acceptedPrivacy: true,
       children: [{ name: 'A', educationLevel: 'PRIMARY', grade: 3, subject: 'Underwater basket weaving' }],
     })
     expect(r.status).toBe(400)

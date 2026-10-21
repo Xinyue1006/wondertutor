@@ -103,6 +103,12 @@ model User {
   profilePhotoUrl String?
   isEmailVerified Boolean       @default(false)
   status          AccountStatus @default(ACTIVE)
+  // PDPA: when the person accepted the Privacy Notice (set at sign-up; null for accounts made before it existed)
+  privacyAcceptedAt DateTime?
+  // Reminder emails (lesson tomorrow, payment due). Record-worthy emails (payment, refunds) are always sent.
+  emailReminders  Boolean       @default(true)
+  // Set when the owner deleted the account: personal details are removed, lesson and payment records are kept
+  deletedAt       DateTime?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 

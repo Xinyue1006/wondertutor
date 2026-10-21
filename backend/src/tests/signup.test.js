@@ -9,7 +9,7 @@ beforeAll(async () => {
 afterAll(stopServer)
 
 const base = (n) => ({
-  role: 'PARENT', fullName: 'Miki Lim', email: `miki${n}@test.local`, phone: '+60123456789', password: 'Parent1234',
+  role: 'PARENT', fullName: 'Miki Lim', email: `miki${n}@test.local`, phone: '+60123456789', password: 'Parent1234', acceptedPrivacy: true,
 })
 
 describe('parent registration', () => {

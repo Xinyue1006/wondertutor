@@ -24,7 +24,7 @@ function GoogleG() {
 // ("continue_with" or "signup_with") and `label` is the same wording on the stand-in button.
 // `onNeedsRole(credential)`: on the login page a new Google user has no role yet, so the page can ask for one
 // and finish sign-up with the same Google credential instead of showing a dead-end error.
-export default function GoogleButton({ role, onError, onNeedsRole, text = 'continue_with', label = 'Continue with Google' }) {
+export default function GoogleButton({ role, onError, onNeedsRole, acceptedPrivacy = false, text = 'continue_with', label = 'Continue with Google' }) {
   const { googleLogin } = useAuth()
   const navigate = useNavigate()
   const from = useLocation().state?.from
@@ -40,7 +40,7 @@ export default function GoogleButton({ role, onError, onNeedsRole, text = 'conti
         client_id: GOOGLE_CLIENT_ID,
         callback: async ({ credential }) => {
           try {
-            const user = await googleLogin(credential, role)
+            const user = await googleLogin(credential, role, acceptedPrivacy)
             navigate(afterLogin(user, from))
           } catch (err) {
             const m = errorMessage(err)
@@ -54,7 +54,7 @@ export default function GoogleButton({ role, onError, onNeedsRole, text = 'conti
     }).catch(() => onError?.('Could not load Google sign-in. Check your internet connection.'))
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [role])
+  }, [role, acceptedPrivacy])
 
   if (!GOOGLE_CLIENT_ID)
     return (

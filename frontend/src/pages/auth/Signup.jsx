@@ -34,6 +34,8 @@ const SECTIONS = {
   TUTOR: [{ id: 'account', label: 'Create your account', icon: 'user' }],
 }
 
+const CONSENT_MESSAGE = 'Please agree to the Terms of Use and Privacy Notice to continue'
+
 // Progress is kept for this browser session (never the passwords), so a refresh or a trip back to the role step does not lose it
 const DRAFT_KEY = 'wt-signup-draft'
 function loadDraft() {
@@ -111,7 +113,7 @@ export default function Signup() {
       const problem = checkName(form.fullName) || checkEmail(form.email) || checkPhone(form.phone) || checkPassword(form.password)
       if (problem) return problem
       if (form.password !== form.confirmPassword) return 'Passwords do not match'
-      if (!terms) return 'Please agree to the Terms of Use and Privacy Policy'
+      if (!terms) return CONSENT_MESSAGE
     }
     if (id === 'children') {
       // A child is only useful for matching with a level and a subject, so both are required for every row that is added
@@ -149,11 +151,13 @@ export default function Signup() {
       const problem = validate(s.id)
       if (problem) { setSection(s.id); return setError(problem) }
     }
+    if (!terms) return setError(CONSENT_MESSAGE)
     if (RECAPTCHA_SITE_KEY && !captcha) return setError('Please tick “I’m not a robot” to continue.')
     setBusy(true)
     try {
       await api.post('/auth/register', {
         role,
+        acceptedPrivacy: true,
         recaptchaToken: captcha || undefined,
         fullName: form.fullName,
         email: form.email,
@@ -248,8 +252,9 @@ export default function Signup() {
             <button onClick={() => { setError(''); setSection(active[0].id); setStep(1) }} className="btn-primary h-12 w-full text-base">
               Continue as {role === 'PARENT' ? 'Parent' : 'Tutor'}
             </button>
-            <GoogleButton role={role} onError={setError} text="signup_with" label={`Sign up with Google as ${role === 'PARENT' ? 'Parent' : 'Tutor'}`} />
+            <GoogleButton role={role} acceptedPrivacy onError={setError} text="signup_with" label={`Sign up with Google as ${role === 'PARENT' ? 'Parent' : 'Tutor'}`} />
           </div>
+          <p className="mt-2 text-xs text-slate-600">By continuing you agree to the <Link to="/privacy" target="_blank" className="font-semibold text-brand-600 underline">Terms of Use and Privacy Notice</Link>.</p>
           {error && <p role="alert" className="mt-2 text-sm text-red-700">{error}</p>}
           <p className="mt-3 text-sm text-slate-700">
             Already have an account? <Link to="/login" className="inline-flex min-h-11 items-center font-semibold text-brand-600 hover:underline">Log in</Link>
@@ -369,7 +374,12 @@ export default function Signup() {
                         <PreferencesFields value={prefs} onChange={setPrefs} />
                       </div>
                     )}
-                    {sec.id === active[active.length - 1].id && <div className="mt-4"><Recaptcha onToken={setCaptcha} /></div>}
+                    {sec.id === active[active.length - 1].id && (
+                      <div className="mt-4">
+                        <Recaptcha onToken={setCaptcha} />
+                        <ConsentBox checked={terms} onChange={setTerms} />
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -444,6 +454,17 @@ function Stepper({ steps, step }) {
 
 // Tutor account step (mockup 03): only what is needed to log in. Teaching details, documents and photo come in the
 // profile setup after the email is verified, so the left panel tells the tutor what happens next.
+// The consent tick box (PDPA). The wording keeps "Terms of Use" and adds the Privacy Notice, which opens in a new tab
+// so nothing already typed is lost.
+function ConsentBox({ checked, onChange }) {
+  return (
+    <label className="mt-3 flex min-h-11 cursor-pointer items-start gap-2 text-sm text-navy">
+      <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-brand-500" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <span>I agree to the <Link to="/privacy" target="_blank" className="font-semibold text-brand-600 underline">Terms of Use and Privacy Notice</Link> (PDPA)</span>
+    </label>
+  )
+}
+
 function TutorAccount({ form, set, terms, setTerms, setCaptcha, error, setError, busy, onSubmit }) {
   const mismatch = form.confirmPassword && form.password !== form.confirmPassword
   return (
@@ -474,7 +495,8 @@ function TutorAccount({ form, set, terms, setTerms, setCaptcha, error, setError,
       </aside>
 
       <form onSubmit={onSubmit} noValidate aria-label="Create your tutor account" className="rounded-2xl border border-brand-100 bg-white p-6 shadow-card md:p-8">
-        <GoogleButton role="TUTOR" onError={setError} text="signup_with" label="Sign up with Google" />
+        <GoogleButton role="TUTOR" acceptedPrivacy onError={setError} text="signup_with" label="Sign up with Google" />
+        <p className="mt-1 text-center text-xs text-slate-600">By continuing with Google you agree to the <Link to="/privacy" target="_blank" className="font-semibold text-brand-600 underline">Terms of Use and Privacy Notice</Link>.</p>
         <div className="my-4 flex items-center gap-3 text-xs text-slate-500"><span className="h-px flex-1 bg-slate-200" /> or use your email <span className="h-px flex-1 bg-slate-200" /></div>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="md:col-span-2">
@@ -494,10 +516,7 @@ function TutorAccount({ form, set, terms, setTerms, setCaptcha, error, setError,
           </div>
         </div>
         <div className="mt-4"><Recaptcha onToken={setCaptcha} /></div>
-        <label className="mt-3 flex min-h-11 cursor-pointer items-center gap-2 text-sm text-navy">
-          <input type="checkbox" className="h-4 w-4 accent-brand-500" checked={terms} onChange={(e) => setTerms(e.target.checked)} />
-          I agree to the Terms of Use and Privacy Policy (PDPA)
-        </label>
+        <ConsentBox checked={terms} onChange={setTerms} />
         <div className="mt-2 min-h-6 text-sm" aria-live="polite">
           {error && (
             <p role="alert" className="flex items-start gap-1.5 font-medium text-red-700">
