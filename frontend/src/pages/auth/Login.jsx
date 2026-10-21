@@ -99,25 +99,44 @@ export default function Login() {
   }
 
   return (
-    <section className="relative left-1/2 -mt-4 flex w-screen flex-1 -translate-x-1/2 items-center overflow-x-clip bg-gradient-to-b from-brand-50 to-brand-25">
-      <div className="relative mx-auto grid w-full max-w-[81.25rem] items-center gap-6 px-4 py-8 md:px-8 lg:grid-cols-[1.15fr_1fr] lg:gap-12">
-        {/* On phones this is a compact brand block under the form */}
-        <div className="order-2 lg:order-1 lg:pl-6">
-          <h1 className="font-display text-3xl font-extrabold leading-[1.1] text-navy md:text-4xl lg:text-[3.25rem]">
-            Learn Today.<br />
-            <span className="text-brand-500">Brighter Tomorrow.</span>
+    // Same pattern as the landing hero: a light-blue band with the photo anchored on one side and fading into it,
+    // so the photo is never stretched or cropped hard on wide screens. The blank wall in the photo holds the headline.
+    <section className="relative left-1/2 -mt-4 flex w-screen flex-1 -translate-x-1/2 items-center overflow-x-clip bg-gradient-to-r from-brand-50 via-brand-50 to-brand-25">
+      <img
+        src="/img/art/login-bg.jpg"
+        alt=""
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-y-0 left-0 hidden h-full w-[64%] object-cover object-[left_bottom] lg:block"
+        style={{ maskImage: 'linear-gradient(to right, #000 55%, transparent)', WebkitMaskImage: 'linear-gradient(to right, #000 55%, transparent)' }}
+      />
+      {/* A soft wash over the upper part of the photo keeps the desk objects from competing with the text and benefits */}
+      <div className="pointer-events-none absolute inset-y-0 left-0 hidden w-[64%] bg-gradient-to-b from-brand-50/90 via-brand-50/55 to-transparent lg:block" aria-hidden="true" />
+
+      <div className="relative mx-auto grid w-full max-w-[81.25rem] items-center gap-6 px-4 py-6 md:px-8 lg:grid-cols-[1.15fr_1fr] lg:gap-12">
+        {/* On phones this is a compact brand block under the form: no benefits row, no picture */}
+        <div className="order-2 lg:order-1 lg:self-start lg:pl-14 lg:pt-12">
+          <div className="eyebrow">Your learning journey starts here</div>
+          <h1 className="mt-2 font-display text-3xl font-bold leading-[1.12] text-navy md:text-4xl lg:text-[2.75rem]">
+            Learn Today,<br />
+            <span className="relative inline-block text-brand-500">
+              Brighter Tomorrow.
+              <span className="absolute -bottom-1 left-0 h-1 w-full rounded-full bg-accent" aria-hidden="true" />
+            </span>
+            <Icon name="sparkle" fill className="ml-2 inline h-6 w-6 -translate-y-3 text-accent" />
           </h1>
-          <p className="mt-4 max-w-md text-base text-slate-700">
-            Connecting passionate tutors with ambitious learners across Malaysia. Find a verified tutor, book a lesson and pay securely in one place.
+          <p className="mt-3 max-w-md text-base text-slate-700">
+            Connecting parents with trusted tutors for a brighter learning future.
           </p>
-          <ul className="mt-5 flex flex-wrap gap-2 text-xs font-semibold" aria-label="Why WonderTutor">
+          <ul className="mt-4 hidden flex-wrap gap-x-8 gap-y-4 lg:flex">
             {[
-              ['bg-brand-100 text-brand-700', 'bg-brand-500', 'Verified tutors'],
-              ['bg-ok-50 text-green-800', 'bg-ok', 'Secure payment'],
-              ['bg-accent-100 text-amber-900', 'bg-accent-600', 'GPS-checked sessions'],
-            ].map(([pill, dot, label]) => (
-              <li key={label} className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 ${pill}`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${dot}`} aria-hidden="true" /> {label}
+              ['cap', 'Trusted Tutors', 'Verified profiles'],
+              ['calendar', 'Flexible Booking', 'Learn at your time'],
+              ['shield', 'Safe & Secure', 'Protected payments'],
+            ].map(([icon, title, sub]) => (
+              <li key={title} className="text-center">
+                <Icon name={icon} className="mx-auto h-9 w-9 text-brand-500" strokeWidth={1.5} />
+                <div className="mt-1 text-sm font-bold text-navy">{title}</div>
+                <div className="text-sm text-slate-700">{sub}</div>
               </li>
             ))}
           </ul>
