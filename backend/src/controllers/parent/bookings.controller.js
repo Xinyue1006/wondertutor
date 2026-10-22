@@ -8,6 +8,7 @@ import { requestReschedule as askReschedule, respondReschedule, withdrawReschedu
 import { fromMinutes, mytToDate, toMinutes } from '../../utils/time.js'
 import { hhmm, id, ringgit, ymd } from '../../utils/validators.js'
 import { SUBJECTS } from '../../data/catalog.js'
+import { subjectsOf } from '../../utils/childSubjects.js'
 
 const createSchema = z.object({
   tutorId: id('Tutor'),
@@ -63,7 +64,11 @@ export async function createBooking(req, res) {
   if (data.teachingMode === 'ONLINE' && !tutor.offersOnline) throw new AppError(400, 'This tutor does not offer online lessons')
   if (data.teachingMode === 'PHYSICAL' && !tutor.offersPhysical) throw new AppError(400, 'This tutor does not offer physical lessons')
 
-  const subject = data.subject || child.subject || tutor.subjects.find((s) => s.educationLevel === child.educationLevel)?.subject
+  // No subject chosen: the first of the child's subjects that this tutor teaches at the child's level, else the child's
+  // first subject, else anything the tutor teaches at that level
+  const atLevel = tutor.subjects.filter((s) => s.educationLevel === child.educationLevel && child.grade >= s.minGrade && child.grade <= s.maxGrade)
+  const wanted = subjectsOf(child)
+  const subject = data.subject || wanted.find((w) => atLevel.some((s) => s.subject === w)) || wanted[0] || atLevel[0]?.subject
   const teachesIt = tutor.subjects.some(
     (s) => s.subject === subject && s.educationLevel === child.educationLevel && child.grade >= s.minGrade && child.grade <= s.maxGrade,
   )

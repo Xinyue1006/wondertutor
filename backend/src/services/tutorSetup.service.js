@@ -5,6 +5,7 @@ import { prisma } from '../config/prisma.js'
 import { AppError } from '../utils/AppError.js'
 import { findLocation } from '../data/catalog.js'
 import { notify } from './notification.service.js'
+import { isOwnUpload } from '../utils/validators.js'
 
 export const TUTOR_STATUS = {
   NOT_SUBMITTED: 'NOT_SUBMITTED', // setup still a draft
@@ -41,7 +42,7 @@ export async function recomputeVerified(db, tutorId) {
 }
 
 // A photo the tutor uploaded themselves (FR 1.8), not one carried over from elsewhere
-const ownPhoto = (url) => typeof url === 'string' && url.startsWith('https://res.cloudinary.com/')
+const ownPhoto = (url) => isOwnUpload(url)
 
 // Status for the logged-in user (GET /auth/me, login), so the frontend can route a tutor without another call
 export async function tutorStatusForUser(user) {

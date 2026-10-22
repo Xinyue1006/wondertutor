@@ -5,7 +5,8 @@ import parentRoutes from './parent.routes.js'
 import adminRoutes from './admin.routes.js'
 import tutorRoutes from './tutor.routes.js'
 import { uploadSignature } from '../controllers/uploads.controller.js'
-import { homeData } from '../controllers/public.controller.js'
+import { homeData, places } from '../controllers/public.controller.js'
+import { rateLimit } from '../middleware/rateLimit.js'
 import { requireAuth } from '../middleware/auth.js'
 import * as notifications from '../controllers/notifications.controller.js'
 
@@ -16,6 +17,8 @@ router.use('/auth', authRoutes)
 
 // [XY] Public landing page data (top tutors + filter lists), no login needed
 router.get('/public/home', homeData)
+// Typing in the area picker sends a request per pause, so one address may ask at most 120 times a minute
+router.get('/public/places', rateLimit({ name: 'places', windowMs: 60_000, max: 120 }), places)
 
 // [XY] Parent Portal: children, matching, bookings, payments, reviews
 router.use('/parent', parentRoutes)

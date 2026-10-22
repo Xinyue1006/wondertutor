@@ -109,6 +109,13 @@ Also built for the Parent Portal and Admin (Xin Yue):
   (personal details are removed; lesson and payment records stay without a name; refused while a booking, refund request or
   complaint is still open). The notice text is a draft: the centre should confirm the wording, the retention period and a contact address
   (`VITE_PRIVACY_EMAIL`).
+- **Areas across the whole of Malaysia**: the area picker (My Profile, sign-up, Find a Tutor, the wizard and the landing page) searches
+  every state by town, neighbourhood or **postcode** (about 2,800 postcodes, `backend/src/services/places.service.js`), shows popular
+  places first, and understands KL, JB, PJ, Penang and Malacca. A picked place is saved as its label and turned into coordinates
+  for the tutor distance. Distance is shown as a band ("Within 8 km"), because a postcode is only known to a few kilometres.
+  The data is GeoNames postal codes (CC BY 4.0, credited on the Privacy Notice). To refresh it: download `MY.zip` from
+  https://download.geonames.org/export/zip/, unzip it outside the project and run `node scripts/build-places.mjs path/to/MY.txt` in `backend`.
+- **Phone numbers with a country code** (My Profile): a "MY +60" dropdown, numbers stored as +60..., letters are refused as you type.
 - **Input validation** everywhere (`backend/src/utils/validators.js`, mirrored in `frontend/src/lib/validation.js`):
   Malaysian phone numbers (stored as +60…), real names, passwords (8–72 characters), real dates and times, RM amounts
   with at most 2 decimals, and every ID in a URL.

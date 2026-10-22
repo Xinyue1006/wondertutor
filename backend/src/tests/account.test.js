@@ -160,3 +160,44 @@ describe('delete my account', () => {
     expect(res.message).toContain('deleted by its owner')
   })
 })
+
+describe('profile photo', () => {
+  const photo = 'https://res.cloudinary.com/demo/image/upload/me.jpg'
+
+  test('is saved on its own as soon as it is uploaded, and survives a reload', async () => {
+    const p = await makeParent()
+    expect((await api(p.token).put('/parent/profile/photo', { profilePhotoUrl: photo })).profilePhotoUrl).toBe(photo)
+    expect((await api(p.token).get('/parent/profile')).profile.profilePhotoUrl).toBe(photo)
+    expect((await api(p.token).get('/auth/me')).user.profilePhotoUrl).toBe(photo)
+  })
+
+  test('can be removed, and only photos from our own image host are accepted', async () => {
+    const p = await makeParent()
+    await api(p.token).put('/parent/profile/photo', { profilePhotoUrl: photo })
+    expect((await api(p.token).put('/parent/profile/photo', { profilePhotoUrl: null })).profilePhotoUrl).toBeNull()
+    expect((await api(p.token).get('/parent/profile')).profile.profilePhotoUrl).toBeNull()
+    expect((await api(p.token).put('/parent/profile/photo', { profilePhotoUrl: 'https://evil.example.com/x.png' })).status).toBe(400)
+    expect((await api(p.token).put('/parent/profile/photo', {})).status).toBe(400)
+  })
+})
+
+describe('profile details', () => {
+  test('a number from another country is saved with its country code, and the page can say since when the parent is a member', async () => {
+    const p = await makeParent()
+    const res = await api(p.token).put('/parent/profile', { fullName: 'Miki Lim', phone: '+65 9123 4567', address: '' })
+    expect(res.status).toBe(200)
+    const profile = (await api(p.token).get('/parent/profile')).profile
+    expect(profile.phone).toBe('+6591234567')
+    expect(profile.address).toBeNull()
+    expect(new Date(profile.memberSince).getTime()).toBeGreaterThan(0)
+  })
+
+  test('preferences can be saved without sending a phone, and the phone is left as it was', async () => {
+    const p = await makeParent()
+    const before = (await api(p.token).get('/parent/profile')).profile.phone
+    const res = await api(p.token).put('/parent/profile', { fullName: 'Test Parent', address: '', preferences: { mode: 'ONLINE' } })
+    expect(res.status).toBe(200)
+    expect((await api(p.token).get('/parent/profile')).profile.phone).toBe(before)
+    expect((await api(p.token).put('/parent/profile', { fullName: 'Test Parent', phone: '12', address: '' })).status).toBe(400)
+  })
+})

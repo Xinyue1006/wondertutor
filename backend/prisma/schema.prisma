@@ -158,7 +158,8 @@ model Child {
   name           String
   educationLevel EducationLevel
   grade          Int            // e.g. Primary 5 -> 5, Form 2 -> 2
-  subject        String?        // main subject the child needs help with (shown on the dashboard card)
+  subject        String?        // the FIRST of `subjects`, kept in step with it so older code that reads one subject still works
+  subjects       Json?          // every subject the child needs help with: ["Mathematics", "Science"] (at most 6)
   notes          String?        @db.Text
   photoUrl       String?
   createdAt      DateTime       @default(now())

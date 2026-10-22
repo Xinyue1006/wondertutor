@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { Prisma } from '@prisma/client'
 import { prisma } from '../../config/prisma.js'
 import { AppError } from '../../utils/AppError.js'
+import { subjectsOf } from '../../utils/childSubjects.js'
 import { sendEmail } from '../../services/email.service.js'
 import { renderEmail } from '../../services/notification.service.js'
 
@@ -51,7 +52,7 @@ export async function exportMyData(req, res) {
     },
     address: req.parent.address,
     tutorPreferences: req.parent.preferences ?? null,
-    children: children.map((c) => ({ name: c.name, educationLevel: c.educationLevel, grade: c.grade, subject: c.subject, notes: c.notes, photoUrl: c.photoUrl })),
+    children: children.map((c) => ({ name: c.name, educationLevel: c.educationLevel, grade: c.grade, subjects: subjectsOf(c), notes: c.notes, photoUrl: c.photoUrl })),
     bookings: bookings.map((b) => ({
       id: b.id,
       status: b.status,

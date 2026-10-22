@@ -2,12 +2,13 @@ import { z } from 'zod'
 import { prisma } from '../../config/prisma.js'
 import { AppError } from '../../utils/AppError.js'
 import { notify } from '../../services/notification.service.js'
+import { imageUrl } from '../../utils/validators.js'
 
 const reviewSchema = z.object({
   rating: z.number({ message: 'Choose a rating' }).int('Choose a rating').min(1, 'Choose a rating').max(5, 'Rating is 1 to 5 stars'),
   comment: z.string().trim().max(500, 'Comment must be 500 characters or fewer').optional(),
   // Optional photo of the child's work or the lesson; only images uploaded to our own Cloudinary account are accepted
-  photoUrl: z.string().url().startsWith('https://res.cloudinary.com/', 'Invalid photo').optional().nullable(),
+  photoUrl: imageUrl().optional().nullable(),
 })
 
 // POST /parent/bookings/:id/review: one review per completed booking, parent -> tutor only

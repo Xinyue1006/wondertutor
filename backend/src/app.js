@@ -8,6 +8,7 @@ import morgan from 'morgan'
 import { env } from './config/env.js'
 import routes from './routes/index.js'
 import { errorHandler, notFound } from './middleware/error.js'
+import { rateLimit } from './middleware/rateLimit.js'
 
 const app = express()
 
@@ -19,6 +20,9 @@ app.use(cors({ origin: env.clientUrl, credentials: true }))
 app.use(express.json({ limit: '1mb' }))
 if (env.nodeEnv !== 'test') app.use(morgan('dev')) // keep test output readable
 
+// A general ceiling per address, on top of the stricter limits on login, codes and places: it stops one machine from
+// hammering the API (and any endpoint that is expensive to answer) without bothering normal use.
+app.use('/api', rateLimit({ name: 'api', windowMs: 60_000, max: 600 }))
 app.use('/api', routes)
 
 // In production one Node app serves both the API and the built React site (frontend/dist),

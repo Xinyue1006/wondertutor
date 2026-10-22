@@ -9,7 +9,8 @@ import { issueOtp, checkOtp } from '../services/otp.service.js'
 import { verifyRecaptcha } from '../services/recaptcha.service.js'
 import { tutorStatusForUser } from '../services/tutorSetup.service.js'
 import { cleanPreferences, preferencesSchema } from '../utils/preferences.js'
-import { MAX_GRADE, SUBJECTS, findLocation } from '../data/catalog.js'
+import { MAX_GRADE, findLocation } from '../data/catalog.js'
+import { checkSubjectsFitLevel, cleanSubjects, subjectColumns, subjectFields } from '../utils/childSubjects.js'
 import { email as emailRule, optionalText, otpCode, password as passwordRule, personName, phoneMY } from '../utils/validators.js'
 
 // Never send passwordHash etc. to the client.
@@ -48,10 +49,11 @@ const registerSchema = z
           name: personName("Child's name", 60),
           educationLevel: z.enum(['KINDERGARTEN', 'PRIMARY', 'SECONDARY']),
           grade: z.coerce.number().int().min(1).max(6),
-          subject: z.enum(SUBJECTS, { message: 'Choose a subject from the list' }).optional(), // the subject the child needs tuition in
+          ...subjectFields, // the subjects the child needs tuition in
           notes: optionalText(500, 'Notes'), // learning needs or goals
         })
-          .refine((c) => c.grade <= MAX_GRADE[c.educationLevel], { message: 'That grade does not exist for the chosen level', path: ['grade'] }),
+          .refine((c) => c.grade <= MAX_GRADE[c.educationLevel], { message: 'That grade does not exist for the chosen level', path: ['grade'] })
+          .superRefine(checkSubjectsFitLevel),
       )
       .max(5)
       .optional(),
@@ -99,7 +101,7 @@ export async function register(req, res) {
               latitude: location?.lat ?? null,
               longitude: location?.lng ?? null,
               preferences: cleanPreferences(data.preferences) ?? undefined,
-              children: { create: (data.children ?? []).map((c) => ({ ...c, notes: c.notes || null })) },
+              children: { create: (data.children ?? []).map(({ subjects, subject, ...c }) => ({ ...c, notes: c.notes || null, ...subjectColumns(cleanSubjects({ subjects, subject })) })) },
             },
           },
         }),

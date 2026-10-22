@@ -3099,6 +3099,51 @@
               "raw": "{\n  \"confirmEmail\": \"parent@wondertutor.local\",\n  \"password\": \"Parent1234\"\n}"
             }
           }
+        },
+        {
+          "name": "Area picker: popular places (no login)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/public/places",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "public",
+                "places"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "Area picker: search a town or postcode (no login)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/public/places?q=kota&limit=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "public",
+                "places"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "kota"
+                },
+                {
+                  "key": "limit",
+                  "value": "5"
+                }
+              ]
+            }
+          }
         }
       ]
     }

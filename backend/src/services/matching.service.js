@@ -41,6 +41,15 @@ export function distanceKm(lat1, lng1, lat2, lng2) {
   return 6371 * 2 * Math.asin(Math.sqrt(a))
 }
 
+// A place is known to within a few kilometres (a postcode or a town, not a street), so a distance is said as a band,
+// "within 8 km", never as an exact "5.3 km". The limits are the same ones the score uses just below.
+export const DISTANCE_BANDS = [3, 8, 15, 30]
+export function distanceBand(km) {
+  if (km == null) return null
+  const limit = DISTANCE_BANDS.find((b) => km <= b)
+  return limit ? `within ${limit} km` : 'more than 30 km away'
+}
+
 // ───────────── Step 1: mandatory filters ─────────────
 
 // The TutorSubject row that satisfies subject + level (+ grade). Returns undefined if none.
@@ -190,7 +199,7 @@ export function scoreTutor(tutor, c) {
   if (parts.location >= 0.55) {
     if (c.mode === 'ONLINE') add(parts.location * WEIGHTS.location, 'Offers online lessons')
     else if (loc.km != null && tutor.offersPhysical)
-      add(parts.location * WEIGHTS.location, `Teaches ${loc.km < 1 ? 'within 1' : `about ${Math.round(loc.km)}`} km from your area`)
+      add(parts.location * WEIGHTS.location, `Teaches ${distanceBand(loc.km)} of your area`)
     else if (tutor.offersOnline) add(parts.location * WEIGHTS.location, 'Offers online lessons')
   }
 

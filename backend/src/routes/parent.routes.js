@@ -23,6 +23,7 @@ router.get('/dashboard', dashboard)
 
 router.get('/profile', profile.getProfile)
 router.put('/profile', profile.updateProfile)
+router.put('/profile/photo', profile.updatePhoto)
 router.post('/profile/password', profile.changePassword)
 
 // Privacy and account controls

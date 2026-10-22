@@ -29,3 +29,21 @@ export const env = {
 }
 
 export const isDev = env.nodeEnv !== 'production'
+
+// A live site must not start with settings that make it easy to break into. A weak JWT secret lets anybody forge a login
+// for any account, including the admin, so that one stops the server. The rest are warnings.
+export function productionProblems(e) {
+  const stop = []
+  const warn = []
+  if (!e.jwtSecret || e.jwtSecret.length < 32 || /change-?me|secret|password|123456/i.test(e.jwtSecret)) {
+    stop.push('JWT_SECRET must be a long random value (at least 32 characters, and not a word like "secret" or "change-me")')
+  }
+  if (!e.smtp.user) warn.push('SMTP_USER is empty, so no email (sign-up codes, receipts) can be sent')
+  if (/localhost|127\.0\.0\.1/.test(e.clientUrl)) warn.push('CLIENT_URL is still localhost: set it to the live address (it is used in email and calendar links)')
+  return { stop, warn }
+}
+if (env.nodeEnv === 'production') {
+  const { stop, warn } = productionProblems(env)
+  for (const w of warn) console.warn(`[settings] ${w}`)
+  if (stop.length) throw new Error(`Unsafe production settings:\n- ${stop.join('\n- ')}`)
+}
