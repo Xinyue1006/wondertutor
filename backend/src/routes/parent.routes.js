@@ -70,5 +70,6 @@ router.post('/complaints', complaints.createComplaint)
 router.get('/payments', payments.paymentsOverview)
 router.post('/payments/checkout', payments.checkout)
 router.post('/payments/:id/confirm', payments.confirmPayment)
+router.post('/payments/return', payments.gatewayReturn)
 
 export default router

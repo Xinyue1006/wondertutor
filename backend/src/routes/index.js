@@ -9,6 +9,7 @@ import { homeData, places } from '../controllers/public.controller.js'
 import { rateLimit } from '../middleware/rateLimit.js'
 import { requireAuth } from '../middleware/auth.js'
 import * as notifications from '../controllers/notifications.controller.js'
+import { billplzCallback } from '../controllers/parent/payments.controller.js'
 
 const router = validateIdParams(Router()) // every :id in these URLs must be a positive whole number
 
@@ -19,6 +20,9 @@ router.use('/auth', authRoutes)
 router.get('/public/home', homeData)
 // Typing in the area picker sends a request per pause, so one address may ask at most 120 times a minute
 router.get('/public/places', rateLimit({ name: 'places', windowMs: 60_000, max: 120 }), places)
+
+// [XY] Billplz tells the server a bill was paid. Public on purpose: it is protected by Billplz's signature, not a login.
+router.post('/payments/billplz/callback', rateLimit({ name: 'billplz-callback', windowMs: 60_000, max: 60 }), billplzCallback)
 
 // [XY] Parent Portal: children, matching, bookings, payments, reviews
 router.use('/parent', parentRoutes)

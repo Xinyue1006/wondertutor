@@ -26,7 +26,8 @@ export default function Payments() {
   useEffect(() => { load() }, [])
   if (!data) return loadError ? <LoadError message={loadError} onRetry={load} /> : <Spinner />
 
-  const { required, summary, transactions, banks } = data
+  const { required, summary, transactions, banks, gateway } = data
+  const live = gateway === 'billplz' // real gateway: the parent pays on Billplz's page, not in our test dialog
   const rows = showAll ? transactions : transactions.slice(0, 5)
 
   return (
@@ -102,17 +103,19 @@ export default function Payments() {
             <h2 className="mb-3 text-xl font-extrabold text-navy">Payment Method</h2>
             <div className="rounded-xl border border-slate-100 p-4">
               <div className="flex items-center gap-4">
-                <span className="text-3xl font-black italic tracking-tight text-navy"><span className="text-brand-500">❯</span>FPX</span>
-                <div><div className="font-bold text-navy">FPX Online Banking</div><div className="text-sm text-slate-500">{bank ? `Preferred bank: ${bank}` : 'Preferred payment method'}</div></div>
+                <span className="text-3xl font-black italic tracking-tight text-navy"><span className="text-brand-500">❯</span>{live ? 'Pay' : 'FPX'}</span>
+                {live
+                  ? <div><div className="font-bold text-navy">FPX &amp; e-wallets</div><div className="text-sm text-slate-500">Choose how to pay on the secure Billplz page.</div></div>
+                  : <div><div className="font-bold text-navy">FPX Online Banking</div><div className="text-sm text-slate-500">{bank ? `Preferred bank: ${bank}` : 'Preferred payment method'}</div></div>}
               </div>
-              <button onClick={() => setMethodOpen(true)} className="btn-outline mt-4 w-full">Change Payment Method <Icon name="arrow-right" className="h-4 w-4" /></button>
+              {!live && <button onClick={() => setMethodOpen(true)} className="btn-outline mt-4 w-full">Change Payment Method <Icon name="arrow-right" className="h-4 w-4" /></button>}
             </div>
           </section>
         </aside>
       </div>
 
       {/* Reload on every close: even a failed attempt can change things (e.g. the booking expired meanwhile) */}
-      <PayModal booking={payFor} banks={banks} defaultBank={bank} onClose={() => { setPayFor(null); load() }} onDone={() => { setPayFor(null); load() }} />
+      <PayModal booking={payFor} banks={banks} defaultBank={bank} live={live} onClose={() => { setPayFor(null); load() }} onDone={() => { setPayFor(null); load() }} />
       <LessonDetails booking={detail} onClose={() => setDetail(null)} onChanged={load} />
       <Modal open={methodOpen} onClose={() => setMethodOpen(false)} title="Payment Method">
         <p className="mb-3 text-sm text-slate-500">Lessons are paid by FPX online banking. Choose the bank you'd like pre-selected at checkout.</p>
@@ -126,12 +129,25 @@ export default function Payments() {
 }
 
 // Sandbox FPX checkout: no real money moves. "Simulate failed payment" tests the failure path.
-function PayModal({ booking, banks, defaultBank, onClose, onDone }) {
+function PayModal({ booking, banks, defaultBank, live, onClose, onDone }) {
   const [bank, setBank] = useState(defaultBank || '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState(null)
   if (!booking) return null
+
+  // Real gateway: create the bill, then leave for Billplz. The result comes back on /parent/payments/return.
+  async function payOnBillplz() {
+    setBusy(true)
+    setError('')
+    try {
+      const checkout = await api.post('/parent/payments/checkout', { bookingId: booking.id })
+      window.location.assign(checkout.data.redirectUrl)
+    } catch (err) {
+      setError(errorMessage(err))
+      setBusy(false)
+    }
+  }
 
   async function pay(outcome) {
     if (!bank) return setError('Please choose your bank.')
@@ -151,7 +167,7 @@ function PayModal({ booking, banks, defaultBank, onClose, onDone }) {
   const close = () => { const ok = result?.status === 'SUCCESS'; setResult(null); setError(''); if (ok) onDone(); else onClose() }
 
   return (
-    <Modal open onClose={close} title={result ? (result.status === 'SUCCESS' ? 'Payment successful' : 'Payment failed') : 'Pay with FPX'}>
+    <Modal open onClose={close} title={result ? (result.status === 'SUCCESS' ? 'Payment successful' : 'Payment failed') : live ? 'Pay for your lesson' : 'Pay with FPX'}>
       {result ? (
         <div className="flex flex-col items-center gap-3 py-4 text-center">
           <span className={`flex h-16 w-16 items-center justify-center rounded-full text-white ${result.status === 'SUCCESS' ? 'bg-ok' : 'bg-red-500'}`}><Icon name={result.status === 'SUCCESS' ? 'check' : 'x'} className="h-9 w-9" strokeWidth={3} /></span>
@@ -164,14 +180,23 @@ function PayModal({ booking, banks, defaultBank, onClose, onDone }) {
             <div><div className="font-bold text-navy">{lessonTitle(booking)}</div><div className="text-xs text-slate-500">{booking.tutor.name} · {fmtDate(booking.startAt)}</div></div>
             <div className="text-2xl font-extrabold text-navy">{money(booking.totalAmount)}</div>
           </div>
-          <div className="flex gap-2 rounded-lg bg-accent-50 p-3 text-xs text-amber-800"><Icon name="info" className="h-4 w-4 shrink-0" /> Sandbox mode: this is a test payment gateway. No real money is charged.</div>
           <ErrorBox>{error}</ErrorBox>
+          {live ? (
+            <>
+              <p className="text-sm text-slate-600">You will be taken to Billplz, our secure payment partner, to pay by FPX online banking or e-wallet. You will come straight back here afterwards.</p>
+              <button disabled={busy} onClick={payOnBillplz} className="btn-primary h-12 w-full text-base">{busy ? 'Opening Billplz…' : `Pay ${money(booking.totalAmount)} with Billplz`}</button>
+            </>
+          ) : (
+          <>
+          <div className="flex gap-2 rounded-lg bg-accent-50 p-3 text-xs text-amber-800"><Icon name="info" className="h-4 w-4 shrink-0" /> Sandbox mode: this is a test payment gateway. No real money is charged.</div>
           <label className="block text-sm font-bold text-navy">Select your bank
             <SelectBox icon="card" className="mt-1.5" value={bank} onChange={(e) => setBank(e.target.value)}>
               <option value="" disabled>Choose a bank…</option>{banks.map((b) => <option key={b}>{b}</option>)}
             </SelectBox></label>
           <button disabled={busy} onClick={() => pay('SUCCESS')} className="btn-primary h-12 w-full text-base">{busy ? 'Processing…' : `Pay ${money(booking.totalAmount)}`}</button>
           <button disabled={busy} onClick={() => pay('FAILED')} className="w-full text-center text-xs font-semibold text-slate-500 hover:underline">Simulate a failed payment (test only)</button>
+          </>
+          )}
         </div>
       )}
     </Modal>
