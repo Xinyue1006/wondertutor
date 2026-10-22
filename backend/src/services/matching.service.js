@@ -120,13 +120,18 @@ function locationScore(tutor, c) {
   return { value: Math.max(online, physical), km }
 }
 
-// Tutor characteristics: gender, teaching style. Parts the parent didn't specify are ignored.
+// Tutor characteristics: gender, language, teaching style. Parts the parent didn't specify are ignored.
 function characteristicsScore(tutor, c) {
   const parts = []
   let genderMatch = false
   if (c.gender && c.gender !== 'ANY') {
     genderMatch = tutor.gender === c.gender
     parts.push(genderMatch ? 1 : 0)
+  }
+  let languageMatch = false
+  if (c.language) {
+    languageMatch = (tutor.languages || []).includes(c.language)
+    parts.push(languageMatch ? 1 : 0)
   }
   let styleMatches = []
   if (c.characteristics?.length) {
@@ -135,7 +140,7 @@ function characteristicsScore(tutor, c) {
     parts.push(styleMatches.length / c.characteristics.length)
   }
   const value = parts.length ? parts.reduce((a, b) => a + b, 0) / parts.length : 1
-  return { value, genderMatch, styleMatches }
+  return { value, genderMatch, languageMatch, styleMatches }
 }
 
 // Fee: full marks inside the budget; above budget the score decays; budget is a preference, not a hard limit
@@ -204,6 +209,7 @@ export function scoreTutor(tutor, c) {
   }
 
   if (chars.styleMatches.length) add(parts.characteristics * WEIGHTS.characteristics, 'Matches your preferred teaching style')
+  if (chars.languageMatch) add(parts.characteristics * WEIGHTS.characteristics - 0.05, `Teaches in ${c.language}`)
   if (chars.genderMatch) add(parts.characteristics * WEIGHTS.characteristics - 0.1, 'Matches your preferred tutor gender')
   if (fee.within) add(parts.fee * WEIGHTS.fee, 'Within your budget')
   if (tutor.ratingCount > 0 && tutor.ratingAvg >= 4.5) add(parts.rating * WEIGHTS.rating, 'Highly rated by parents')

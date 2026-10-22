@@ -15,12 +15,14 @@ router.get('/users', users.listUsers)
 router.get('/users/:id', users.getUser)
 router.post('/users/:id/deactivate', users.setStatus)
 router.post('/users/:id/reactivate', users.setStatus)
+router.post('/users/:id/warn', users.warnUser)
 router.post('/qualifications/:id/review', users.reviewQualification)
 
 // [XY] complaints
 router.get('/complaints', complaints.listComplaints)
 router.get('/complaints/report', complaints.complaintsReport)
 router.get('/complaints/export', complaints.exportComplaints)
+router.get('/complaints/:id', complaints.getComplaint)
 router.patch('/complaints/:id', complaints.updateComplaint)
 
 // [YH] booking oversight / finance / system settings go here

@@ -12,6 +12,7 @@
 // Nothing here moves money: an expired booking was never paid. Each function takes `now` so tests can control time.
 import { prisma } from '../config/prisma.js'
 import { notify, notifyWithEmail } from './notification.service.js'
+import { promoteChildren } from './progression.service.js'
 
 export const PAYMENT_DEADLINE_MINUTES = 60
 export const REMINDER_HOURS = 24
@@ -113,6 +114,8 @@ export function startScheduler(intervalMs = 5 * 60_000) {
       const { expired } = await expireStaleBookings()
       const { sent } = await sendLessonReminders()
       const { sent: paymentReminders } = await sendPaymentReminders()
+      const { moved } = await promoteChildren() // 1 January: every child moves up a grade (does nothing the rest of the year)
+      if (moved) console.log(`[scheduler] moved ${moved} child(ren) up a grade for the new school year`)
       if (expired || sent || paymentReminders) console.log(`[scheduler] expired ${expired} booking(s), sent ${sent} lesson and ${paymentReminders} payment reminder(s)`)
     } catch (err) {
       console.error('[scheduler]', err.message)

@@ -124,6 +124,18 @@ Also built for the Parent Portal and Admin (Xin Yue):
   then back to the page the user wanted; pages that fail to load offer *Try again*.
 - **Accessibility**: dialogs keep keyboard focus inside and return it when closed, errors and new chat messages are
   announced to screen readers, dropdowns report whether they are open, and every control has a label.
+- **Automatic education-level progression**: on 1 January (Malaysia time) every child moves up one grade
+  (Kindergarten 3 → Primary 1, Primary 6 → Form 1; a child who finished Form 5 stays and the parent is told once).
+  `Child.gradeYear` records the school year the grade is true for, so a child is never moved twice and a server that
+  was off on 1 January catches up; the parent gets an in-app notice and can correct the grade in My Children.
+  Code: `backend/src/services/progression.service.js` (run by the scheduler).
+- **Child language and goals**: preferred learning language and academic goals are saved per child; the language
+  is also a soft criterion in matching ("Teaches in Mandarin").
+- **Compare tutors**: tick up to three tutors on Find a Tutor, the match results or Saved Tutors and compare them side by side.
+- **Payment receipts**: every payment that went through has a printable receipt (Payments → Receipt).
+- **Admin**: formal warnings to users (recorded, with notification), suspicious-account flags (below the rating
+  threshold, 3+ complaints against, 2+ warnings), and a complaint investigation view (lesson, payment and refunds,
+  attendance, tutor summary, the account's other complaints and warnings).
 
 Matching is **rule-based weighted scoring** (`backend/src/services/matching.service.js`, weights from Form 2), not machine learning.
 The chatbot is a guided quick-reply flow that fills the same criteria and calls the same service.

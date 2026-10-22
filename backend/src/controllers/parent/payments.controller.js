@@ -207,3 +207,27 @@ export async function billplzCallback(req, res) {
   }
   res.sendStatus(200)
 }
+
+// GET /parent/payments/:id/receipt: the receipt of a payment that went through (FR 4.2). Only the parent who paid can see it.
+export async function getReceipt(req, res) {
+  const payment = await prisma.payment.findFirst({
+    where: { id: Number(req.params.id), booking: { parentId: req.parent.id } },
+    include: { refunds: true, booking: { include: { tutor: { include: { user: { select: { fullName: true } } } }, child: { select: { name: true } }, parent: { include: { user: { select: { fullName: true, email: true } } } } } } },
+  })
+  if (!payment || !['PAID', 'REFUNDED', 'PARTIALLY_REFUNDED'].includes(payment.status)) throw new AppError(404, 'Receipt not found')
+  const b = payment.booking
+  const paidAt = payment.paidAt ?? payment.createdAt
+  res.json({
+    receipt: {
+      number: `WT-${mytParts(paidAt).date.slice(0, 4)}-${String(payment.id).padStart(6, '0')}`,
+      paidAt,
+      status: payment.status,
+      method: payment.method,
+      reference: payment.gatewayRef,
+      amount: money(payment.amount),
+      payer: { name: b.parent.user.fullName, email: b.parent.user.email },
+      lesson: { subject: b.subject, child: b.child.name, tutor: b.tutor.user.fullName, startAt: b.startAt, endAt: b.endAt, teachingMode: b.teachingMode, isTrial: b.isTrial },
+      refunds: payment.refunds.map((r) => ({ amount: money(r.amount), status: r.status, type: r.type })),
+    },
+  })
+}

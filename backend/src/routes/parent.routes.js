@@ -71,5 +71,6 @@ router.get('/payments', payments.paymentsOverview)
 router.post('/payments/checkout', payments.checkout)
 router.post('/payments/:id/confirm', payments.confirmPayment)
 router.post('/payments/return', payments.gatewayReturn)
+router.get('/payments/:id/receipt', payments.getReceipt)
 
 export default router

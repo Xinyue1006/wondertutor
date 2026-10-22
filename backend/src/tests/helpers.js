@@ -41,7 +41,7 @@ export function api(token) {
 // Empty every table (children first) so each test file starts from a known state
 export async function resetDb() {
   for (const model of [
-    'refund', 'payment', 'review', 'attendance', 'sessionSummary', 'rescheduleRequest', 'complaint', 'booking',
+    'accountWarning', 'refund', 'payment', 'review', 'attendance', 'sessionSummary', 'rescheduleRequest', 'complaint', 'booking',
     'notification', 'matchingRequest', 'favouriteTutor', 'withdrawal', 'bankAccount', 'availabilitySlot',
     'portfolioItem', 'qualification', 'tutorSubject', 'child', 'tutorProfile', 'parentProfile', 'emailOtp', 'user', 'systemSetting',
   ]) await prisma[model].deleteMany()

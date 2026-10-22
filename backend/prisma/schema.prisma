@@ -118,6 +118,8 @@ model User {
   complaintsFiled    Complaint[]    @relation("ComplaintBy")
   complaintsAgainst  Complaint[]    @relation("ComplaintAgainst")
   complaintsHandled  Complaint[]    @relation("ComplaintHandler")
+  warningsReceived   AccountWarning[] @relation("WarnedUser")
+  warningsIssued     AccountWarning[] @relation("WarningIssuer")
 }
 
 model EmailOtp {
@@ -160,6 +162,11 @@ model Child {
   grade          Int            // e.g. Primary 5 -> 5, Form 2 -> 2
   subject        String?        // the FIRST of `subjects`, kept in step with it so older code that reads one subject still works
   subjects       Json?          // every subject the child needs help with: ["Mathematics", "Science"] (at most 6)
+  // The school year (calendar year, Malaysia time) that `educationLevel` + `grade` are true for. On 1 January the
+  // scheduler moves every child up one grade and stamps the new year, so a child is never moved twice in a year.
+  gradeYear         Int?
+  preferredLanguage String?        // language the child learns best in, e.g. "English", "Bahasa Melayu", "Mandarin"
+  goals             String?        @db.Text // what the parent wants to achieve, e.g. "UPSR improvement", "SPM Additional Mathematics A"
   notes          String?        @db.Text
   photoUrl       String?
   createdAt      DateTime       @default(now())
@@ -437,6 +444,20 @@ model Complaint {
   handledBy     User?           @relation("ComplaintHandler", fields: [handledById], references: [id])
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
+}
+
+// A formal warning an Admin gives to a user (before any deactivation). The user is also notified in-app.
+model AccountWarning {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  user       User     @relation("WarnedUser", fields: [userId], references: [id], onDelete: Cascade)
+  issuedById Int
+  issuedBy   User     @relation("WarningIssuer", fields: [issuedById], references: [id])
+  reason     String   @db.Text
+  complaintId Int?    // the complaint that led to the warning, if any
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
 }
 
 // ───────────── Notifications & settings [Shared] ─────────────

@@ -1,4 +1,5 @@
 import bcrypt from 'bcrypt'
+import { currentSchoolYear } from '../services/progression.service.js'
 import { z } from 'zod'
 import { OAuth2Client } from 'google-auth-library'
 import { prisma } from '../config/prisma.js'
@@ -101,7 +102,7 @@ export async function register(req, res) {
               latitude: location?.lat ?? null,
               longitude: location?.lng ?? null,
               preferences: cleanPreferences(data.preferences) ?? undefined,
-              children: { create: (data.children ?? []).map(({ subjects, subject, ...c }) => ({ ...c, notes: c.notes || null, ...subjectColumns(cleanSubjects({ subjects, subject })) })) },
+              children: { create: (data.children ?? []).map(({ subjects, subject, ...c }) => ({ ...c, gradeYear: currentSchoolYear(), notes: c.notes || null, ...subjectColumns(cleanSubjects({ subjects, subject })) })) },
             },
           },
         }),

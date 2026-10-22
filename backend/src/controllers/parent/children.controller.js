@@ -1,7 +1,8 @@
 import { z } from 'zod'
 import { prisma } from '../../config/prisma.js'
 import { AppError } from '../../utils/AppError.js'
-import { MAX_GRADE } from '../../data/catalog.js'
+import { LANGUAGES, MAX_GRADE } from '../../data/catalog.js'
+import { currentSchoolYear } from '../../services/progression.service.js'
 import { checkSubjectsFitLevel, cleanSubjects, subjectColumns, subjectFields, subjectsOf } from '../../utils/childSubjects.js'
 import { imageUrl, optionalText, personName } from '../../utils/validators.js'
 
@@ -12,6 +13,8 @@ const childSchema = z
     grade: z.coerce.number({ message: 'Choose a grade' }).int('Choose a grade').min(1, 'Choose a grade'),
     ...subjectFields,
     notes: optionalText(500, 'Notes'),
+    preferredLanguage: z.enum(LANGUAGES, { message: 'Choose a language from the list' }).optional().nullable(),
+    goals: optionalText(300, 'Academic goals'),
     photoUrl: imageUrl().optional().nullable(),
   })
   .refine((d) => d.grade <= MAX_GRADE[d.educationLevel], { message: 'That grade does not exist for the chosen level', path: ['grade'] })
@@ -31,6 +34,9 @@ export const toChildDto = (c) => ({
   subjects: subjectsOf(c),
   subject: subjectsOf(c)[0] ?? null, // the first one, for screens that show a single subject
   notes: c.notes,
+  preferredLanguage: c.preferredLanguage,
+  goals: c.goals,
+  gradeYear: c.gradeYear,
   photoUrl: c.photoUrl,
   bookingCount: c._count?.bookings ?? undefined,
 })
@@ -53,14 +59,17 @@ export async function listChildren(req, res) {
 
 export async function createChild(req, res) {
   const data = childSchema.parse(req.body)
-  const child = await prisma.child.create({ data: { ...toColumns(data), parentId: req.parent.id } })
+  // gradeYear: the grade the parent entered is true for this school year, so the January progression starts from here
+  const child = await prisma.child.create({ data: { ...toColumns(data), gradeYear: currentSchoolYear(), parentId: req.parent.id } })
   res.status(201).json({ child: toChildDto(child) })
 }
 
 export async function updateChild(req, res) {
   const existing = await ownChild(req)
   const data = childSchema.parse(req.body)
-  const child = await prisma.child.update({ where: { id: existing.id }, data: toColumns(data) })
+  // Changing the level or grade (a correction, or a child repeating a year) is true for this year, so it is not moved up again
+  const gradeChanged = data.educationLevel !== existing.educationLevel || data.grade !== existing.grade
+  const child = await prisma.child.update({ where: { id: existing.id }, data: { ...toColumns(data), ...((gradeChanged || existing.gradeYear == null) && { gradeYear: currentSchoolYear() }) } })
   res.json({ child: toChildDto(child) })
 }
 
