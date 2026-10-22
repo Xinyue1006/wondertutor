@@ -8,6 +8,7 @@ import Robot from '../../components/ui/Robot'
 import { ErrorBox, LoadError, Modal, PageTitle, SelectBox, Spinner, VerifiedTick } from '../../components/ui/Common'
 import { addDaysYmd, dateLabel, dayMonth, hhmmLabel, mondayOfYmd, todayYmd, weekdayName } from '../../lib/format'
 import { gradeLabel } from '../../lib/education'
+import { childSubjects } from '../../lib/subjects'
 import { checkRinggit, checkText } from '../../lib/validation'
 
 const hourOf = (hhmm) => Number(hhmm.split(':')[0])
@@ -56,7 +57,9 @@ export default function BookLesson() {
 
   // Prefer the child's own subject when this tutor teaches it
   useEffect(() => {
-    if (tutor && child?.subject && tutor.subjects.includes(child.subject)) setSubject(child.subject)
+    // The first of the child's subjects that this tutor teaches
+    const match = childSubjects(child).find((s) => tutor?.subjects.includes(s))
+    if (tutor && match) setSubject(match)
   }, [tutor, child])
 
   const hours = useMemo(() => {

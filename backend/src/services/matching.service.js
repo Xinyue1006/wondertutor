@@ -41,6 +41,15 @@ export function distanceKm(lat1, lng1, lat2, lng2) {
   return 6371 * 2 * Math.asin(Math.sqrt(a))
 }
 
+// A place is known to within a few kilometres (a postcode or a town, not a street), so a distance is said as a band,
+// "within 8 km", never as an exact "5.3 km". The limits are the same ones the score uses just below.
+export const DISTANCE_BANDS = [3, 8, 15, 30]
+export function distanceBand(km) {
+  if (km == null) return null
+  const limit = DISTANCE_BANDS.find((b) => km <= b)
+  return limit ? `within ${limit} km` : 'more than 30 km away'
+}
+
 // ───────────── Step 1: mandatory filters ─────────────
 
 // The TutorSubject row that satisfies subject + level (+ grade). Returns undefined if none.
@@ -111,13 +120,18 @@ function locationScore(tutor, c) {
   return { value: Math.max(online, physical), km }
 }
 
-// Tutor characteristics: gender, teaching style. Parts the parent didn't specify are ignored.
+// Tutor characteristics: gender, language, teaching style. Parts the parent didn't specify are ignored.
 function characteristicsScore(tutor, c) {
   const parts = []
   let genderMatch = false
   if (c.gender && c.gender !== 'ANY') {
     genderMatch = tutor.gender === c.gender
     parts.push(genderMatch ? 1 : 0)
+  }
+  let languageMatch = false
+  if (c.language) {
+    languageMatch = (tutor.languages || []).includes(c.language)
+    parts.push(languageMatch ? 1 : 0)
   }
   let styleMatches = []
   if (c.characteristics?.length) {
@@ -126,7 +140,7 @@ function characteristicsScore(tutor, c) {
     parts.push(styleMatches.length / c.characteristics.length)
   }
   const value = parts.length ? parts.reduce((a, b) => a + b, 0) / parts.length : 1
-  return { value, genderMatch, styleMatches }
+  return { value, genderMatch, languageMatch, styleMatches }
 }
 
 // Fee: full marks inside the budget; above budget the score decays; budget is a preference, not a hard limit
@@ -190,11 +204,12 @@ export function scoreTutor(tutor, c) {
   if (parts.location >= 0.55) {
     if (c.mode === 'ONLINE') add(parts.location * WEIGHTS.location, 'Offers online lessons')
     else if (loc.km != null && tutor.offersPhysical)
-      add(parts.location * WEIGHTS.location, `Teaches ${loc.km < 1 ? 'within 1' : `about ${Math.round(loc.km)}`} km from your area`)
+      add(parts.location * WEIGHTS.location, `Teaches ${distanceBand(loc.km)} of your area`)
     else if (tutor.offersOnline) add(parts.location * WEIGHTS.location, 'Offers online lessons')
   }
 
   if (chars.styleMatches.length) add(parts.characteristics * WEIGHTS.characteristics, 'Matches your preferred teaching style')
+  if (chars.languageMatch) add(parts.characteristics * WEIGHTS.characteristics - 0.05, `Teaches in ${c.language}`)
   if (chars.genderMatch) add(parts.characteristics * WEIGHTS.characteristics - 0.1, 'Matches your preferred tutor gender')
   if (fee.within) add(parts.fee * WEIGHTS.fee, 'Within your budget')
   if (tutor.ratingCount > 0 && tutor.ratingAvg >= 4.5) add(parts.rating * WEIGHTS.rating, 'Highly rated by parents')

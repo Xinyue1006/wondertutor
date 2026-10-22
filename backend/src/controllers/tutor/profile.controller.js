@@ -1,13 +1,13 @@
 import { z } from 'zod'
 import { prisma } from '../../config/prisma.js'
 import { AppError } from '../../utils/AppError.js'
-import { CHARACTERISTICS, LANGUAGES, LOCATIONS, MAX_GRADE, SUBJECTS } from '../../data/catalog.js'
+import { CHARACTERISTICS, LANGUAGES, LOCATIONS, MAX_GRADE, SUBJECTS, SUBJECT_LEVELS } from '../../data/catalog.js'
 import { cloudinaryUrl, hourlyRate, optionalText, personName, phoneMY, yearsExperience } from '../../utils/validators.js'
 import * as setup from '../../services/tutorSetup.service.js'
 
 // GET /tutor/catalog: option lists for the setup wizard
 export function catalog(req, res) {
-  res.json({ subjects: SUBJECTS, locations: LOCATIONS.map((l) => l.name), characteristics: CHARACTERISTICS, languages: LANGUAGES, maxGrade: MAX_GRADE })
+  res.json({ subjects: SUBJECTS, subjectLevels: SUBJECT_LEVELS, locations: LOCATIONS.map((l) => l.name), characteristics: CHARACTERISTICS, languages: LANGUAGES, maxGrade: MAX_GRADE })
 }
 
 // GET /tutor/profile: the setup draft, its verification status and what is still missing before submit

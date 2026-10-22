@@ -97,7 +97,7 @@ const TUTORS = [
   {
     key: 'lim-kai-zheng', name: 'Mr. Lim Kai Zheng', gender: 'MALE', rate: 70, rating: 4.9, count: 102, years: 6, loc: 'Damansara, Kuala Lumpur', verified: true,
     online: true, physical: true, chars: ['Exam-Focused', 'Structured'],
-    subjects: [['Mathematics', 'PRIMARY', 5, 6], ['Mathematics', 'SECONDARY', 1, 5], ['Additional Mathematics', 'SECONDARY', 4, 5], ['Physics', 'SECONDARY', 4, 5]],
+    subjects: [['Mathematics', 'PRIMARY', 5, 6], ['Mathematics', 'SECONDARY', 1, 5], ['Additional Mathematics', 'SECONDARY', 4, 5], ['Physics', 'SECONDARY', 4, 5], ['Computer Science', 'SECONDARY', 1, 5]],
     avail: 'Mon 17-21, Wed 17-21, Fri 17-21, Sat 09-12',
     qual: ['Master of Science (Applied Mathematics)', 'Universiti Kebangsaan Malaysia (UKM)', 2018],
     bio: 'Six years of coaching SPM candidates. I specialise in Mathematics, Additional Mathematics and Physics, with a structured weekly plan for every student.',
@@ -113,7 +113,7 @@ const TUTORS = [
   {
     key: 'tee-jun-hao', name: 'Mr. Tee Jun Hao', gender: 'MALE', rate: 55, rating: 4.6, count: 49, years: 2, loc: 'Bangsar, Kuala Lumpur', verified: false,
     online: true, physical: true, chars: ['Interactive'],
-    subjects: [['Mathematics', 'PRIMARY', 4, 6], ['Mathematics', 'SECONDARY', 1, 3]],
+    subjects: [['Mathematics', 'PRIMARY', 4, 6], ['Mathematics', 'SECONDARY', 1, 3], ['Principles of Accounting', 'SECONDARY', 4, 5], ['Economics', 'SECONDARY', 4, 5], ['Business', 'SECONDARY', 4, 5]],
     avail: 'Tue 17-21, Thu 17-21, Sat 14-18',
     qual: ['Bachelor of Science (Actuarial Science)', 'Sunway University', 2023],
     bio: 'Young, energetic tutor who explains Mathematics with everyday examples. Lessons feel like a conversation, not a lecture.',
@@ -145,7 +145,7 @@ const TUTORS = [
   {
     key: 'ahmad-faiz', name: 'Mr. Ahmad Faiz bin Hakim', gender: 'MALE', rate: 40, rating: 4.5, count: 31, years: 3, loc: 'Shah Alam, Selangor', verified: false,
     online: false, physical: true, chars: ['Patient & Encouraging'],
-    subjects: [['Bahasa Melayu', 'PRIMARY', 1, 6], ['Bahasa Melayu', 'SECONDARY', 1, 3]],
+    subjects: [['Bahasa Melayu', 'PRIMARY', 1, 6], ['Bahasa Melayu', 'SECONDARY', 1, 3], ['History', 'PRIMARY', 4, 6], ['History', 'SECONDARY', 1, 5]],
     avail: 'Tue 16-20, Thu 16-20, Sat 09-13',
     qual: ['Bachelor of Education (Bahasa Melayu)', 'Universiti Teknologi MARA (UiTM)', 2021],
     bio: 'Bahasa Melayu tutor focused on karangan (essay) writing and tatabahasa, from Year 1 to Form 3.',
@@ -211,6 +211,11 @@ const REVIEW_PARENTS = [
 
 // ───────────── main ─────────────
 async function seedBasics() {
+  // On a live site the admin login must be chosen by the owner: never fall back to the published demo password
+  if (process.env.NODE_ENV === 'production' && !process.env.ADMIN_PASSWORD) {
+    console.error('Refusing to seed in production without ADMIN_PASSWORD (and ADMIN_EMAIL). Set them in the environment variables first.')
+    process.exit(1)
+  }
   const settings = {
     GPS_RADIUS_METRES: '100',
     RATING_THRESHOLD: '3.0',
@@ -362,8 +367,8 @@ async function seedDemoParent(tutors, hash) {
     include: { parent: true },
   })
   const parentId = user.parent.id
-  const sarah = await prisma.child.create({ data: { parentId, name: 'Sarah Tan', educationLevel: 'PRIMARY', grade: 5, subject: 'Mathematics', photoUrl: '/img/people/sarah-tan.jpg' } })
-  const adam = await prisma.child.create({ data: { parentId, name: 'Adam Tan', educationLevel: 'PRIMARY', grade: 2, subject: 'English', photoUrl: '/img/people/adam-tan.jpg' } })
+  const sarah = await prisma.child.create({ data: { parentId, name: 'Sarah Tan', educationLevel: 'PRIMARY', grade: 5, subject: 'Mathematics', subjects: ['Mathematics', 'Science', 'English'], photoUrl: '/img/people/sarah-tan.jpg' } })
+  const adam = await prisma.child.create({ data: { parentId, name: 'Adam Tan', educationLevel: 'PRIMARY', grade: 2, subject: 'English', subjects: ['English', 'Mathematics'], photoUrl: '/img/people/adam-tan.jpg' } })
 
   const T = (key) => tutors[key]
   const rateOf = Object.fromEntries(TUTORS.map((t) => [t.key, t.rate]))

@@ -52,6 +52,7 @@ export function toTutorCard(t, subjectName) {
     availableDays: availableDays(t.availability),
     yearsExperience: t.yearsExperience,
     characteristics: t.characteristics || [],
+    languages: t.languages || [],
     gender: t.gender,
   }
 }

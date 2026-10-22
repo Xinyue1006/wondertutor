@@ -63,6 +63,21 @@ describe('3-step matching wizard', () => {
     expect(dropdown(1)).toHaveValue('PRIMARY:5')
   })
 
+  test('a child with several subjects: one tap switches which subject to look for', async () => {
+    setup({ kids: [{ ...sarah, subjects: ['Mathematics', 'Science'] }] })
+    await waitFor(() => expect(dropdown(0)).toHaveValue('Mathematics'))
+    expect(screen.getByText('Sarah Tan needs help with:')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Science' }))
+    expect(dropdown(0)).toHaveValue('Science')
+    expect(screen.getByRole('button', { name: 'Science' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  test('a child with only one subject shows no subject chips', async () => {
+    setup({ kids: [sarah] })
+    await waitFor(() => expect(dropdown(0)).toHaveValue('Mathematics'))
+    expect(screen.queryByText(/needs help with:/)).not.toBeInTheDocument()
+  })
+
   test('walks through all three steps and sends the criteria to the matching API', async () => {
     setup({ kids: [sarah] })
     await waitFor(() => expect(dropdown(0)).toHaveValue('Mathematics'))

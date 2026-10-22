@@ -6,6 +6,8 @@ import Icon from './ui/Icon'
 import { ErrorBox, Modal, StatusPill, Stars, VerifiedTick } from './ui/Common'
 import { fmtDateLong, fmtShortDate, fmtTime, fmtTimeRange, money } from '../lib/format'
 import { gradeLabel } from '../lib/education'
+import { canAddToCalendar, googleCalendarUrl } from '../lib/calendar'
+import { downloadFile } from '../lib/download'
 
 function Row({ icon, label, children }) {
   return (
@@ -24,6 +26,7 @@ export default function LessonDetails({ booking: b, onClose, footer, onChanged }
   const [dispute, setDispute] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [calError, setCalError] = useState('')
   if (!b) return null
 
   // Parent-initiated refunds are reviewed by Admin (never automatic)
@@ -137,7 +140,20 @@ export default function LessonDetails({ booking: b, onClose, footer, onChanged }
       ) : (
         <button onClick={() => setAsking(true)} className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-500 hover:underline"><Icon name="refresh" className="h-3.5 w-3.5" /> Request a refund</button>
       ))}
-      <div className="mt-3 text-xs text-slate-400">Requested on {fmtShortDate(b.createdAt)}</div>
+      {/* A confirmed lesson that has not started can go straight into the parent's own calendar */}
+      {canAddToCalendar(b) && (
+        <div className="mt-3 rounded-xl border border-brand-100 p-3">
+          <div className="flex items-center gap-2 text-sm font-bold text-navy"><Icon name="calendar" className="h-4 w-4 text-brand-500" /> Add to your calendar</div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <a href={googleCalendarUrl(b)} target="_blank" rel="noopener noreferrer" className="btn-outline min-h-10 px-4 text-sm">Google Calendar</a>
+            <button type="button" onClick={async () => setCalError(await downloadFile(`/parent/bookings/${b.id}/calendar.ics`, `wondertutor-lesson-${b.id}.ics`))} className="btn-outline min-h-10 px-4 text-sm">
+              Apple / Outlook (.ics file)
+            </button>
+          </div>
+          {calError && <p role="alert" className="mt-2 text-sm text-red-700">{calError}</p>}
+        </div>
+      )}
+      <div className="mt-3 text-xs text-slate-500">Requested on {fmtShortDate(b.createdAt)}</div>
       {['CONFIRMED', 'COMPLETED', 'CANCELLED'].includes(b.status) && (
         <Link to={`/parent/complaints?booking=${b.id}`} className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-red-500">
           <Icon name="shield" className="h-3.5 w-3.5" /> Report a problem with this lesson

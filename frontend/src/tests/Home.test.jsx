@@ -90,6 +90,22 @@ describe('landing page', () => {
     expect(screen.getByDisplayValue('Secondary')).toBeInTheDocument()
   })
 
+  test('the location box suggests places from anywhere in Malaysia as you type, and a match goes on to the wizard', async () => {
+    api.get.mockImplementation(async (url, opts) => (url === '/public/places'
+      ? { data: { popular: false, results: opts?.params?.q ? [{ label: 'Kota Kinabalu, Sabah', kind: 'town', state: 'Sabah' }] : [{ label: 'Kepong, Kuala Lumpur', kind: 'area', state: 'Kuala Lumpur' }] } }
+      : { data: full }))
+    render(<MemoryRouter><Routes><Route path="/" element={<Home />} /><Route path="/login" element={<div>LOGIN PAGE</div>} /></Routes></MemoryRouter>)
+    await screen.findByText('Daniel Tan')
+    await userEvent.type(screen.getByRole('combobox', { name: /Subject/ }), 'Mathematics')
+    await userEvent.type(screen.getByRole('combobox', { name: /Education Level/ }), 'Primary')
+    await userEvent.type(screen.getByRole('combobox', { name: /Location/ }), 'kota')
+    await userEvent.click(await screen.findByRole('option', { name: 'Kota Kinabalu, Sabah' }))
+    expect(screen.getByDisplayValue('Kota Kinabalu, Sabah')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /^Search Tutors/ }))
+    expect(await screen.findByText('LOGIN PAGE')).toBeInTheDocument() // a visitor is asked to log in first
+    expect(JSON.parse(sessionStorage.getItem('wt-home-search'))).toMatchObject({ location: 'Kota Kinabalu, Sabah' })
+  })
+
   test('the four How It Works steps are an ordered list', async () => {
     setup(full)
     const steps = await screen.findAllByRole('listitem')

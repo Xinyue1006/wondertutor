@@ -5,6 +5,8 @@ import { EmptyState, ErrorBox, LoadError, Modal, PageTitle, Spinner } from '../.
 import { ComplaintPill } from '../parent/Complaints'
 import { fmtDate, fmtShortDate } from '../../lib/format'
 import ComplaintsReport from '../../components/ComplaintsReport'
+import WarnUser from '../../components/WarnUser'
+import { fmtTimeRange, money } from '../../lib/format'
 
 const TABS = [['', 'All'], ['OPEN', 'Open'], ['IN_PROGRESS', 'In Progress'], ['RESOLVED', 'Resolved'], ['DISMISSED', 'Dismissed']]
 
@@ -65,7 +67,11 @@ function ReviewModal({ complaint: c, onClose, onDone }) {
   const [response, setResponse] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  useEffect(() => { setResponse(c?.adminResponse || ''); setError('') }, [c])
+  const [inv, setInv] = useState(null) // what the Admin needs to investigate: booking, payment, attendance, history
+  const loadInvestigation = useCallback(() => {
+    if (c) api.get(`/admin/complaints/${c.id}`).then((r) => setInv(r.data.investigation)).catch((e) => setError(errorMessage(e)))
+  }, [c])
+  useEffect(() => { setResponse(c?.adminResponse || ''); setError(''); setInv(null); loadInvestigation() }, [c, loadInvestigation])
   if (!c) return null
   const closed = ['RESOLVED', 'DISMISSED'].includes(c.status)
 
@@ -85,13 +91,15 @@ function ReviewModal({ complaint: c, onClose, onDone }) {
   }
 
   return (
-    <Modal open onClose={onClose} title={c.category} width="max-w-xl">
+    <Modal open onClose={onClose} title={c.category} width="max-w-2xl">
       <div className="space-y-3">
         <ComplaintPill status={c.status} />
         <div className="rounded-xl bg-brand-25 p-3 text-sm">
           <div className="mb-1 text-xs text-slate-500">From {c.filedBy.name} · {fmtShortDate(c.createdAt)}{c.against && ` · Against ${c.against.name}`}</div>
           <p className="text-slate-700">{c.description}</p>
         </div>
+        <Investigation inv={inv} />
+        {c.against && !closed && <WarnUser userId={c.against.id} name={c.against.name} complaintId={c.id} onDone={loadInvestigation} />}
         <ErrorBox>{error}</ErrorBox>
         <label className="block text-sm font-bold text-navy">Response to the parent {closed ? '' : <span className="font-normal text-slate-500">(required to resolve or dismiss)</span>}
           <textarea rows={4} maxLength={1000} disabled={closed} className="input mt-1.5 resize-none disabled:bg-slate-50" value={response} onChange={(e) => setResponse(e.target.value)} placeholder="Explain what was done or why the complaint is closed." />
@@ -105,5 +113,38 @@ function ReviewModal({ complaint: c, onClose, onDone }) {
         )}
       </div>
     </Modal>
+  )
+}
+
+// The facts around a complaint: the lesson, whether it was paid, whether the tutor checked in, and the account's record
+function Investigation({ inv }) {
+  if (!inv) return <p className="text-sm text-slate-500">Loading the related lesson, payment and history…</p>
+  const { booking: b, payment: p, attendance: a, sessionSummary: s, otherComplaints, warnings } = inv
+  const line = (label, value) => <div className="flex justify-between gap-4 py-1"><dt className="text-slate-500">{label}</dt><dd className="text-right font-semibold text-navy">{value}</dd></div>
+  return (
+    <section className="space-y-3 rounded-xl border border-slate-100 p-3 text-sm" aria-label="Investigation">
+      <h3 className="font-bold text-navy">Investigation</h3>
+      {!b ? <p className="text-slate-500">This complaint is not linked to a lesson.</p> : (
+        <dl className="divide-y divide-slate-50">
+          {line('Lesson', `${b.subject} for ${b.child} (${b.status.toLowerCase().replace('_', ' ')})`)}
+          {line('When', `${fmtDate(b.startAt)}, ${fmtTimeRange(b.startAt, b.endAt)} · ${b.teachingMode === 'ONLINE' ? 'Online' : 'Physical'}`)}
+          {b.cancelReason && line('Cancel reason', b.cancelReason)}
+          {line('Payment', p ? `${money(p.amount)} · ${p.status.toLowerCase().replace('_', ' ')}${p.method ? ` (${p.method})` : ''}` : 'No payment')}
+          {p?.refunds.map((r) => <div key={r.id}>{line('Refund', `${money(r.amount)} · ${r.status.toLowerCase()} (${r.type === 'AUTO' ? 'automatic' : 'Admin review'})`)}</div>)}
+          {line('Attendance', a?.checkInAt ? `Checked in ${fmtDate(a.checkInAt)}${a.distanceMetres != null ? ` · ${Math.round(a.distanceMetres)} m from the address` : ''}${a.checkOutAt ? ', checked out' : ''}` : b.teachingMode === 'ONLINE' ? 'Not tracked for online lessons' : 'No check-in recorded')}
+          {s && line('Lesson summary', s.content)}
+        </dl>
+      )}
+      {a?.photoUrl && /^https?:\/\//i.test(a.photoUrl) && <a href={a.photoUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-9 items-center gap-1 text-xs font-semibold text-brand-600 hover:underline"><Icon name="file" className="h-3.5 w-3.5" /> View the check-in photo</a>}
+      <div>
+        <h4 className="font-semibold text-navy">Record of this account</h4>
+        {otherComplaints.length === 0 && warnings.length === 0 ? <p className="text-slate-500">No other complaints or warnings.</p> : (
+          <ul className="mt-1 list-disc space-y-0.5 pl-5 text-slate-700">
+            {otherComplaints.map((o) => <li key={o.id}>Complaint: {o.category} ({o.status.toLowerCase().replace('_', ' ')}), {fmtShortDate(o.createdAt)}</li>)}
+            {warnings.map((w) => <li key={w.id}>Warning: {w.reason} ({fmtShortDate(w.createdAt)})</li>)}
+          </ul>
+        )}
+      </div>
+    </section>
   )
 }

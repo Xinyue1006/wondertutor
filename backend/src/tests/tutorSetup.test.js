@@ -20,7 +20,7 @@ const email = () => `newtutor${Date.now()}${++n}@test.local`
 async function signUpTutor() {
   const address = email()
   const reg = await api().post('/auth/register', {
-    role: 'TUTOR', fullName: 'Daniel Tan', email: address, phone: '012-345 6789', password: 'Tutor1234',
+    role: 'TUTOR', fullName: 'Daniel Tan', email: address, phone: '012-345 6789', password: 'Tutor1234', acceptedPrivacy: true,
   })
   expect(reg.status).toBe(201)
   const codeHash = await bcrypt.hash('123456', 4)

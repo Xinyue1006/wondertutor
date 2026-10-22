@@ -11,6 +11,9 @@ import * as payments from '../controllers/parent/payments.controller.js'
 import * as reviews from '../controllers/parent/reviews.controller.js'
 import * as profile from '../controllers/parent/profile.controller.js'
 import * as complaints from '../controllers/parent/complaints.controller.js'
+import * as calendar from '../controllers/parent/calendar.controller.js'
+import * as account from '../controllers/parent/account.controller.js'
+import { rateLimit } from '../middleware/rateLimit.js'
 import { dashboard } from '../controllers/parent/dashboard.controller.js'
 
 const router = validateIdParams(Router()) // every :id in these URLs must be a positive whole number
@@ -20,7 +23,15 @@ router.get('/dashboard', dashboard)
 
 router.get('/profile', profile.getProfile)
 router.put('/profile', profile.updateProfile)
+router.put('/profile/photo', profile.updatePhoto)
 router.post('/profile/password', profile.changePassword)
+
+// Privacy and account controls
+router.put('/account/email-reminders', account.setEmailReminders)
+router.get('/account/export', account.exportMyData)
+router.get('/account/deletion-check', account.deletionCheck)
+// Deleting needs the password, so wrong guesses are slowed down like on the login form
+router.post('/account/delete', rateLimit({ name: 'account-delete', windowMs: 15 * 60_000, max: 5, keyBy: (req) => req.user.id }), account.deleteMyAccount)
 
 router.get('/children', children.listChildren)
 router.post('/children', children.createChild)
@@ -41,7 +52,10 @@ router.get('/matching/latest', matching.latestMatching)
 
 router.post('/bookings', bookings.createBooking)
 router.get('/bookings', bookings.listBookings)
+// Registered before '/bookings/:id' so "calendar.ics" is not read as a booking id
+router.get('/bookings/calendar.ics', calendar.upcomingCalendar)
 router.get('/bookings/:id', bookings.getBooking)
+router.get('/bookings/:id/calendar.ics', calendar.lessonCalendar)
 router.post('/bookings/:id/accept-counter', bookings.acceptCounter)
 router.post('/bookings/:id/decline-counter', bookings.declineCounter)
 router.post('/bookings/:id/cancel', bookings.cancelBooking)
@@ -56,5 +70,7 @@ router.post('/complaints', complaints.createComplaint)
 router.get('/payments', payments.paymentsOverview)
 router.post('/payments/checkout', payments.checkout)
 router.post('/payments/:id/confirm', payments.confirmPayment)
+router.post('/payments/return', payments.gatewayReturn)
+router.get('/payments/:id/receipt', payments.getReceipt)
 
 export default router

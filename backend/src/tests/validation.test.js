@@ -27,7 +27,7 @@ describe('IDs in the URL', () => {
 })
 
 describe('signup fields', () => {
-  const base = (n, extra = {}) => ({ role: 'PARENT', fullName: 'Miki Lim', email: `v${n}@test.local`, phone: '012-345 6789', password: 'Parent1234', ...extra })
+  const base = (n, extra = {}) => ({ role: 'PARENT', fullName: 'Miki Lim', email: `v${n}@test.local`, phone: '012-345 6789', password: 'Parent1234', acceptedPrivacy: true, ...extra })
 
   test('a Malaysian phone in any common format is stored as +60…, and extra spaces in the name are removed', async () => {
     expect((await api().post('/auth/register', base(1, { fullName: '  Miki   Lim ' }))).status).toBe(201)
@@ -38,7 +38,8 @@ describe('signup fields', () => {
 
   test.each([
     [{ phone: '12345' }, 'phone'],
-    [{ phone: '+65 9123 4567' }, 'phone'],
+    [{ phone: '+65 12' }, 'country code'],
+    [{ phone: '+60 12' }, 'Malaysian'],
     [{ fullName: 'Miki123' }, 'Full name'],
     [{ fullName: 'M' }, 'Full name'],
     [{ password: 'short1' }, 'at least 8'],
@@ -59,10 +60,17 @@ describe('signup fields', () => {
     expect(res.message).toContain('must be different')
   })
 
+  test('a number from another country is accepted when it starts with its country code', async () => {
+    expect((await api().post('/auth/register', base(7, { phone: '+65 9123 4567' }))).status).toBe(201)
+    expect((await prisma.user.findUnique({ where: { email: 'v7@test.local' } })).phone).toBe('+6591234567')
+  })
+
   test('phone numbers normalise the same way everywhere', () => {
     expect(normalizePhone('+60 12-345 6789')).toBe('+60123456789')
     expect(normalizePhone('03-1234 5678')).toBe('+60312345678')
     expect(normalizePhone('abc')).toBeNull()
+    expect(normalizePhone('+65 9123 4567')).toBe('+6591234567')
+    expect(normalizePhone('+44 (0)20 7946 0958')).toBe('+4402079460958') // the number is kept as written, only spaces and brackets go
   })
 })
 

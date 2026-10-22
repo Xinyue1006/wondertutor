@@ -59,9 +59,10 @@ export function AuthProvider({ children }) {
     return res.data.user
   }
 
-  async function googleLogin(credential, role) {
+  // acceptedPrivacy is only sent by screens that show the Privacy Notice next to the button (new accounts need it)
+  async function googleLogin(credential, role, acceptedPrivacy = false) {
     setNotice('')
-    const res = await api.post('/auth/google', { credential, role })
+    const res = await api.post('/auth/google', { credential, role, ...(acceptedPrivacy && { acceptedPrivacy: true }) })
     saveSession(res.data.token, res.data.user, true)
     return res.data.user
   }

@@ -132,3 +132,50 @@ export async function exportComplaints(req, res) {
   res.set('Content-Disposition', `attachment; filename="${name}"`)
   res.send('\uFEFF' + lines.join('\r\n')) // BOM so Excel reads names with accents correctly
 }
+
+// GET /admin/complaints/:id: the complaint plus what the Admin needs to investigate it (FR 9.2, 9.5):
+// the booking, its payment and refunds, attendance, the tutor's session summary, and the history of the account complained about.
+export async function getComplaint(req, res) {
+  const c = await prisma.complaint.findUnique({
+    where: { id: Number(req.params.id) },
+    include: {
+      ...complaintInclude,
+      booking: { include: { child: { select: { name: true } }, payment: { include: { refunds: true } }, attendance: true, summary: true } },
+    },
+  })
+  if (!c) throw new AppError(404, 'Complaint not found')
+
+  const b = c.booking
+  const [others, warnings] = c.againstUserId
+    ? await Promise.all([
+        prisma.complaint.findMany({
+          where: { againstUserId: c.againstUserId, id: { not: c.id } },
+          select: { id: true, category: true, status: true, createdAt: true },
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+        }),
+        prisma.accountWarning.findMany({ where: { userId: c.againstUserId }, select: { id: true, reason: true, createdAt: true }, orderBy: { createdAt: 'desc' } }),
+      ])
+    : [[], []]
+
+  res.json({
+    complaint: toComplaintDto(c),
+    investigation: {
+      booking: b && {
+        id: b.id, subject: b.subject, child: b.child.name, status: b.status, startAt: b.startAt, endAt: b.endAt,
+        teachingMode: b.teachingMode, agreedPrice: b.agreedPrice == null ? null : Number(b.agreedPrice), cancelReason: b.cancelReason,
+      },
+      payment: b?.payment && {
+        status: b.payment.status, amount: Number(b.payment.amount), method: b.payment.method, paidAt: b.payment.paidAt,
+        refunds: b.payment.refunds.map((r) => ({ id: r.id, amount: Number(r.amount), type: r.type, status: r.status, reason: r.reason })),
+      },
+      attendance: b?.attendance && {
+        checkInAt: b.attendance.checkInAt, checkOutAt: b.attendance.checkOutAt, distanceMetres: b.attendance.checkInDistance, photoUrl: b.attendance.checkInPhotoUrl,
+      },
+      sessionSummary: b?.summary ? { content: b.summary.content, progressNote: b.summary.progressNote } : null,
+      // Repeated violations: every other complaint against the same account, and the warnings it already has
+      otherComplaints: others,
+      warnings,
+    },
+  })
+}

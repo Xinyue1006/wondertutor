@@ -22,17 +22,28 @@ export function checkName(v, label = 'Full name', max = 80) {
   return ''
 }
 
-// "012-345 6789", "+60 12 345 6789", "0312345678" -> "+60123456789" (null if it cannot be a Malaysian number)
+// Phone numbers are sent in international form (+60123456789), like the server stores them.
+//  - Without a "+" the number is Malaysian: "012-345 6789", "03-1234 5678" and so on.
+//  - With a "+" the country code is taken as given. "+60..." is checked as Malaysian, any other country only for a sensible
+//    length (an international number has at most 15 digits).
+// Returns the international form, or null when it cannot be a phone number.
+const WORLD_PHONE = /^\+[1-9]\d{7,14}$/
 export function normalizePhone(v) {
-  const digits = String(v || '').replace(/[\s\-().]/g, '').replace(/^\+/, '')
+  const text = String(v || '').trim()
+  const digits = text.replace(/[\s\-().]/g, '').replace(/^\+/, '')
   if (!/^\d+$/.test(digits)) return null
-  const n = `+60${digits.replace(/^60/, '').replace(/^0/, '')}`
-  return MY_PHONE.test(n) ? n : null
+  const n = text.startsWith('+') && !digits.startsWith('60') ? `+${digits}` : `+60${digits.replace(/^60/, '').replace(/^0/, '')}`
+  return (n.startsWith('+60') ? MY_PHONE : WORLD_PHONE).test(n) ? n : null
 }
 
 export function checkPhone(v, label = 'Phone number') {
-  if (!String(v || '').trim()) return `Enter the ${label.toLowerCase()}.`
-  return normalizePhone(v) ? '' : `Enter a valid Malaysian ${label.toLowerCase()}, like 012-345 6789.`
+  const text = String(v || '').trim()
+  if (!text) return `Enter the ${label.toLowerCase()}.`
+  if (normalizePhone(text)) return ''
+  const foreign = text.startsWith('+') && !text.replace(/[\s\-().]/g, '').startsWith('+60')
+  return foreign
+    ? `Enter a valid ${label.toLowerCase()} with its country code, like +65 9123 4567.`
+    : `Enter a valid Malaysian ${label.toLowerCase()}, like 012-345 6789.`
 }
 
 export function checkPassword(v) {

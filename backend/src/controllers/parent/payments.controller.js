@@ -1,16 +1,21 @@
-// Payments: SANDBOX only. There is no real gateway yet, so "checkout" creates a pending Payment and
-// "confirm" plays the role of the gateway's callback. When Billplz/ToyyibPay/Stripe test mode is wired,
-// only `confirmPayment` needs to be replaced by the gateway's webhook handler.
-import { randomBytes } from 'node:crypto'
+// Payments. Two gateways behind one flow:
+//  - Billplz (real sandbox/live gateway) when BILLPLZ_API_KEY is set: checkout creates a bill and sends the parent to
+//    Billplz's page; the result comes back through the browser return (`gatewayReturn`) and Billplz's server callback
+//    (`billplzCallback`). Both are checked against Billplz's signature AND against Billplz's own record of the bill.
+//  - A built-in test gateway otherwise (no account needed): `confirmPayment` plays the gateway's role.
+// Either way the result is applied by `settlePayment`, so a payment is confirmed in exactly one way.
 import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { prisma } from '../../config/prisma.js'
+import { env } from '../../config/env.js'
 import { AppError } from '../../utils/AppError.js'
 import { bookingInclude, toBookingDto } from '../../services/booking.dto.js'
-import { notify, notifyWithEmail } from '../../services/notification.service.js'
 import { id } from '../../utils/validators.js'
 import { PAYMENT_DEADLINE_MINUTES } from '../../services/lifecycle.service.js'
 import { mytParts, mytToDate } from '../../utils/time.js'
+import { billplzConfigured, createBill, getBill, signatureIsValid } from '../../services/billplz.service.js'
+import { settlePayment } from '../../services/payment.service.js'
+import { randomBytes } from 'node:crypto'
 
 export const SANDBOX_BANKS = ['Maybank2u', 'CIMB Clicks', 'Public Bank', 'RHB Now', 'Hong Leong Connect', 'Bank Islam']
 
@@ -63,6 +68,7 @@ export async function paymentsOverview(req, res) {
       booking: toBookingDto(p.booking),
     })),
     banks: SANDBOX_BANKS,
+    gateway: billplzConfigured() ? 'billplz' : 'sandbox',
   })
 }
 
@@ -78,6 +84,7 @@ export async function checkout(req, res) {
     throw new AppError(400, `Payment closes ${PAYMENT_DEADLINE_MINUTES} minutes before the lesson starts. Please book another time.`)
 
   const amount = lessonAmount(booking)
+  if (billplzConfigured()) return checkoutWithBillplz(req, res, booking, amount)
   const gatewayRef = `SBX-${randomBytes(5).toString('hex').toUpperCase()}`
 
   // One Payment per booking (bookingId is unique), so a failed attempt is retried on the same row
@@ -90,15 +97,16 @@ export async function checkout(req, res) {
   res.status(201).json({ paymentId: payment.id, gatewayRef, amount: money(amount), banks: SANDBOX_BANKS })
 }
 
-// POST /parent/payments/:id/confirm { bank, outcome }: stands in for the gateway callback
+// POST /parent/payments/:id/confirm { bank, outcome }: the built-in test gateway's "callback" (never used with Billplz)
 export async function confirmPayment(req, res) {
+  if (billplzConfigured()) throw new AppError(404, 'Not found')
   const { bank, outcome } = z
     .object({ bank: z.enum(SANDBOX_BANKS, { message: 'Choose a bank from the list' }), outcome: z.enum(['SUCCESS', 'FAILED']) })
     .parse(req.body)
 
   const payment = await prisma.payment.findFirst({
     where: { id: Number(req.params.id), booking: { parentId: req.parent.id } },
-    include: { booking: { include: { tutor: { include: { user: true } }, child: true } } },
+    include: { booking: true },
   })
   if (!payment) throw new AppError(404, 'Payment not found')
   if (payment.status !== 'PENDING') throw new AppError(400, 'This payment has already been processed')
@@ -106,46 +114,120 @@ export async function confirmPayment(req, res) {
   if (payment.booking.status !== 'AWAITING_PAYMENT')
     throw new AppError(400, 'This booking is no longer waiting for payment. You have not been charged.')
 
-  const processedAlready = () => new AppError(409, 'This payment has already been processed')
-  if (outcome === 'FAILED') {
-    const { count } = await prisma.payment.updateMany({ where: { id: payment.id, status: 'PENDING' }, data: { status: 'FAILED' } })
-    if (!count) throw processedAlready()
-    return res.json({ status: 'FAILED', message: 'The payment was not completed. You have not been charged.' })
-  }
-
-  // Commission: platform base rate unless the Admin set a rate for this tutor. The rate is
-  // snapshotted on the Payment so later rate changes never alter past transactions.
-  const base = await prisma.systemSetting.findUnique({ where: { key: 'BASE_COMMISSION_RATE' } })
-  const rate = payment.booking.tutor.commissionRate ?? new Prisma.Decimal(base?.value ?? 0)
-  const commissionAmount = new Prisma.Decimal(payment.amount).mul(rate).div(100).toDecimalPlaces(2)
-
-  // Both changes are conditional, so a double click (or the scheduler expiring the booking at the same moment)
-  // cannot confirm twice or confirm a booking that was released: either both happen or neither does
-  await prisma.$transaction(async (tx) => {
-    const paid = await tx.payment.updateMany({
-      where: { id: payment.id, status: 'PENDING' },
-      data: { status: 'PAID', paidAt: new Date(), method: `FPX (${bank})`, commissionRate: rate, commissionAmount },
-    })
-    if (!paid.count) throw processedAlready()
-    const confirmed = await tx.booking.updateMany({ where: { id: payment.bookingId, status: 'AWAITING_PAYMENT' }, data: { status: 'CONFIRMED' } })
-    if (!confirmed.count) throw new AppError(400, 'This booking is no longer waiting for payment. You have not been charged.')
-  })
-
-  const b = payment.booking
-  const when = b.startAt.toLocaleString('en-MY', { timeZone: 'Asia/Kuala_Lumpur', dateStyle: 'medium', timeStyle: 'short' })
-  // Payment success + booking confirmed are record-worthy, so they are also emailed
-  await notifyWithEmail(req.user, {
-    type: 'PAYMENT_SUCCESS',
-    title: 'Payment successful. Booking confirmed',
-    message: `We received RM ${Number(payment.amount).toFixed(2)} for ${b.child.name}'s ${b.subject} lesson with ${b.tutor.user.fullName} on ${when}.`,
-    link: '/parent/bookings',
-  })
-  await notify(b.tutor.userId, {
-    type: 'BOOKING_CONFIRMED',
-    title: 'Booking confirmed',
-    message: `${req.user.fullName} paid for the ${b.subject} lesson on ${when}.`,
-    link: '/tutor/bookings',
-  })
-
+  const { result } = await settlePayment(payment.id, { paid: outcome === 'SUCCESS', method: `FPX (${bank})` })
+  if (result === 'ALREADY') throw new AppError(409, 'This payment has already been processed')
+  if (result === 'FAILED') return res.json({ status: 'FAILED', message: 'The payment was not completed. You have not been charged.' })
   res.json({ status: 'SUCCESS', message: 'Payment successful. Your lesson is confirmed.' })
+}
+
+// ───────────── Billplz ─────────────
+
+// Creates (or re-creates, after a failed attempt) the Payment row and a Billplz bill for it
+async function checkoutWithBillplz(req, res, booking, amount) {
+  const cents = amount.mul(100).toFixed(0)
+  if (Number(cents) < 100) throw new AppError(400, 'The amount is too small to pay online')
+  const payment = booking.payment
+    ? await prisma.payment.update({ where: { id: booking.payment.id }, data: { status: 'PENDING', amount, gatewayRef: null } })
+    : await prisma.payment.create({ data: { bookingId: booking.id, amount, commissionRate: 0, commissionAmount: 0, method: 'Billplz' } })
+
+  let bill
+  try {
+    bill = await createBill({
+      email: req.user.email,
+      name: req.user.fullName,
+      amountCents: cents,
+      description: `WonderTutor lesson #${booking.id}`,
+      reference: String(booking.id),
+      callbackUrl: `${env.clientUrl.replace(/\/$/, '')}/api/payments/billplz/callback`,
+      redirectUrl: `${env.clientUrl.replace(/\/$/, '')}/parent/payments/return`,
+    })
+  } catch (err) {
+    // Details stay in the server log; the parent only needs to know it did not start
+    console.error('[billplz] could not create the bill:', err.message)
+    throw new AppError(502, 'The payment service is not available right now. You have not been charged. Please try again in a moment.')
+  }
+  await prisma.payment.update({ where: { id: payment.id }, data: { gatewayRef: bill.id } })
+  res.status(201).json({ paymentId: payment.id, gatewayRef: bill.id, amount: money(amount), redirectUrl: bill.url })
+}
+
+// Asks Billplz itself whether the bill is paid, and settles our Payment to match
+async function settleFromBillplz(billId) {
+  const payment = await prisma.payment.findFirst({ where: { gatewayRef: billId } })
+  if (!payment) throw new AppError(404, 'Payment not found')
+  const bill = await getBill(billId)
+  // The amount Billplz holds must be the amount we asked for, so a bill cannot be "paid" with a smaller sum
+  const expected = new Prisma.Decimal(payment.amount).mul(100).toFixed(0)
+  if (String(bill.amount) !== expected) throw new AppError(400, 'The paid amount does not match this payment')
+  // Billplz marks an unpaid bill as "due" until it is paid (or it expires/deleted), so "not paid yet" is not "failed"
+  if (!bill.paid) return { result: bill.state === 'deleted' ? 'FAILED' : 'WAITING', payment }
+  const settled = await settlePayment(payment.id, { paid: true, method: 'Billplz', real: true })
+  return settled
+}
+
+// POST /parent/payments/return { id, paid, paid_at, x_signature }: the parent's browser coming back from Billplz.
+// The page sends the three values Billplz put in the address bar; the signature proves Billplz made them.
+export async function gatewayReturn(req, res) {
+  if (!billplzConfigured()) throw new AppError(404, 'Not found')
+  const body = z.object({ id: z.string().min(1).max(64), paid: z.string().max(10), paid_at: z.string().max(60).optional(), x_signature: z.string().max(100) }).parse(req.body)
+  const params = { 'billplz[id]': body.id, 'billplz[paid]': body.paid, ...(body.paid_at !== undefined && { 'billplz[paid_at]': body.paid_at }) }
+  if (!signatureIsValid({ ...params, 'billplz[x_signature]': body.x_signature })) throw new AppError(400, 'This payment result could not be verified')
+
+  const owned = await prisma.payment.findFirst({ where: { gatewayRef: body.id, booking: { parentId: req.parent.id } } })
+  if (!owned) throw new AppError(404, 'Payment not found')
+
+  const { result } = await settleFromBillplz(body.id)
+  const fresh = await prisma.payment.findUnique({ where: { id: owned.id } })
+  const messages = {
+    SUCCESS: 'Payment successful. Your lesson is confirmed.',
+    ALREADY: fresh.status === 'PAID' ? 'Payment successful. Your lesson is confirmed.' : 'This payment was not completed. You have not been charged.',
+    LATE: 'We received your payment, but the booking had already been released. A full refund has been queued.',
+    FAILED: 'The payment was not completed. You have not been charged.',
+    WAITING: 'We have not received the payment yet. If you already paid, it can take a minute to show up: check Payments again shortly.',
+  }
+  const status = result === 'SUCCESS' || (result === 'ALREADY' && fresh.status === 'PAID') ? 'SUCCESS' : result === 'LATE' ? 'LATE' : result === 'WAITING' ? 'WAITING' : 'FAILED'
+  // `outcome` (not `status`) so it cannot be confused with an HTTP status
+  res.json({ outcome: status, message: messages[result] })
+}
+
+// POST /api/payments/billplz/callback: Billplz telling our server (not the browser) that a bill was paid.
+// Public route: its only protection is the signature, so anything unsigned or wrongly signed is refused.
+export async function billplzCallback(req, res) {
+  if (!billplzConfigured() || !signatureIsValid(req.body)) return res.status(400).json({ message: 'Invalid signature' })
+  const billId = String(req.body.id || '')
+  if (!billId) return res.status(400).json({ message: 'Missing bill' })
+  try {
+    await settleFromBillplz(billId)
+  } catch (err) {
+    // 404 means a bill that is not ours (Billplz account shared with another site): acknowledge it, there is nothing to do.
+    // Anything else makes Billplz retry, which is what we want for a temporary problem.
+    if (err.status !== 404) {
+      console.error('[billplz] callback failed:', err.message)
+      return res.status(500).json({ message: 'Try again' })
+    }
+  }
+  res.sendStatus(200)
+}
+
+// GET /parent/payments/:id/receipt: the receipt of a payment that went through (FR 4.2). Only the parent who paid can see it.
+export async function getReceipt(req, res) {
+  const payment = await prisma.payment.findFirst({
+    where: { id: Number(req.params.id), booking: { parentId: req.parent.id } },
+    include: { refunds: true, booking: { include: { tutor: { include: { user: { select: { fullName: true } } } }, child: { select: { name: true } }, parent: { include: { user: { select: { fullName: true, email: true } } } } } } },
+  })
+  if (!payment || !['PAID', 'REFUNDED', 'PARTIALLY_REFUNDED'].includes(payment.status)) throw new AppError(404, 'Receipt not found')
+  const b = payment.booking
+  const paidAt = payment.paidAt ?? payment.createdAt
+  res.json({
+    receipt: {
+      number: `WT-${mytParts(paidAt).date.slice(0, 4)}-${String(payment.id).padStart(6, '0')}`,
+      paidAt,
+      status: payment.status,
+      method: payment.method,
+      reference: payment.gatewayRef,
+      amount: money(payment.amount),
+      payer: { name: b.parent.user.fullName, email: b.parent.user.email },
+      lesson: { subject: b.subject, child: b.child.name, tutor: b.tutor.user.fullName, startAt: b.startAt, endAt: b.endAt, teachingMode: b.teachingMode, isTrial: b.isTrial },
+      refunds: payment.refunds.map((r) => ({ amount: money(r.amount), status: r.status, type: r.type })),
+    },
+  })
 }

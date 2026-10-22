@@ -14,7 +14,10 @@ import Signup from '../pages/auth/Signup'
 
 const setup = () => {
   sessionStorage.clear()
-  api.get.mockResolvedValue({ data: { subjects: ['Mathematics', 'English'], locations: [], tutors: [] } })
+  api.get.mockResolvedValue({ data: {
+    subjects: ['Mathematics', 'English', 'Science', 'Physics'], locations: [], tutors: [],
+    subjectLevels: { Mathematics: ['KINDERGARTEN', 'PRIMARY', 'SECONDARY'], English: ['KINDERGARTEN', 'PRIMARY', 'SECONDARY'], Science: ['PRIMARY', 'SECONDARY'], Physics: ['SECONDARY'] },
+  } })
   api.post.mockResolvedValue({ data: { message: 'ok' } })
   return render(<MemoryRouter><Signup /></MemoryRouter>)
 }
@@ -63,7 +66,24 @@ describe('signup: parent sections', () => {
     await userEvent.type(screen.getByLabelText(/Child's Name/), 'Sarah')
     await userEvent.selectOptions(screen.getByLabelText(/Education Level/), 'PRIMARY:5')
     await next()
-    expect(await screen.findByRole('alert')).toHaveTextContent(/subject each child needs/)
+    expect(await screen.findByRole('alert')).toHaveTextContent(/at least one subject for each child/)
+  })
+
+  test('a child is offered only the subjects that exist at their level, and changing the level drops the ones that do not', async () => {
+    setup()
+    await userEvent.click(screen.getByRole('button', { name: /^Continue as/ }))
+    await fillBasic()
+    await next()
+    await userEvent.type(screen.getByLabelText(/Phone Number/), '123456789')
+    await next()
+    await userEvent.click(screen.getByRole('button', { name: /Add a child/ }))
+    expect(screen.getByText(/Choose the education level first/)).toBeInTheDocument() // no level yet: nothing to pick
+    await userEvent.selectOptions(screen.getByLabelText(/Education Level/), 'SECONDARY:4')
+    await userEvent.click(await screen.findByRole('button', { name: 'Physics' }))
+    expect(screen.getByRole('button', { name: 'Physics' })).toHaveAttribute('aria-pressed', 'true')
+    await userEvent.selectOptions(screen.getByLabelText(/Education Level/), 'PRIMARY:3')
+    expect(screen.queryByRole('button', { name: 'Physics' })).not.toBeInTheDocument() // Primary has no Physics
+    expect(screen.getByRole('button', { name: 'Science' })).toBeInTheDocument()
   })
 
   test('sends the children (with subject and goals) and the chosen preferences, then asks for the email code', async () => {
@@ -76,7 +96,8 @@ describe('signup: parent sections', () => {
     await userEvent.click(screen.getByRole('button', { name: /Add a child/ }))
     await userEvent.type(screen.getByLabelText(/Child's Name/), 'Sarah')
     await userEvent.selectOptions(screen.getByLabelText(/Education Level/), 'PRIMARY:5')
-    await userEvent.selectOptions(screen.getByLabelText(/Subject needed/), 'Mathematics')
+    await userEvent.click(screen.getByRole('button', { name: 'Mathematics' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Science' })) // a child can need more than one subject
     await userEvent.type(screen.getByLabelText(/Learning needs or goals/), 'Faster at word problems')
     await next()
     // Preferences: Physical, Evening, Saturday, Structured, up to RM 60
@@ -85,13 +106,14 @@ describe('signup: parent sections', () => {
     await userEvent.click(screen.getByRole('checkbox', { name: 'Sat' }))
     await userEvent.click(screen.getByRole('checkbox', { name: 'Structured' }))
     await userEvent.selectOptions(screen.getByLabelText(/Maximum budget per hour/), '60')
+    await userEvent.click(screen.getByRole('checkbox', { name: /Privacy Notice/ })) // the PDPA consent
     await next()
 
     const [url, body] = api.post.mock.calls.find(([u]) => u === '/auth/register')
     expect(url).toBe('/auth/register')
     expect(body).toMatchObject({
-      role: 'PARENT', fullName: 'Miki Lim', email: 'miki@example.com', phone: '+60123456789',
-      children: [{ name: 'Sarah', educationLevel: 'PRIMARY', grade: 5, subject: 'Mathematics', notes: 'Faster at word problems' }],
+      role: 'PARENT', fullName: 'Miki Lim', email: 'miki@example.com', phone: '+60123456789', acceptedPrivacy: true,
+      children: [{ name: 'Sarah', educationLevel: 'PRIMARY', grade: 5, subjects: ['Mathematics', 'Science'], notes: 'Faster at word problems' }],
       preferences: { mode: 'PHYSICAL', gender: 'ANY', characteristics: ['Structured'], days: [6], timePreset: 'EVENING', budgetMax: 60 },
     })
     expect(await screen.findByText('Check your email')).toBeInTheDocument()
@@ -105,10 +127,27 @@ describe('signup: parent sections', () => {
     await userEvent.type(screen.getByLabelText(/Phone Number/), '123456789')
     await next()
     await next() // children are optional
+    await userEvent.click(screen.getByRole('checkbox', { name: /Privacy Notice/ }))
     await next() // preferences are optional: Create Account
     const [, body] = api.post.mock.calls.find(([u]) => u === '/auth/register')
     expect(body.preferences).toBeUndefined()
     expect(body.children).toEqual([])
+  })
+
+  test('without ticking the Privacy Notice no account is created, and the notice opens in a new tab', async () => {
+    setup()
+    await userEvent.click(screen.getByRole('button', { name: /^Continue as/ }))
+    await fillBasic()
+    await next()
+    await userEvent.type(screen.getByLabelText(/Phone Number/), '123456789')
+    await next()
+    await next() // children are optional
+    await next() // preferences are optional: Create Account, but the box is not ticked
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Privacy Notice/)
+    expect(api.post.mock.calls.find(([u]) => u === '/auth/register')).toBeUndefined()
+    const link = screen.getByRole('link', { name: /Terms of Use and Privacy Notice/ })
+    expect(link).toHaveAttribute('href', '/privacy')
+    expect(link).toHaveAttribute('target', '_blank')
   })
 
   test('progress is remembered for the session but the password never is', async () => {
@@ -160,7 +199,7 @@ describe('signup: tutor', () => {
     await userEvent.click(screen.getByRole('checkbox', { name: /Terms of Use/ }))
     await create()
     const [, body] = api.post.mock.calls.find(([u]) => u === '/auth/register')
-    expect(body).toEqual({ role: 'TUTOR', fullName: 'Daniel Tan', email: 'daniel@example.com', phone: '+60123456789', password: 'Tutor1234' })
+    expect(body).toEqual({ role: 'TUTOR', fullName: 'Daniel Tan', email: 'daniel@example.com', phone: '+60123456789', password: 'Tutor1234', acceptedPrivacy: true })
     expect(await screen.findByText('Check your email')).toBeInTheDocument()
     expect(screen.getByText(/works for 10 minutes/)).toBeInTheDocument()
     expect(screen.getByText(/After 5 wrong tries/)).toBeInTheDocument()

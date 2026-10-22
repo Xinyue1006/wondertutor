@@ -100,6 +100,22 @@ Also built for the Parent Portal and Admin (Xin Yue):
 - **Reviews** may carry an optional photo; **trial lessons** can be marked (only a child's first lesson with that tutor).
 - **Refunds**: Cancel is the way to get money back for a lesson that has not started (Admin decides the refund);
   a refund request is for a lesson that has started or finished (e.g. the tutor did not come).
+- **Add to calendar**: a confirmed lesson can be added to Google Calendar or downloaded as an `.ics` file (Apple / Outlook),
+  one lesson or all upcoming ones (`backend/src/services/calendar.service.js`). Importing again after a reschedule updates the event.
+- **Reminder emails**: the day before a lesson, and once when a payment is due within 24 hours (the booking is released
+  1 hour before the lesson). Parents can switch them off in My Profile; payment and refund emails are always sent.
+- **Privacy (PDPA)**: a Privacy Notice page (`/privacy`), a required consent tick at sign-up (email and Google) that records the
+  time, and *Privacy & account* in My Profile: reminder emails on/off, **download my data** (JSON) and **delete my account**
+  (personal details are removed; lesson and payment records stay without a name; refused while a booking, refund request or
+  complaint is still open). The notice text is a draft: the centre should confirm the wording, the retention period and a contact address
+  (`VITE_PRIVACY_EMAIL`).
+- **Areas across the whole of Malaysia**: the area picker (My Profile, sign-up, Find a Tutor, the wizard and the landing page) searches
+  every state by town, neighbourhood or **postcode** (about 2,800 postcodes, `backend/src/services/places.service.js`), shows popular
+  places first, and understands KL, JB, PJ, Penang and Malacca. A picked place is saved as its label and turned into coordinates
+  for the tutor distance. Distance is shown as a band ("Within 8 km"), because a postcode is only known to a few kilometres.
+  The data is GeoNames postal codes (CC BY 4.0, credited on the Privacy Notice). To refresh it: download `MY.zip` from
+  https://download.geonames.org/export/zip/, unzip it outside the project and run `node scripts/build-places.mjs path/to/MY.txt` in `backend`.
+- **Phone numbers with a country code** (My Profile): a "MY +60" dropdown, numbers stored as +60..., letters are refused as you type.
 - **Input validation** everywhere (`backend/src/utils/validators.js`, mirrored in `frontend/src/lib/validation.js`):
   Malaysian phone numbers (stored as +60…), real names, passwords (8–72 characters), real dates and times, RM amounts
   with at most 2 decimals, and every ID in a URL.
@@ -108,6 +124,18 @@ Also built for the Parent Portal and Admin (Xin Yue):
   then back to the page the user wanted; pages that fail to load offer *Try again*.
 - **Accessibility**: dialogs keep keyboard focus inside and return it when closed, errors and new chat messages are
   announced to screen readers, dropdowns report whether they are open, and every control has a label.
+- **Automatic education-level progression**: on 1 January (Malaysia time) every child moves up one grade
+  (Kindergarten 3 → Primary 1, Primary 6 → Form 1; a child who finished Form 5 stays and the parent is told once).
+  `Child.gradeYear` records the school year the grade is true for, so a child is never moved twice and a server that
+  was off on 1 January catches up; the parent gets an in-app notice and can correct the grade in My Children.
+  Code: `backend/src/services/progression.service.js` (run by the scheduler).
+- **Child language and goals**: preferred learning language and academic goals are saved per child; the language
+  is also a soft criterion in matching ("Teaches in Mandarin").
+- **Compare tutors**: tick up to three tutors on Find a Tutor, the match results or Saved Tutors and compare them side by side.
+- **Payment receipts**: every payment that went through has a printable receipt (Payments → Receipt).
+- **Admin**: formal warnings to users (recorded, with notification), suspicious-account flags (below the rating
+  threshold, 3+ complaints against, 2+ warnings), and a complaint investigation view (lesson, payment and refunds,
+  attendance, tutor summary, the account's other complaints and warnings).
 
 Matching is **rule-based weighted scoring** (`backend/src/services/matching.service.js`, weights from Form 2), not machine learning.
 The chatbot is a guided quick-reply flow that fills the same criteria and calls the same service.

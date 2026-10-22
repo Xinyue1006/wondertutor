@@ -7,7 +7,9 @@ describe('form validation rules (same as the server)', () => {
     expect(normalizePhone('+60 11-2345 6789')).toBe('+601123456789')
     expect(normalizePhone('03-1234 5678')).toBe('+60312345678')
     expect(normalizePhone('12345')).toBeNull()
-    expect(checkPhone('+65 9123 4567')).toContain('valid Malaysian')
+    expect(checkPhone('+65 9123 4567')).toBe('') // another country, written with its country code
+    expect(checkPhone('+65 12')).toContain('country code')
+    expect(normalizePhone('+65 9123 4567')).toBe('+6591234567')
     expect(checkPhone('')).toBe('Enter the phone number.')
     expect(checkPhone('0123456789')).toBe('')
   })

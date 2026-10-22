@@ -38,7 +38,14 @@ describe('Google sign-in', () => {
     expect(noRole.message).toMatch(/choose Parent or Tutor/)
 
     const res = await api().post('/auth/google', { credential: credential({ sub: `g-${email}`, email, name: 'Nur Aisyah' }), role: 'TUTOR' })
-    expect(res.status).toBe(200)
+    // A new account needs the Privacy Notice to be accepted: without it Google sign-up is refused
+    expect(res.status).toBe(400)
+    expect(res.message).toMatch(/Privacy Notice/)
+    expect((await prisma.user.findUnique({ where: { email } }))).toBeNull()
+    const accepted = await api().post('/auth/google', { credential: credential({ sub: `g-${email}`, email, name: 'Nur Aisyah' }), role: 'TUTOR', acceptedPrivacy: true })
+    expect(accepted.status).toBe(200)
+    expect((await prisma.user.findUnique({ where: { email } })).privacyAcceptedAt).not.toBeNull()
+    Object.assign(res, accepted)
     expect(res.user).toMatchObject({ role: 'TUTOR', isEmailVerified: true, profilePhotoUrl: null, phone: null, tutorStatus: 'NOT_SUBMITTED' })
   })
 
@@ -53,10 +60,10 @@ describe('Google sign-in', () => {
   test('an unverified email signup is replaced, so the password its maker chose stops working', async () => {
     const email = newEmail()
     // Someone else registers this email with their own password and never verifies it
-    expect((await api().post('/auth/register', { role: 'PARENT', fullName: 'Not The Owner', email, phone: '0123456789', password: 'Squatter123' })).status).toBe(201)
+    expect((await api().post('/auth/register', { role: 'PARENT', fullName: 'Not The Owner', email, phone: '0123456789', password: 'Squatter123', acceptedPrivacy: true })).status).toBe(201)
     const squatter = await prisma.user.findUnique({ where: { email } })
 
-    const res = await api().post('/auth/google', { credential: credential({ sub: `g-${email}`, email, name: 'Real Owner' }), role: 'PARENT' })
+    const res = await api().post('/auth/google', { credential: credential({ sub: `g-${email}`, email, name: 'Real Owner' }), role: 'PARENT', acceptedPrivacy: true })
     expect(res.status).toBe(200)
     expect(res.user.fullName).toBe('Real Owner')
     expect(await prisma.user.findUnique({ where: { id: squatter.id } })).toBeNull()

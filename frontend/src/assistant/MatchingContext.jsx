@@ -5,6 +5,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import api, { errorMessage } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { preferencesToCriteria } from '../lib/preferences'
+import { childSubjects } from '../lib/subjects'
 
 const Ctx = createContext(null)
 
@@ -22,6 +23,7 @@ export const EMPTY_CRITERIA = {
   budgetMin: null, // null = no budget preference
   budgetMax: null,
   gender: 'ANY',
+  language: '', // the language the lesson should be taught in ('' = no preference)
   characteristics: [],
   notes: '',
 }
@@ -41,6 +43,7 @@ function toPayload(c) {
     budgetMin: c.budgetMin,
     budgetMax: c.budgetMax,
     gender: c.gender,
+    language: c.language || null,
     characteristics: c.characteristics,
     notes: c.notes || null,
   }
@@ -90,7 +93,8 @@ export function MatchingProvider({ children }) {
       childId: child.id,
       level: child.educationLevel,
       grade: child.grade,
-      subject: child.subject || c.subject,
+      subject: childSubjects(child)[0] || c.subject,
+      language: child.preferredLanguage || c.language, // the language the parent said the child learns best in
     }))
   }, [])
 

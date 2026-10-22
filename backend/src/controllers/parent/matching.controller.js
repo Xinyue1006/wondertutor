@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { prisma } from '../../config/prisma.js'
-import { CHARACTERISTICS, MAX_GRADE, SUBJECTS, findLocation } from '../../data/catalog.js'
+import { CHARACTERISTICS, LANGUAGES, MAX_GRADE, SUBJECTS, findLocation } from '../../data/catalog.js'
 import { hhmm as hhmmRule, id, optionalText } from '../../utils/validators.js'
 import { rankTutors } from '../../services/matching.service.js'
 import { toTutorCard } from '../../services/tutor.service.js'
@@ -23,6 +23,7 @@ export const criteriaSchema = z.object({
   budgetMin: z.number().min(0).max(1000, 'Budget cannot be more than RM1000').optional().nullable(),
   budgetMax: z.number().min(0).max(1000, 'Budget cannot be more than RM1000').optional().nullable(),
   gender: z.enum(['MALE', 'FEMALE', 'ANY']).default('ANY'),
+  language: z.enum(LANGUAGES, { message: 'Choose a language from the list' }).optional().nullable(), // the language the lesson should be taught in
   characteristics: z.array(z.enum(CHARACTERISTICS)).max(CHARACTERISTICS.length).default([]),
   notes: optionalText(200, 'Notes'),
 })

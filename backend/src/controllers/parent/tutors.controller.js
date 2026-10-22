@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { prisma } from '../../config/prisma.js'
 import { AppError } from '../../utils/AppError.js'
-import { CHARACTERISTICS, LOCATIONS, MAX_GRADE, SUBJECTS, findLocation } from '../../data/catalog.js'
+import { CHARACTERISTICS, LANGUAGES, LOCATIONS, MAX_CHILD_SUBJECTS, MAX_GRADE, SUBJECTS, SUBJECT_LEVELS, findLocation } from '../../data/catalog.js'
 import { rankTutors, distanceKm } from '../../services/matching.service.js'
 import { tutorInclude, toTutorCard, toTutorProfile } from '../../services/tutor.service.js'
 import { SLOT_BLOCKING, getTutorSlots } from '../../services/booking.service.js'
@@ -13,11 +13,15 @@ import { hhmm, ymd } from '../../utils/validators.js'
 export function catalog(req, res) {
   res.json({
     subjects: SUBJECTS,
+    subjectLevels: SUBJECT_LEVELS, // which levels each subject exists at, so a form offers only the right ones
+    maxChildSubjects: MAX_CHILD_SUBJECTS,
     maxGrade: MAX_GRADE,
     characteristics: CHARACTERISTICS,
+    languages: LANGUAGES,
     locations: LOCATIONS.map((l) => l.name),
     // The parent's saved address, used as the default "Location" filter when it is a known area
-    homeLocation: LOCATIONS.some((l) => l.name === req.parent.address) ? req.parent.address : null,
+    // Any saved place we can find on the map (a neighbourhood, a town or a postcode), not only the named neighbourhoods
+    homeLocation: findLocation(req.parent.address) ? req.parent.address : null,
     // Saved signup/profile preferences: the matching wizard starts from these
     preferences: req.parent.preferences ?? null,
   })

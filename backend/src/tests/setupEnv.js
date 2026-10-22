@@ -10,3 +10,7 @@ process.env.NODE_ENV = 'test'
 process.env.SMTP_USER = ''
 process.env.RECAPTCHA_SECRET = ''
 process.env.GOOGLE_CLIENT_ID = ''
+process.env.BILLPLZ_API_KEY = '' // tests always use the built-in test gateway
+process.env.CLOUDINARY_CLOUD_NAME = ''
+process.env.CLOUDINARY_API_KEY = ''
+process.env.CLOUDINARY_API_SECRET = ''

@@ -50,7 +50,7 @@ export default function Login() {
     setBusy(true)
     setError('')
     try {
-      const user = await googleLogin(newGoogle, role)
+      const user = await googleLogin(newGoogle, role, true)
       navigate(afterLogin(user, state?.from))
     } catch (err) {
       // Google's credential is short-lived; if it has expired the person simply clicks the Google button again
@@ -147,6 +147,7 @@ export default function Login() {
             <h2 className="font-display text-2xl font-bold text-navy">Welcome back</h2>
             <p className="mt-1 text-sm text-slate-600">Log in to continue to your account</p>
           </div>
+          {state?.deleted && <p role="status" className="flex gap-2 rounded-lg bg-brand-50 px-3 py-2.5 text-sm text-slate-700"><Icon name="check-circle" className="mt-0.5 h-4 w-4 shrink-0 text-ok" /> Your account has been deleted. We have emailed you a confirmation.</p>}
           {/* Why the user is here again (expired session, deactivated account) */}
           {notice && <p role="status" className="flex gap-2 rounded-lg bg-accent-50 px-3 py-2.5 text-sm text-amber-900"><Icon name="info" className="mt-0.5 h-4 w-4 shrink-0" /> {notice}</p>}
 
@@ -194,6 +195,7 @@ export default function Login() {
             <div role="group" aria-labelledby="new-google-title" className="rounded-xl border border-brand-100 bg-brand-25 p-4 text-center">
               <p id="new-google-title" className="text-sm font-semibold text-navy">No WonderTutor account uses this Google email yet.</p>
               <p className="mt-0.5 text-sm text-slate-600">Create one now. Which describes you?</p>
+              <p className="mt-0.5 text-xs text-slate-600">By choosing, you agree to the <Link to="/privacy" target="_blank" className="font-semibold text-brand-600 underline">Privacy Notice</Link>.</p>
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <button type="button" disabled={busy} onClick={() => finishGoogleSignup('PARENT')} className="btn-primary h-11">I'm a Parent</button>
                 <button type="button" disabled={busy} onClick={() => finishGoogleSignup('TUTOR')} className="btn-primary h-11">I'm a Tutor</button>
