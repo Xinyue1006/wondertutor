@@ -10,6 +10,7 @@ import { LoadError, SectionCard, Spinner, StatusPill } from '../../components/ui
 import LessonDetails from '../../components/LessonDetails'
 import { fmtDate, fmtTimeRange, greeting, timeAgo } from '../../lib/format'
 import { gradeLabel } from '../../lib/education'
+import { childSubjects } from '../../lib/subjects'
 import { DAY_SHORT, hhmmLabel } from '../../lib/format'
 
 const ACTIVITY_ICON = {
@@ -90,7 +91,7 @@ export default function ParentDashboard() {
                     <div className="min-w-0">
                       <div className="truncate text-lg font-bold text-navy">{c.name}</div>
                       <div className="flex items-center gap-1.5 text-sm text-slate-500"><Icon name="calendar" className="h-3.5 w-3.5 text-brand-500" /> {gradeLabel(c.educationLevel, c.grade)}</div>
-                      {c.subject && <div className="flex items-center gap-1.5 text-sm text-slate-500"><Icon name="book" className="h-3.5 w-3.5 text-brand-500" /> {c.subject}</div>}
+                      {childSubjects(c).length > 0 && <div className="flex items-center gap-1.5 text-sm text-slate-500"><Icon name="book" className="h-3.5 w-3.5 shrink-0 text-brand-500" /> <span className="truncate">{childSubjects(c).slice(0, 2).join(', ')}{childSubjects(c).length > 2 ? ` +${childSubjects(c).length - 2}` : ''}</span></div>}
                     </div>
                   </div>
                   <Link to={`/parent/children?edit=${c.id}`} className="btn-outline mt-3 w-full">View Profile <Icon name="arrow-right" className="h-4 w-4" /></Link>

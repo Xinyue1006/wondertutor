@@ -7,8 +7,10 @@ import Robot from '../../components/ui/Robot'
 import TutorCard from '../../components/TutorCard'
 import Pagination from '../../components/ui/Pagination'
 import FilterChips, { NO_EXTRA } from '../../components/FilterChips'
+import PlaceSearch from '../../components/PlaceSearch'
 import { ErrorBox, FilterDropdown, LoadError, PageTitle, SelectBox, Spinner, EmptyState } from '../../components/ui/Common'
 import { GRADE_GROUPS, parseGrade } from '../../lib/education'
+import { subjectsForLevel } from '../../lib/subjects'
 import { hhmmLabel, todayYmd } from '../../lib/format'
 
 const SORTS = [
@@ -129,7 +131,7 @@ export default function FindTutor() {
           <label className="block">
             <span className="mb-1.5 block text-sm font-semibold text-navy">Subject <span className="text-red-500">*</span></span>
             <SelectBox icon="book" value={bar.subject} onChange={set('subject')}>
-              {catalog.subjects.map((s) => <option key={s}>{s}</option>)}
+              {[...new Set([...subjectsForLevel(catalog.subjects, catalog.subjectLevels, parseGrade(bar.grade).level), bar.subject])].map((s) => <option key={s}>{s}</option>)}
             </SelectBox>
           </label>
           <label className="block">
@@ -140,13 +142,10 @@ export default function FindTutor() {
               ))}
             </SelectBox>
           </label>
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-semibold text-navy">Location</span>
-            <SelectBox icon="pin" value={bar.location} onChange={set('location')}>
-              <option value="">Any location</option>
-              {catalog.locations.map((l) => <option key={l}>{l}</option>)}
-            </SelectBox>
-          </label>
+          <PlaceSearch
+            label="Location" value={bar.location} onChange={(v) => setBar((b) => ({ ...b, location: v }))} quiet
+            labelClass="mb-1.5 block text-sm font-semibold text-navy" placeholder="Any location: search a town or postcode"
+          />
           <div>
             <span className="mb-1.5 block text-sm font-semibold text-navy">Availability</span>
             <AvailabilityPicker bar={bar} setBar={setBar} label={dateTimeLabel} />

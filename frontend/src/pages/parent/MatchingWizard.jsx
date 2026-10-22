@@ -5,6 +5,8 @@ import { useMatching } from '../../assistant/MatchingContext'
 import Icon from '../../components/ui/Icon'
 import Robot from '../../components/ui/Robot'
 import { ErrorBox, LoadError, PageTitle, SelectBox, Spinner } from '../../components/ui/Common'
+import PlaceSearch from '../../components/PlaceSearch'
+import { childSubjects, subjectsForLevel } from '../../lib/subjects'
 import { CHARACTERISTICS, GRADE_GROUPS, gradeLabel, parseGrade } from '../../lib/education'
 import { DAY_SHORT } from '../../lib/format'
 import { TIME_PRESETS, defaultRange, rangeKey, rangeLabel } from '../../lib/times'
@@ -36,7 +38,8 @@ export default function MatchingWizard() {
     const level = { kindergarten: 'KINDERGARTEN', primary: 'PRIMARY', secondary: 'SECONDARY' }[String(saved.level || '').trim().toLowerCase()]
     const patch = {}
     const subject = pick(catalog.subjects, saved.subject)
-    const location = pick(catalog.locations, saved.location)
+    // Any place picked on the landing page (a town or a postcode anywhere in Malaysia), not only the named neighbourhoods
+    const location = String(saved.location || '').trim()
     if (subject) patch.subject = subject
     if (level) Object.assign(patch, { level, grade: null, childId: null }) // the grade is chosen in the wizard; drop any child's old grade
     if (location) patch.location = location
@@ -133,6 +136,7 @@ function Label({ children, required }) {
 // ───────────── Step 1: Learning Needs ─────────────
 function StepLearning({ c, kids, catalog, patch, applyChild, onNext }) {
   const gradeValue = c.level ? `${c.level}:${c.grade ?? 1}` : ''
+  const chosenKid = kids.find((k) => k.id === c.childId)
   return (
     <>
       <StepHeader icon="book" step={1} title="Learning Needs" text="Start with the two requirements needed to find eligible tutors." art="book" />
@@ -147,12 +151,22 @@ function StepLearning({ c, kids, catalog, patch, applyChild, onNext }) {
           <button type="button" onClick={() => patch({ childId: null })} className={`chip px-3 py-1.5 text-[13px] ${!c.childId ? 'chip-on' : ''}`}>Someone else</button>
         </div>
       )}
+      {/* A child with several subjects: one tap switches which one to look for now */}
+      {chosenKid && childSubjects(chosenKid).length > 1 && (
+        <div className="mb-5 flex flex-wrap items-center gap-2" role="group" aria-label={`${chosenKid.name}'s subjects`}>
+          <span className="text-sm font-semibold text-navy">{chosenKid.name} needs help with:</span>
+          {childSubjects(chosenKid).map((s) => (
+            <button key={s} type="button" aria-pressed={c.subject === s} onClick={() => patch({ subject: s })} className={`chip px-3 py-1.5 text-[13px] ${c.subject === s ? 'chip-on' : ''}`}>{s}</button>
+          ))}
+        </div>
+      )}
       <div className="grid gap-5 md:grid-cols-2">
         <label className="block">
           <Label required>Subject</Label>
           <SelectBox icon="book" value={c.subject} onChange={(e) => patch({ subject: e.target.value })}>
             <option value="" disabled>Select a subject</option>
-            {catalog.subjects.map((s) => <option key={s}>{s}</option>)}
+            {/* Only what exists at the chosen level, but never lose the subject that is already chosen */}
+            {[...new Set([...subjectsForLevel(catalog.subjects, catalog.subjectLevels, c.level), ...(c.subject ? [c.subject] : [])])].map((s) => <option key={s}>{s}</option>)}
           </SelectBox>
         </label>
         <label className="block">
@@ -235,12 +249,10 @@ function StepSchedule({ c, catalog, patch, onBack, onNext }) {
         </div>
         <div>
           <Label>Preferred Location</Label>
-          <div className="relative">
-            <SelectBox icon="pin" value={c.location} onChange={(e) => patch({ location: e.target.value })} disabled={c.mode === 'ONLINE'}>
-              <option value="">Any location</option>
-              {catalog.locations.map((l) => <option key={l}>{l}</option>)}
-            </SelectBox>
-          </div>
+          <PlaceSearch
+            label="Search a town or postcode" value={c.location} onChange={(v) => patch({ location: v })} disabled={c.mode === 'ONLINE'} quiet
+            labelClass="sr-only" placeholder="Any location: search a town or postcode"
+          />
           <p className="mt-1.5 text-xs text-slate-500">{c.mode === 'ONLINE' ? 'Not needed for online lessons.' : 'Used to match tutors who can teach within your preferred area.'}</p>
         </div>
       </div>

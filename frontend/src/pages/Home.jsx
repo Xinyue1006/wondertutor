@@ -84,6 +84,19 @@ export default function Home() {
       .catch(() => setHome((h) => ({ ...h, loaded: true })))
   }, [])
 
+  // Location suggestions for anywhere in Malaysia: popular places first, then what matches the typing
+  const [placeOptions, setPlaceOptions] = useState([])
+  const [placesFor, setPlacesFor] = useState(null)
+  useEffect(() => {
+    const asked = search.location
+    const t = setTimeout(() => {
+      api.get('/public/places', { params: { q: asked.trim() || undefined, limit: 8 } })
+        .then((r) => { setPlaceOptions((r.data.results || []).map((p) => p.label)); setPlacesFor(asked) })
+        .catch(() => {})
+    }, 180)
+    return () => clearTimeout(t)
+  }, [search.location])
+
   const isParent = user?.role === 'PARENT'
   // Finding a tutor needs an account (the matching and booking data is private), so guests go to Log In first
   const findTutor = () => navigate(isParent ? '/parent/find-tutor' : '/login')
@@ -103,7 +116,8 @@ export default function Home() {
     else if (home.subjects.length && !has(home.subjects, search.subject)) found.subject = 'Pick a subject from the list.'
     if (!search.level.trim()) found.level = 'Choose an education level.'
     else if (!has(LEVELS, search.level)) found.level = 'Pick a level from the list.'
-    if (search.location.trim() && home.locations.length && !has(home.locations, search.location)) found.location = 'Pick a location from the list.'
+    // The places come from a search as the person types, so a typed place is only judged once its search has answered
+    if (search.location.trim() && placesFor === search.location && !has(placeOptions, search.location)) found.location = 'Pick a place from the list.'
     return found
   }
 
@@ -158,7 +172,7 @@ export default function Home() {
             <form onSubmit={startSearch} noValidate aria-label="Search for a tutor" className="relative mt-5 grid gap-1 rounded-2xl bg-white p-2.5 shadow-card md:grid-cols-3 lg:flex lg:w-[138%] lg:items-center">
               <ComboField icon="book" label="Subject" required placeholder="e.g. Mathematics" value={search.subject} options={home.subjects} error={errors.subject} onChange={update('subject')} />
               <ComboField icon="cap" label="Education Level" required placeholder="e.g. Primary" value={search.level} options={LEVELS} error={errors.level} onChange={update('level')} />
-              <ComboField icon="pin" label="Location" placeholder="e.g. Kepong, KL" value={search.location} options={home.locations} error={errors.location} onChange={update('location')} />
+              <ComboField icon="pin" label="Location" placeholder="Town or postcode" value={search.location} options={placeOptions} filter={false} error={errors.location} onChange={update('location')} />
               <button className="btn-accent mt-1 h-12 shrink-0 px-6 md:col-span-3 lg:col-span-1 lg:mt-0">
                 Search Tutors <Icon name="arrow-right" className="h-4 w-4" />
               </button>

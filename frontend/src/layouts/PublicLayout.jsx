@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import Logo from '../components/Logo'
+import { useAuth } from '../context/AuthContext'
+import { homeFor } from '../components/ProtectedRoute'
 
 // Public nav (matches the login / signup mockups). "Find a Tutor" needs an account, so it leads to Log In.
 const footerLink = 'inline-flex min-h-9 items-center text-slate-700 hover:text-brand-600 hover:underline'
@@ -24,6 +26,8 @@ function NavLink({ label, to, active }) {
 
 export default function PublicLayout() {
   const { pathname, hash } = useLocation()
+  // Someone who is already logged in (e.g. reading the Privacy Notice) is offered their dashboard, not Log In / Sign Up
+  const { user } = useAuth()
   const isHome = pathname === '/'
   // The login page is a single screen: no footer, and the page fills the window height so nothing needs scrolling
   const isLogin = pathname === '/login'
@@ -44,8 +48,14 @@ export default function PublicLayout() {
             {LINKS.map(([label, to]) => <NavLink key={label} label={label} to={to} active={isActive(to)} />)}
           </nav>
           <div className="flex items-center gap-2">
-            <Link to="/login" aria-current={pathname === '/login' ? 'page' : undefined} className={`btn-outline min-h-11 px-4 sm:px-5 ${pathname === '/login' ? 'bg-brand-50' : ''}`}>Log In</Link>
-            <Link to="/signup" aria-current={pathname === '/signup' ? 'page' : undefined} className="btn-accent min-h-11 px-4 sm:px-5">Sign Up</Link>
+            {user ? (
+              <Link to={homeFor(user.role)} className="btn-primary min-h-11 px-4 sm:px-5">My Dashboard</Link>
+            ) : (
+              <>
+                <Link to="/login" aria-current={pathname === '/login' ? 'page' : undefined} className={`btn-outline min-h-11 px-4 sm:px-5 ${pathname === '/login' ? 'bg-brand-50' : ''}`}>Log In</Link>
+                <Link to="/signup" aria-current={pathname === '/signup' ? 'page' : undefined} className="btn-accent min-h-11 px-4 sm:px-5">Sign Up</Link>
+              </>
+            )}
             <button
               type="button"
               className="flex h-11 w-11 items-center justify-center rounded-lg text-navy hover:bg-brand-50 lg:hidden"
@@ -95,8 +105,9 @@ export default function PublicLayout() {
             <nav aria-label="Account">
               <h2 className="mb-2 font-display text-base font-bold text-navy">Account</h2>
               <ul className="space-y-1">
-                <li><Link to="/login" className={footerLink}>Log In</Link></li>
-                <li><Link to="/signup" className={footerLink}>Sign Up</Link></li>
+                {user
+                  ? <li><Link to={homeFor(user.role)} className={footerLink}>My Dashboard</Link></li>
+                  : <><li><Link to="/login" className={footerLink}>Log In</Link></li><li><Link to="/signup" className={footerLink}>Sign Up</Link></li></>}
                 <li><Link to="/privacy" className={footerLink}>Privacy Notice</Link></li>
               </ul>
             </nav>

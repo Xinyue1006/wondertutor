@@ -10,6 +10,7 @@ import { useMatching, EMPTY_CRITERIA } from './MatchingContext'
 import { parseText } from './parseText'
 import { DAY_SHORT, hhmmLabel } from '../lib/format'
 import { gradeLabel, LEVELS, levelLabel } from '../lib/education'
+import { childSubjects, subjectsForLevel } from '../lib/subjects'
 import { TIME_PRESETS, defaultRange, rangeKey, rangeLabel } from '../lib/times'
 
 let nextId = 1
@@ -380,13 +381,13 @@ function StepInput({ msg, c, catalog, kids, onAnswer }) { // eslint-disable-line
           options={[...kids.map((k) => ({ label: `${k.name} (${gradeLabel(k.educationLevel, k.grade)})`, child: k })), { label: 'Someone else' }]}
           onPick={(o) =>
             o.child
-              ? onAnswer(msg, { childId: o.child.id, level: o.child.educationLevel, grade: o.child.grade, subject: o.child.subject || c.subject }, o.child.name, 'childAsked')
+              ? onAnswer(msg, { childId: o.child.id, level: o.child.educationLevel, grade: o.child.grade, subject: childSubjects(o.child)[0] || c.subject }, o.child.name, 'childAsked')
               : onAnswer(msg, {}, o.label, 'childAsked')
           }
         />
       )
     case 'subject':
-      return <Chips options={(catalog?.subjects || []).map((s) => ({ label: s }))} onPick={(o) => onAnswer(msg, { subject: o.label }, o.label)} />
+      return <Chips options={subjectsForLevel(catalog?.subjects || [], catalog?.subjectLevels, c.level).map((s) => ({ label: s }))} onPick={(o) => onAnswer(msg, { subject: o.label }, o.label)} />
     case 'level':
       return <Chips options={LEVELS.map((l) => ({ label: l.value === 'SECONDARY' ? 'Secondary' : l.label, value: l.value }))} onPick={(o) => onAnswer(msg, { level: o.value }, o.label)} />
     case 'grade': {

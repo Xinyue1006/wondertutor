@@ -8,9 +8,16 @@ const DAY_WORDS = {
   thursday: 4, thu: 4, thur: 4, thurs: 4, friday: 5, fri: 5, saturday: 6, sat: 6,
 }
 
+// Other ways parents say a subject: short forms, Malay names (Sejarah, Fizik, Kimia...) and the SPM subject names
 const SUBJECT_ALIASES = {
   maths: 'Mathematics', math: 'Mathematics', matematik: 'Mathematics', bm: 'Bahasa Melayu', 'bahasa melayu': 'Bahasa Melayu',
   'bahasa malaysia': 'Bahasa Melayu', mandarin: 'Chinese', 'add maths': 'Additional Mathematics', 'additional maths': 'Additional Mathematics',
+  'add math': 'Additional Mathematics', 'matematik tambahan': 'Additional Mathematics', bi: 'English', 'bahasa inggeris': 'English',
+  sains: 'Science', sejarah: 'History', fizik: 'Physics', kimia: 'Chemistry', biologi: 'Biology', geografi: 'Geography', ekonomi: 'Economics',
+  cs: 'Computer Science', computing: 'Computer Science', 'sains komputer': 'Computer Science', ict: 'Computer Science', coding: 'Computer Science',
+  accounting: 'Principles of Accounting', accounts: 'Principles of Accounting', 'prinsip akaun': 'Principles of Accounting', perakaunan: 'Principles of Accounting',
+  perniagaan: 'Business', literature: 'Literature in English', kesusasteraan: 'Literature in English', 'pendidikan islam': 'Islamic Education',
+  'pendidikan moral': 'Moral Education', moral: 'Moral Education',
 }
 
 export function parseText(text, catalog) {

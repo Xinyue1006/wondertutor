@@ -4,13 +4,14 @@ import Icon from './ui/Icon'
 // A field you can type in AND pick from: suggestions narrow down as you type, and the chevron opens the full list.
 // Built by hand instead of using <datalist> so there is exactly one arrow and it looks the same in every browser.
 // Keyboard: ArrowDown/ArrowUp move through the list, Enter picks, Escape closes.
-export default function ComboField({ icon, label, value, onChange, options, placeholder, required = false, error }) {
+// `filter={false}`: the options already match what was typed (they came from a search), so they are shown as they are.
+export default function ComboField({ icon, label, value, onChange, options, placeholder, required = false, error, filter = true }) {
   const id = useId()
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(-1)
   const typed = value.trim().toLowerCase()
   // When the box already holds an exact option, show the whole list so the parent can switch easily
-  const shown = !typed || options.some((o) => o.toLowerCase() === typed) ? options : options.filter((o) => o.toLowerCase().includes(typed))
+  const shown = !filter || !typed || options.some((o) => o.toLowerCase() === typed) ? options : options.filter((o) => o.toLowerCase().includes(typed))
   const listOpen = open && shown.length > 0
 
   const pick = (o) => { onChange(o); setOpen(false); setActive(-1) }

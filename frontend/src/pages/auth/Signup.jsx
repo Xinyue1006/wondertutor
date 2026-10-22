@@ -5,6 +5,9 @@ import { useAuth } from '../../context/AuthContext'
 import { afterLogin } from '../../components/ProtectedRoute'
 import Icon from '../../components/ui/Icon'
 import GoogleButton from '../../components/GoogleButton'
+import PlaceSearch from '../../components/PlaceSearch'
+import SubjectPicker from '../../components/SubjectPicker'
+import { childSubjects, keepAllowed } from '../../lib/subjects'
 import Recaptcha, { RECAPTCHA_SITE_KEY } from '../../components/Recaptcha'
 import { ErrorBox } from '../../components/ui/Common'
 import OtpInput from '../../components/OtpInput'
@@ -52,9 +55,10 @@ export default function Signup() {
   const [role, setRole] = useState(draft?.role || 'PARENT')
   const [section, setSection] = useState(SECTIONS[draft?.role || 'PARENT'][0].id)
   const [form, setForm] = useState({ ...emptyForm, ...(draft?.form || {}) })
-  const [kids, setKids] = useState(draft?.kids || [])
+  const [kids, setKids] = useState((draft?.kids || []).map((k) => ({ ...k, subjects: childSubjects(k) })))
   const [prefs, setPrefs] = useState({ ...emptyPreferences(), ...(draft?.prefs || {}) })
   const [subjects, setSubjects] = useState([])
+  const [subjectLevels, setSubjectLevels] = useState(null) // which levels each subject exists at
   const [photo, setPhoto] = useState(null)
   const [captcha, setCaptcha] = useState('')
   const [terms, setTerms] = useState(false)
@@ -88,7 +92,7 @@ export default function Signup() {
 
   // The subject list comes from the public endpoint (the same list the tutors teach), so children are never saved with a subject nobody teaches
   useEffect(() => {
-    api.get('/public/home').then((r) => setSubjects(r.data.subjects || [])).catch(() => {})
+    api.get('/public/home').then((r) => { setSubjects(r.data.subjects || []); setSubjectLevels(r.data.subjectLevels || null) }).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -122,7 +126,7 @@ export default function Signup() {
         const problem = checkName(k.name, "Child's name", 60) || checkText(k.notes, { label: 'Learning goals', max: 500 })
         if (problem) return problem
       }
-      if (kids.some((k) => !k.subject)) return 'Choose the subject each child needs help with, or remove the row'
+      if (kids.some((k) => !k.subjects?.length)) return 'Choose at least one subject for each child, or remove the row'
     }
     return ''
   }
@@ -165,7 +169,7 @@ export default function Signup() {
         password: form.password,
         ...(role === 'PARENT' && {
           address: form.address || undefined,
-          children: kids.map((k) => ({ name: k.name, educationLevel: k.level, grade: k.grade, subject: k.subject, ...(k.notes?.trim() && { notes: k.notes.trim() }) })),
+          children: kids.map((k) => ({ name: k.name, educationLevel: k.level, grade: k.grade, subjects: k.subjects, ...(k.notes?.trim() && { notes: k.notes.trim() }) })),
           preferences: toApiPreferences(prefs) ?? undefined,
         }),
       })
@@ -348,17 +352,11 @@ export default function Signup() {
                       <div className="grid gap-4 md:grid-cols-2">
                         <Phone label="Phone Number" required value={form.phone} onChange={set('phone')} />
                         {role === 'PARENT' && (
-                          <label className="block">
-                            <span className="mb-1.5 block text-sm font-semibold text-navy">Home Area</span>
-                            <div className="relative">
-                              <Icon name="pin" className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-brand-500" />
-                              <input list="areas" className="input h-11 pl-10" placeholder="e.g. Kepong, Kuala Lumpur" value={form.address} onChange={set('address')} />
-                              <datalist id="areas">
-                                {['Kepong, Kuala Lumpur', 'Mont Kiara, Kuala Lumpur', 'Damansara, Kuala Lumpur', 'Bangsar, Kuala Lumpur', 'Sri Petaling, Kuala Lumpur', 'Cheras, Kuala Lumpur', 'Petaling Jaya, Selangor', 'Subang Jaya, Selangor', 'Puchong, Selangor', 'Shah Alam, Selangor', 'Klang, Selangor', 'Banting, Selangor'].map((a) => <option key={a} value={a} />)}
-                              </datalist>
-                            </div>
-                            <span className="mt-1 block text-xs text-slate-600">Optional. Pick your area so we can rank tutors by distance. Your exact address is only needed when you book a physical lesson.</span>
-                          </label>
+                          <PlaceSearch
+                            label="Home area" optional value={form.address} onChange={(v) => setForm((f) => ({ ...f, address: v }))}
+                            labelClass="mb-1.5 block text-sm font-semibold text-navy"
+                            hint="Type your town or postcode, anywhere in Malaysia. We use it to rank tutors by distance. Your exact address is only needed when you book a physical lesson."
+                          />
                         )}
                         <div className="md:col-span-2">
                           <PhotoUpload photo={photo} setPhoto={setPhoto} />
@@ -366,7 +364,7 @@ export default function Signup() {
                       </div>
                     )}
 
-                    {sec.id === 'children' && <Kids kids={kids} setKids={setKids} subjects={subjects} />}
+                    {sec.id === 'children' && <Kids kids={kids} setKids={setKids} subjects={subjects} subjectLevels={subjectLevels} />}
 
                     {sec.id === 'preferences' && (
                       <div className="space-y-4">
@@ -619,7 +617,7 @@ function PhotoUpload({ photo, setPhoto }) {
   )
 }
 
-function Kids({ kids, setKids, subjects }) {
+function Kids({ kids, setKids, subjects, subjectLevels }) {
   const update = (i, patch) => setKids(kids.map((k, j) => (j === i ? { ...k, ...patch } : k)))
   return (
     <div className="space-y-3">
@@ -627,35 +625,34 @@ function Kids({ kids, setKids, subjects }) {
         Optional now, but add at least one child to get tutor matches straight away. You can add or edit children later under <b>My Children</b>.
       </p>
       {kids.map((k, i) => (
-        <div key={i} className="grid gap-3 rounded-xl bg-white p-3 md:grid-cols-[1fr_1fr_1fr_auto] md:items-start">
+        <div key={i} className="grid gap-3 rounded-xl bg-white p-3 md:grid-cols-[1fr_1fr_auto] md:items-start">
           <Input label="Child's Name" required value={k.name} onChange={(e) => update(i, { name: e.target.value })} placeholder="e.g. Sarah" />
           <label className="block">
             <span className="mb-1.5 block text-sm font-semibold text-navy">Education Level <span className="text-red-600">*</span></span>
-            <select className="input h-11" value={k.level ? `${k.level}:${k.grade}` : ''} onChange={(e) => { const g = parseGrade(e.target.value); update(i, g.level ? { level: g.level, grade: g.grade } : {}) }}>
+            <select className="input h-11" value={k.level ? `${k.level}:${k.grade}` : ''} onChange={(e) => { const g = parseGrade(e.target.value); update(i, g.level ? { level: g.level, grade: g.grade, subjects: keepAllowed(k.subjects, subjects, subjectLevels, g.level) } : {}) }}>
               <option value="">Select…</option>
               {GRADE_GROUPS.map((g) => (
                 <optgroup key={g.label} label={g.label}>{g.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</optgroup>
               ))}
             </select>
           </label>
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-semibold text-navy">Subject needed <span className="text-red-600">*</span></span>
-            <select className="input h-11" value={k.subject || ''} onChange={(e) => update(i, { subject: e.target.value })}>
-              <option value="">Select…</option>
-              {subjects.map((sub) => <option key={sub}>{sub}</option>)}
-            </select>
-          </label>
           <button type="button" onClick={() => setKids(kids.filter((_, j) => j !== i))} className="flex h-11 w-11 items-center justify-center self-end rounded-lg text-red-600 hover:bg-red-50" aria-label={`Remove ${k.name || 'this child'}`}>
             <Icon name="trash" className="h-5 w-5" />
           </button>
-          <label className="block md:col-span-4">
+          <div className="md:col-span-3">
+            <SubjectPicker
+              label="Subjects needed" required idPrefix={`kid-${i}-subj`} value={k.subjects || []} onChange={(list) => update(i, { subjects: list })}
+              level={k.level} subjects={subjects} subjectLevels={subjectLevels}
+            />
+          </div>
+          <label className="block md:col-span-3">
             <span className="mb-1.5 block text-sm font-semibold text-navy">Learning needs or goals <span className="font-normal text-slate-600">(optional)</span></span>
             <input className="input h-11" maxLength={500} value={k.notes || ''} onChange={(e) => update(i, { notes: e.target.value })} placeholder="e.g. Wants to improve exam scores, needs help with fractions" />
           </label>
         </div>
       ))}
       {kids.length < 5 && (
-        <button type="button" onClick={() => setKids([...kids, { name: '', level: '', grade: null, subject: '', notes: '' }])} className="btn-outline min-h-11">
+        <button type="button" onClick={() => setKids([...kids, { name: '', level: '', grade: null, subjects: [], notes: '' }])} className="btn-outline min-h-11">
           <Icon name="plus" className="h-4 w-4" /> Add a child
         </button>
       )}

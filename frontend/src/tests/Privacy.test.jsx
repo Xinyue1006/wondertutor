@@ -1,8 +1,13 @@
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
+import { vi } from 'vitest'
+
+let auth = { user: null }
+vi.mock('../context/AuthContext', () => ({ useAuth: () => auth }))
 import Privacy from '../pages/Privacy'
 
 const renderPage = () => render(<MemoryRouter><Privacy /></MemoryRouter>)
+beforeEach(() => { auth = { user: null } })
 
 describe('Privacy Notice page', () => {
   test('has the sections a parent looks for, in plain language', () => {
@@ -18,5 +23,21 @@ describe('Privacy Notice page', () => {
     renderPage()
     expect(screen.getByText(/Download my data/)).toBeInTheDocument()
     expect(screen.getByText(/Delete my account/)).toBeInTheDocument()
+  })
+})
+
+describe('going back from the Privacy Notice', () => {
+  test('a visitor goes back to the landing page', () => {
+    renderPage()
+    expect(screen.getByRole('link', { name: /Back to WonderTutor/ })).toHaveAttribute('href', '/')
+  })
+
+  test('a logged-in parent, tutor or admin goes back to their own dashboard', () => {
+    for (const [role, home] of [['PARENT', '/parent'], ['TUTOR', '/tutor'], ['ADMIN', '/admin']]) {
+      auth = { user: { role } }
+      const { unmount } = renderPage()
+      expect(screen.getByRole('link', { name: /Back to my dashboard/ })).toHaveAttribute('href', home)
+      unmount()
+    }
   })
 })

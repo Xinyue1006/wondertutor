@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom'
 import Icon from '../components/ui/Icon'
+import { useAuth } from '../context/AuthContext'
+import { homeFor } from '../components/ProtectedRoute'
 
 // Plain-language Privacy Notice (Malaysia's Personal Data Protection Act 2010, PDPA) and the few rules of using the site.
 // Everything stated here is what the system really does. Contact details come from VITE_PRIVACY_EMAIL when it is set.
@@ -22,6 +24,8 @@ const List = ({ items }) => (
 )
 
 export default function Privacy() {
+  // A logged-in reader goes back to their own dashboard, not to the landing page
+  const { user } = useAuth()
   return (
     <article className="mx-auto w-full max-w-3xl py-8">
       <div className="eyebrow">Your data, your choice</div>
@@ -134,9 +138,14 @@ export default function Privacy() {
         <p>If we change this notice in a way that matters to you, we will tell you in the app. The date at the top shows the latest version.</p>
       </Section>
 
-      <p className="mt-10">
-        <Link to="/" className="inline-flex min-h-11 items-center gap-1.5 font-semibold text-brand-600 hover:underline">
-          <Icon name="arrow-left" className="h-4 w-4" /> Back to WonderTutor
+      <p className="mt-8 text-xs text-slate-600">
+        Town and postcode locations come from <a href="https://www.geonames.org" target="_blank" rel="noopener noreferrer" className="font-semibold text-brand-600 underline">GeoNames</a>,
+        used under the <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer" className="font-semibold text-brand-600 underline">Creative Commons Attribution 4.0</a> licence.
+      </p>
+
+      <p className="mt-6">
+        <Link to={user ? homeFor(user.role) : '/'} className="inline-flex min-h-11 items-center gap-1.5 font-semibold text-brand-600 hover:underline">
+          <Icon name="arrow-left" className="h-4 w-4" /> {user ? 'Back to my dashboard' : 'Back to WonderTutor'}
         </Link>
       </p>
     </article>

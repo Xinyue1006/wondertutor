@@ -5,6 +5,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import api, { errorMessage } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { preferencesToCriteria } from '../lib/preferences'
+import { childSubjects } from '../lib/subjects'
 
 const Ctx = createContext(null)
 
@@ -90,7 +91,7 @@ export function MatchingProvider({ children }) {
       childId: child.id,
       level: child.educationLevel,
       grade: child.grade,
-      subject: child.subject || c.subject,
+      subject: childSubjects(child)[0] || c.subject,
     }))
   }, [])
 
