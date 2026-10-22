@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import api, { errorMessage } from '../../api/client'
 import TutorCard from '../../components/TutorCard'
+import { CompareBar, useCompare } from '../../components/Compare'
 import Icon from '../../components/ui/Icon'
 import { EmptyState, ErrorBox, PageTitle, Spinner } from '../../components/ui/Common'
 
 // Tutors the parent saved with the heart button, to compare or book later
 export default function SavedTutors() {
+  const compare = useCompare() // up to 3 tutors ticked for the side-by-side comparison
   const [tutors, setTutors] = useState(null)
   const [error, setError] = useState('')
   // The tutor just removed, so an accidental click can be undone
@@ -61,8 +63,9 @@ export default function SavedTutors() {
         <>
           <p className="mb-3 text-sm text-slate-600">{tutors.length === 1 ? '1 saved tutor' : `${tutors.length} saved tutors`}</p>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {tutors.map((t) => <TutorCard key={t.id} tutor={t} saved onToggleSave={unsave} />)}
+            {tutors.map((t) => <TutorCard key={t.id} tutor={t} saved onToggleSave={unsave} compare={compare} />)}
           </div>
+          <CompareBar compare={compare} />
           <Link to="/parent/find-tutor" className="btn-outline mt-6 min-h-11"><Icon name="search" className="h-4 w-4" /> Find more tutors</Link>
         </>
       )}

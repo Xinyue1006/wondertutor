@@ -11,7 +11,7 @@ import { checkName, checkText } from '../../lib/validation'
 import SubjectPicker from '../../components/SubjectPicker'
 import { childSubjects, keepAllowed } from '../../lib/subjects'
 
-const blank = { name: '', grade: 'PRIMARY:1', subjects: [], notes: '', photoUrl: null }
+const blank = { name: '', grade: 'PRIMARY:1', subjects: [], preferredLanguage: '', goals: '', notes: '', photoUrl: null }
 
 // My Children: add / edit / remove child profiles (name, education level, grade, subject, notes)
 export default function MyChildren() {
@@ -47,7 +47,7 @@ export default function MyChildren() {
   function openForm(c) {
     setError('')
     setEditing(c)
-    setForm(c === 'new' ? blank : { name: c.name, grade: `${c.educationLevel}:${c.grade}`, subjects: childSubjects(c), notes: c.notes || '', photoUrl: c.photoUrl })
+    setForm(c === 'new' ? blank : { name: c.name, grade: `${c.educationLevel}:${c.grade}`, subjects: childSubjects(c), preferredLanguage: c.preferredLanguage || '', goals: c.goals || '', notes: c.notes || '', photoUrl: c.photoUrl })
   }
   function closeForm() {
     setEditing(null)
@@ -57,10 +57,10 @@ export default function MyChildren() {
   async function save(e) {
     e.preventDefault()
     setError('')
-    const problem = checkName(form.name, "Child's name", 60) || (!form.grade && 'Choose the education level and grade') || checkText(form.notes, { label: 'Notes', max: 500 })
+    const problem = checkName(form.name, "Child's name", 60) || (!form.grade && 'Choose the education level and grade') || checkText(form.notes, { label: 'Learning preferences', max: 500 }) || checkText(form.goals, { label: 'Academic goals', max: 300 })
     if (problem) return setError(problem)
     const { level, grade } = parseGrade(form.grade)
-    const body = { name: form.name, educationLevel: level, grade, subjects: form.subjects, notes: form.notes || null, photoUrl: form.photoUrl }
+    const body = { name: form.name, educationLevel: level, grade, subjects: form.subjects, preferredLanguage: form.preferredLanguage || null, goals: form.goals || null, notes: form.notes || null, photoUrl: form.photoUrl }
     setBusy(true)
     try {
       if (editing === 'new') await api.post('/parent/children', body)
@@ -115,6 +115,12 @@ export default function MyChildren() {
                 {childSubjects(c).map((s) => <li key={s} className="pill bg-brand-50 text-brand-700">{s}</li>)}
               </ul>
             )}
+            {(c.preferredLanguage || c.goals) && (
+              <dl className="mt-3 space-y-1 text-sm text-slate-600">
+                {c.preferredLanguage && <div><dt className="inline font-semibold text-navy">Learns best in: </dt><dd className="inline">{c.preferredLanguage}</dd></div>}
+                {c.goals && <div><dt className="inline font-semibold text-navy">Goal: </dt><dd className="inline">{c.goals}</dd></div>}
+              </dl>
+            )}
             {c.notes && <p className="mt-3 rounded-lg bg-brand-25 p-3 text-sm text-slate-600">{c.notes}</p>}
             <div className="mt-2 text-xs text-slate-400">{c.bookingCount} booking{c.bookingCount === 1 ? '' : 's'}</div>
             <div className="mt-3 grid grid-cols-2 gap-2">
@@ -149,7 +155,14 @@ export default function MyChildren() {
             label="Subjects that need help" idPrefix="child-subj" value={form.subjects} onChange={(subjects) => setForm({ ...form, subjects })}
             level={parseGrade(form.grade).level} subjects={catalog?.subjects} subjectLevels={catalog?.subjectLevels} max={catalog?.maxChildSubjects || 6}
           />
-          <label className="block"><span className="mb-1.5 block text-sm font-bold text-navy">Notes <span className="font-normal text-slate-500">(Optional)</span></span>
+          <label className="block"><span className="mb-1.5 block text-sm font-bold text-navy">Preferred learning language <span className="font-normal text-slate-500">(Optional)</span></span>
+            <SelectBox icon="book" value={form.preferredLanguage} onChange={(e) => setForm({ ...form, preferredLanguage: e.target.value })}>
+              <option value="">No preference</option>
+              {(catalog?.languages || []).map((l) => <option key={l}>{l}</option>)}
+            </SelectBox></label>
+          <label className="block"><span className="mb-1.5 block text-sm font-bold text-navy">Academic goals <span className="font-normal text-slate-500">(Optional)</span></span>
+            <input maxLength={300} className="input" value={form.goals} onChange={(e) => setForm({ ...form, goals: e.target.value })} placeholder="e.g. Score A in SPM Mathematics" /></label>
+          <label className="block"><span className="mb-1.5 block text-sm font-bold text-navy">Learning preferences &amp; notes <span className="font-normal text-slate-500">(Optional)</span></span>
             <textarea rows={3} maxLength={500} className="input resize-none" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="e.g. Struggles with problem sums. Preparing for UPSR-style exams." />
             <span className="block text-right text-xs text-slate-400">{form.notes.length}/500</span></label>
           <div className="flex justify-end gap-3"><button type="button" onClick={closeForm} className="btn-outline">Cancel</button><button disabled={busy} className="btn-primary px-6">{busy ? 'Saving…' : 'Save'}</button></div>

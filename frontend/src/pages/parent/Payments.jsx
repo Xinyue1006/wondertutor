@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import api, { errorMessage } from '../../api/client'
 import Avatar from '../../components/ui/Avatar'
 import Icon from '../../components/ui/Icon'
@@ -80,7 +81,10 @@ export default function Payments() {
                         <td className="px-3 py-3"><div className="flex items-start gap-2"><Icon name="calendar" className="mt-0.5 h-4 w-4 text-brand-500" /><div><div className="text-navy">{fmtDate(t.booking.startAt)}</div><div className="text-xs text-slate-500">{fmtTimeRange(t.booking.startAt, t.booking.endAt)}</div></div></div></td>
                         <td className="px-3 py-3 font-bold text-navy">{money(t.amount)}</td>
                         <td className="px-3 py-3"><StatusPill status={t.status} /></td>
-                        <td className="px-3 py-3"><button onClick={() => setDetail(t.booking)} className="flex items-center gap-1 font-semibold text-brand-500 hover:underline">View Details <Icon name="arrow-right" className="h-4 w-4" /></button></td>
+                        <td className="px-3 py-3"><div className="flex flex-col items-start gap-1">
+                          <button onClick={() => setDetail(t.booking)} className="flex items-center gap-1 font-semibold text-brand-500 hover:underline">View Details <Icon name="arrow-right" className="h-4 w-4" /></button>
+                          {t.status !== 'FAILED' && <Link to={`/parent/payments/${t.id}/receipt`} className="text-xs font-semibold text-slate-600 hover:underline">Receipt</Link>}
+                        </div></td>
                       </tr>))}
                   </tbody>
                 </table>

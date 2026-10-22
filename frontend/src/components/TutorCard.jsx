@@ -8,7 +8,7 @@ import { ModePills, VerifiedTick } from './ui/Common'
 // One tutor card, used by Find a Tutor (browse) and the matching results.
 // With a `match` it also shows the match % badge and the "why we recommend this tutor" reasons.
 // With `onToggleSave` it also shows a heart button to save / unsave the tutor.
-export default function TutorCard({ tutor, match, query = '', saved = false, onToggleSave }) {
+export default function TutorCard({ tutor, match, query = '', saved = false, onToggleSave, compare }) {
   const distance = distanceLabel(tutor.distanceKm ?? match?.distanceKm)
   const [more, setMore] = useState(false)
   const reasons = match?.reasons || []
@@ -96,6 +96,12 @@ export default function TutorCard({ tutor, match, query = '', saved = false, onT
         <Link to={`/parent/tutors/${tutor.id}${query}`} className="btn-outline">View Profile</Link>
         <Link to={`/parent/tutors/${tutor.id}/book${query}`} className="btn-primary">Book a Lesson</Link>
       </div>
+      {compare && (
+        <label className={`flex items-center gap-2 text-sm ${!compare.has(tutor) && compare.full ? 'cursor-not-allowed text-slate-400' : 'cursor-pointer text-slate-600'}`}>
+          <input type="checkbox" className="h-4 w-4 accent-brand-500" checked={compare.has(tutor)} disabled={!compare.has(tutor) && compare.full} onChange={() => compare.toggle(tutor)} />
+          Compare{!compare.has(tutor) && compare.full ? ` (up to ${compare.max})` : ''}
+        </label>
+      )}
     </article>
   )
 }

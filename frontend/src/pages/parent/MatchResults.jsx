@@ -5,6 +5,7 @@ import { useMatching } from '../../assistant/MatchingContext'
 import Icon from '../../components/ui/Icon'
 import { EmptyState, ErrorBox, LoadError, PageTitle, Spinner } from '../../components/ui/Common'
 import TutorCard from '../../components/TutorCard'
+import { CompareBar, useCompare } from '../../components/Compare'
 import FilterChips, { NO_EXTRA, applyExtra } from '../../components/FilterChips'
 
 const SORTS = [
@@ -17,6 +18,7 @@ const SORTS = [
 
 // Matching results: each card shows the match % and the "why we recommend this tutor" reasons
 export default function MatchResults() {
+  const compare = useCompare() // up to 3 tutors ticked for the side-by-side comparison
   const navigate = useNavigate()
   const { result, setResult, setCriteria } = useMatching()
   const [loading, setLoading] = useState(!result)
@@ -110,9 +112,10 @@ export default function MatchResults() {
         </EmptyState></div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {tutors.map((t) => <TutorCard key={t.id} tutor={t} match={t.match} saved={t.isFavourite} onToggleSave={toggleSave} />)}
+          {tutors.map((t) => <TutorCard key={t.id} tutor={t} match={t.match} saved={t.isFavourite} onToggleSave={toggleSave} compare={compare} />)}
         </div>
       )}
+      <CompareBar compare={compare} />
     </div>
   )
 }

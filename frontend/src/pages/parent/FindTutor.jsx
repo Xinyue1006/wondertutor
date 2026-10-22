@@ -5,6 +5,7 @@ import { useMatching } from '../../assistant/MatchingContext'
 import Icon from '../../components/ui/Icon'
 import Robot from '../../components/ui/Robot'
 import TutorCard from '../../components/TutorCard'
+import { CompareBar, useCompare } from '../../components/Compare'
 import Pagination from '../../components/ui/Pagination'
 import FilterChips, { NO_EXTRA } from '../../components/FilterChips'
 import PlaceSearch from '../../components/PlaceSearch'
@@ -25,6 +26,7 @@ const PAGE_SIZE = 9
 const HOURS = Array.from({ length: 15 }, (_, i) => `${String(i + 8).padStart(2, '0')}:00`) // 08:00 - 22:00
 
 export default function FindTutor() {
+  const compare = useCompare() // up to 3 tutors ticked for the side-by-side comparison
   const navigate = useNavigate()
   const { catalog, kids, kidsLoaded, patchCriteria, loadError, reloadShared } = useMatching()
 
@@ -195,8 +197,9 @@ export default function FindTutor() {
           <div className="card"><EmptyState icon="search" title="No tutors match these filters">Try another subject or level, or remove some filters.</EmptyState></div>
         )}
         <div className={`grid gap-4 md:grid-cols-2 xl:grid-cols-3 ${loading ? 'opacity-60' : ''}`}>
-          {data?.tutors.map((t) => <TutorCard key={t.id} tutor={t} match={t.match} saved={t.isFavourite} onToggleSave={toggleSave} />)}
+          {data?.tutors.map((t) => <TutorCard key={t.id} tutor={t} match={t.match} saved={t.isFavourite} onToggleSave={toggleSave} compare={compare} />)}
         </div>
+        <CompareBar compare={compare} />
         {data && (
           <div className="mt-6">
             <Pagination

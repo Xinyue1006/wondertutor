@@ -87,7 +87,7 @@ export default function MatchingWizard() {
         <ErrorBox className="mb-4">{error}</ErrorBox>
         {step === 0 && <StepLearning c={c} kids={kids} catalog={catalog} patch={patchCriteria} applyChild={applyChild} onNext={next} />}
         {step === 1 && <StepSchedule c={c} catalog={catalog} patch={patchCriteria} onBack={() => setStep(0)} onNext={next} />}
-        {step === 2 && <StepPrefs c={c} patch={patchCriteria} onBack={() => setStep(1)} onFind={find} busy={busy} />}
+        {step === 2 && <StepPrefs c={c} languages={catalog.languages} patch={patchCriteria} onBack={() => setStep(1)} onFind={find} busy={busy} />}
       </section>
     </div>
   )
@@ -265,7 +265,7 @@ function StepSchedule({ c, catalog, patch, onBack, onNext }) {
 }
 
 // ───────────── Step 3: Preferences ─────────────
-function StepPrefs({ c, patch, onBack, onFind, busy }) {
+function StepPrefs({ c, languages, patch, onBack, onFind, busy }) {
   const lo = c.budgetMin ?? MIN_RATE
   const hi = c.budgetMax ?? MAX_RATE
   const setBudget = (a, b) => (a <= MIN_RATE && b >= MAX_RATE ? patch({ budgetMin: null, budgetMax: null }) : patch({ budgetMin: a, budgetMax: b }))
@@ -301,6 +301,15 @@ function StepPrefs({ c, patch, onBack, onFind, busy }) {
                 <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${c.gender === v ? 'border-brand-500' : 'border-slate-300'}`}>{c.gender === v && <span className="h-2.5 w-2.5 rounded-full bg-brand-500" />}</span>
                 <span className="truncate">{l}</span>
               </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <Label>Teaching Language</Label>
+          <div className="flex flex-wrap gap-2">
+            {[['', 'No preference'], ...(languages || []).map((l) => [l, l])].map(([v, l]) => (
+              <button key={v || 'any'} type="button" aria-pressed={(c.language || '') === v} onClick={() => patch({ language: v })} className={`chip px-3 py-1.5 text-[13px] ${(c.language || '') === v ? 'chip-on' : ''}`}>{l}</button>
             ))}
           </div>
         </div>

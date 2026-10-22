@@ -6,6 +6,7 @@ import Icon from '../../components/ui/Icon'
 import { EmptyState, ErrorBox, LoadError, Modal, PageTitle, Spinner, VerifiedTick } from '../../components/ui/Common'
 import { fmtShortDate } from '../../lib/format'
 import { gradeLabel } from '../../lib/education'
+import WarnUser from '../../components/WarnUser'
 
 // Admin user management: search, deactivate / reactivate, approve tutor qualifications
 export default function AdminUsers() {
@@ -16,13 +17,14 @@ export default function AdminUsers() {
   const role = params.get('role') || ''
   const status = params.get('status') || ''
   const flagged = params.get('flagged') || ''
+  const review = params.get('review') || '' // any account with a suspicious-account signal
   const pending = params.get('pending') || ''
 
   const [loadError, setLoadError] = useState('')
   const load = useCallback(() => {
     setLoadError('')
-    api.get('/admin/users', { params: { role, status, flagged, q } }).then((r) => setData(r.data)).catch((e) => setLoadError(errorMessage(e)))
-  }, [role, status, flagged, q])
+    api.get('/admin/users', { params: { role, status, flagged, review, q } }).then((r) => setData(r.data)).catch((e) => setLoadError(errorMessage(e)))
+  }, [role, status, flagged, review, q])
   useEffect(() => {
     const t = setTimeout(load, 250) // wait for the admin to stop typing
     return () => clearTimeout(t)
@@ -51,6 +53,10 @@ export default function AdminUsers() {
           Below rating threshold{data && ` (${data.threshold})`}
         </label>
         <label className="flex items-center gap-2 text-sm font-semibold text-navy">
+          <input type="checkbox" className="h-4 w-4 accent-brand-500" checked={!!review} onChange={(e) => set('review', e.target.checked ? '1' : '')} />
+          Needs review
+        </label>
+        <label className="flex items-center gap-2 text-sm font-semibold text-navy">
           <input type="checkbox" className="h-4 w-4 accent-brand-500" checked={!!pending} onChange={(e) => set('pending', e.target.checked ? '1' : '')} />
           Qualifications pending
         </label>
@@ -70,6 +76,12 @@ export default function AdminUsers() {
                   <td className="px-3 capitalize">{u.role.toLowerCase()}</td>
                   <td className="px-3"><span className={`pill ${u.status === 'ACTIVE' ? 'bg-ok-50 text-ok' : 'bg-red-50 text-red-600'}`}>{u.deleted ? 'Deleted by owner' : u.status === 'ACTIVE' ? 'Active' : 'Deactivated'}</span></td>
                   <td className="px-3 text-xs text-slate-600">
+                    {u.suspicious.length > 0 && (
+                      <div className="mb-1 space-y-0.5" aria-label="Why this account needs review">
+                        {u.suspicious.map((s) => <span key={s} className="pill mr-1 bg-red-50 py-0.5 text-red-600">{s}</span>)}
+                      </div>
+                    )}
+                    {u.warnings > 0 && <div className="mb-1 text-amber-700">{u.warnings} warning{u.warnings === 1 ? '' : 's'} issued</div>}
                     {u.tutor && (<div className="space-y-0.5">
                       <div className="flex items-center gap-1"><Icon name="star" fill className="h-3.5 w-3.5 text-accent" /> {u.tutor.ratingAvg.toFixed(1)} ({u.tutor.ratingCount})</div>
                       {u.tutor.flagged && <span className="pill bg-red-50 py-0.5 text-red-600">Below threshold</span>}
@@ -128,6 +140,13 @@ function UserModal({ id, onClose, onChanged }) {
             <div><span className="text-slate-500">Joined:</span> <b className="text-navy">{fmtShortDate(user.createdAt)}</b></div>
           </div>
 
+          {user.suspicious.length > 0 && (
+            <div role="alert" className="rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-800">
+              <b>This account needs review:</b>
+              <ul className="mt-1 list-disc pl-5">{user.suspicious.map((s) => <li key={s}>{s}</li>)}</ul>
+            </div>
+          )}
+
           {user.children.length > 0 && (
             <div><div className="mb-1 text-sm font-bold text-navy">Children</div>
               <div className="flex flex-wrap gap-2">{user.children.map((c) => <span key={c.id} className="pill bg-brand-50 text-brand-600">{c.name} · {gradeLabel(c.educationLevel, c.grade)}</span>)}</div></div>
@@ -163,6 +182,21 @@ function UserModal({ id, onClose, onChanged }) {
                     ))}
                   </li>))}
               </ul>
+            </div>
+          )}
+
+          {user.role !== 'ADMIN' && !user.deleted && (
+            <div className="space-y-2">
+              <div className="text-sm font-bold text-navy">Warnings ({user.warningHistory.length})</div>
+              {user.warningHistory.length > 0 && (
+                <ul className="space-y-1.5">
+                  {user.warningHistory.map((w) => (
+                    <li key={w.id} className="rounded-lg border border-slate-100 p-2.5 text-sm text-slate-700">
+                      {w.reason}<div className="text-xs text-slate-500">{fmtShortDate(w.createdAt)} · by {w.issuedBy}</div>
+                    </li>))}
+                </ul>
+              )}
+              <WarnUser userId={user.id} name={user.fullName} onDone={() => { load(); onChanged() }} />
             </div>
           )}
 

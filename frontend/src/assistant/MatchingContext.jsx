@@ -23,6 +23,7 @@ export const EMPTY_CRITERIA = {
   budgetMin: null, // null = no budget preference
   budgetMax: null,
   gender: 'ANY',
+  language: '', // the language the lesson should be taught in ('' = no preference)
   characteristics: [],
   notes: '',
 }
@@ -42,6 +43,7 @@ function toPayload(c) {
     budgetMin: c.budgetMin,
     budgetMax: c.budgetMax,
     gender: c.gender,
+    language: c.language || null,
     characteristics: c.characteristics,
     notes: c.notes || null,
   }
@@ -92,6 +94,7 @@ export function MatchingProvider({ children }) {
       level: child.educationLevel,
       grade: child.grade,
       subject: childSubjects(child)[0] || c.subject,
+      language: child.preferredLanguage || c.language, // the language the parent said the child learns best in
     }))
   }, [])
 

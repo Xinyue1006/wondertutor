@@ -21,6 +21,7 @@ import MyBookings from './pages/parent/MyBookings'
 import MyChildren from './pages/parent/MyChildren'
 import Payments from './pages/parent/Payments'
 import PaymentReturn from './pages/parent/PaymentReturn'
+import Receipt from './pages/parent/Receipt'
 import Complaints from './pages/parent/Complaints'
 import Profile from './pages/parent/Profile'
 import SavedTutors from './pages/parent/SavedTutors'
@@ -65,6 +66,7 @@ export default function App() {
           <Route path="children" element={<MyChildren />} />
           <Route path="payments" element={<Payments />} />
           <Route path="payments/return" element={<PaymentReturn />} />
+          <Route path="payments/:id/receipt" element={<Receipt />} />
           <Route path="complaints" element={<Complaints />} />
           <Route path="profile" element={<Profile />} />
           <Route path="favourites" element={<SavedTutors />} />
