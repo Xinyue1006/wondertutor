@@ -37,7 +37,7 @@ describe('My Profile layout', () => {
   test('has four sections as tabs, and opens on the personal details', async () => {
     setup()
     expect(await screen.findByRole('heading', { name: 'Personal details' })).toBeInTheDocument()
-    expect(screen.getAllByRole('tab').map((t) => t.textContent.trim())).toEqual(['Personal details', 'Tutor preferences', 'Password', 'Privacy & account'])
+    expect(screen.getAllByRole('tab').map((t) => t.textContent.trim())).toEqual(['Personal details', 'Tutor preferences', 'Password & email', 'Privacy & account'])
     expect(screen.getByRole('tab', { name: 'Personal details' })).toHaveAttribute('aria-selected', 'true')
   })
 
@@ -56,7 +56,7 @@ describe('My Profile layout', () => {
   test('switching tabs shows each section, and the tab can be opened from the address', async () => {
     setup()
     await screen.findByRole('heading', { name: 'Personal details' })
-    await userEvent.click(screen.getByRole('tab', { name: 'Password' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Password & email' }))
     expect(screen.getByRole('heading', { name: 'Password' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('tab', { name: 'Privacy & account' }))
     expect(screen.getByText('PRIVACY CARD')).toBeInTheDocument()
@@ -127,7 +127,7 @@ describe('password', () => {
   test('a new password must match, and shows the strength', async () => {
     setup()
     await screen.findByRole('heading', { name: 'Personal details' })
-    await userEvent.click(screen.getByRole('tab', { name: 'Password' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Password & email' }))
     await userEvent.type(screen.getByLabelText('Current password'), 'Parent1234')
     await userEvent.type(screen.getByLabelText('New password'), 'Newpass5678')
     await userEvent.type(screen.getByLabelText('Confirm new password'), 'Different1')
@@ -140,7 +140,7 @@ describe('password', () => {
   test('a Google account is told it has no password', async () => {
     setup({ hasPassword: false })
     await screen.findByRole('heading', { name: 'Personal details' })
-    await userEvent.click(screen.getByRole('tab', { name: 'Password' }))
-    expect(screen.getByText(/signs in with Google/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('tab', { name: 'Password & email' }))
+    expect(screen.getByText(/no password to change/)).toBeInTheDocument()
   })
 })

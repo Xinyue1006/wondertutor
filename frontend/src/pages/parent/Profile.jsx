@@ -8,6 +8,7 @@ import PhotoPicker from '../../components/PhotoPicker'
 import PhoneInput from '../../components/PhoneInput'
 import PlaceSearch from '../../components/PlaceSearch'
 import PasswordHint from '../../components/PasswordHint'
+import ChangeEmail from '../../components/ChangeEmail'
 import PreferencesFields from '../../components/PreferencesFields'
 import { fromApiPreferences, isEmptyPreferences, toApiPreferences } from '../../lib/preferences'
 import Icon from '../../components/ui/Icon'
@@ -21,7 +22,7 @@ import { checkName, checkPassword, checkPhone, checkText, normalizePhone } from 
 const TABS = [
   ['details', 'Personal details', 'user'],
   ['preferences', 'Tutor preferences', 'sliders'],
-  ['security', 'Password', 'lock'],
+  ['security', 'Password & email', 'lock'],
   ['privacy', 'Privacy & account', 'shield'],
 ]
 
@@ -263,7 +264,7 @@ export default function Profile() {
                 />
               </Field>
 
-              <Field id="pf-email" label="Email address" hint="This is how you log in, so it cannot be changed here.">
+              <Field id="pf-email" label="Email address" hint="This is how you log in. To change it, open the Password & email tab.">
                 <div className="relative">
                   <Icon name="lock" className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-500" />
                   <input id="pf-email" className="input h-11 bg-slate-50 pl-10 text-slate-700" value={profile.email} disabled aria-describedby="pf-email-hint" />
@@ -336,6 +337,13 @@ export default function Profile() {
                 </>
               )}
             </form>
+          )}
+
+          {tab === 'security' && (
+            <ChangeEmail
+              email={profile.email} hasPassword={profile.hasPassword}
+              onChanged={(email) => { setProfile((p) => ({ ...p, email })); setUser?.((u) => (u ? { ...u, email } : u)) }}
+            />
           )}
 
           {tab === 'privacy' && (
