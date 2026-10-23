@@ -36,7 +36,7 @@ describe('learning progress', () => {
     const times = r.timeline.map((l) => new Date(l.startAt).getTime())
     expect([...times].sort((x, y) => y - x)).toEqual(times)
     const withPhoto = r.timeline.find((l) => l.attendance)
-    expect(withPhoto.summary).toEqual({ content: 'Fractions: adding unlike denominators', progressNote: 'Getting faster' })
+    expect(withPhoto.summary).toEqual({ content: 'Fractions: adding unlike denominators', progressNote: 'Getting faster', topics: null, homework: null, recommendations: null })
     expect(withPhoto.attendance.checkInPhotoUrl).toMatch(/cloudinary/)
   })
 

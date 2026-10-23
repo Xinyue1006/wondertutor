@@ -5,6 +5,7 @@ import Avatar from '../../components/ui/Avatar'
 import Icon from '../../components/ui/Icon'
 import { EmptyState, LoadError, PageTitle, Spinner, Stars } from '../../components/ui/Common'
 import { gradeLabel } from '../../lib/education'
+import LessonNotes from '../../components/LessonNotes'
 import { fmtDate, fmtDateLong, fmtTime, fmtTimeRange } from '../../lib/format'
 
 // A child's learning journey: totals, subjects, the next lesson, and every completed lesson with the
@@ -49,6 +50,7 @@ export default function ChildProgress() {
         title={`${child.name}'s Learning Progress`}
         subtitle={`${gradeLabel(child.educationLevel, child.grade)}${stats.firstLessonAt ? ` · learning with WonderTutor since ${fmtDate(stats.firstLessonAt)}` : ''}`}
         sparkle={false}
+        right={<Link to={`/parent/children/${id}/report`} className="btn-primary px-5"><Icon name="file" className="h-4 w-4" /> Progress report</Link>}
       />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -76,12 +78,7 @@ export default function ChildProgress() {
                     <span className="flex items-center gap-1.5 text-sm text-slate-600"><Avatar src={l.tutor.photoUrl} name={l.tutor.name} className="h-6 w-6" text="text-[10px]" /> {l.tutor.name}</span>
                     {l.rating && <span className="flex items-center gap-1 text-sm text-slate-600"><Stars value={l.rating} size="h-3.5 w-3.5" /> your rating</span>}
                   </div>
-                  {l.summary ? (
-                    <div className="mt-2 rounded-xl bg-brand-25 p-3 text-sm">
-                      <p className="text-slate-700">{l.summary.content}</p>
-                      {l.summary.progressNote && <p className="mt-1 text-slate-600"><b className="text-navy">Progress:</b> {l.summary.progressNote}</p>}
-                    </div>
-                  ) : <p className="mt-1 text-sm text-slate-500">No summary for this lesson.</p>}
+                  <LessonNotes summary={l.summary} />
                   {l.teachingMode === 'PHYSICAL' && (
                     l.attendance?.checkInAt ? (
                       <div className="mt-2 flex items-center gap-3 text-xs text-slate-600">
@@ -97,6 +94,21 @@ export default function ChildProgress() {
         </section>
 
         <aside className="space-y-4">
+          {/* The newest homework, so the parent sees what to do before the next lesson without scrolling the history */}
+          {(() => {
+            const latest = timeline.find((l) => l.summary?.homework)
+            return (
+              <section className="card border-accent/30 bg-accent-50/60 p-5" aria-labelledby="homework-title">
+                <h2 id="homework-title" className="text-lg font-bold text-navy">Latest homework</h2>
+                {latest ? (
+                  <div className="mt-2 text-sm text-slate-700">
+                    <p>{latest.summary.homework}</p>
+                    <p className="mt-1 text-xs text-slate-500">From the {latest.subject} lesson on {fmtDate(latest.startAt)} with {latest.tutor.name}</p>
+                  </div>
+                ) : <p className="mt-2 text-sm text-slate-600">No homework has been set yet. When a tutor sets some, it appears here.</p>}
+              </section>
+            )
+          })()}
           <section className="card p-5" aria-labelledby="next-title">
             <h2 id="next-title" className="text-lg font-bold text-navy">Next lesson</h2>
             {nextLesson ? (

@@ -11,9 +11,11 @@ const RESEND_COOLDOWN_SECONDS = 60
 const PURPOSE_TEXT = {
   verify: { subject: 'Your WonderTutor verification code', note: "If you didn't sign up, ignore this email." },
   reset: { subject: 'Reset your WonderTutor password', note: "If you didn't ask to reset your password, ignore this email. Your password stays the same." },
+  change: { subject: 'Confirm your new WonderTutor email', note: "If you didn't ask to use this email for WonderTutor, ignore this message. Nothing changes until the code is entered." },
 }
 
-export async function issueOtp(email, purpose = 'verify') {
+// `email` is the key the code is stored under; `to` is where it is sent (the same, unless the key is private, as for an email change)
+export async function issueOtp(email, purpose = 'verify', to = email) {
   const latest = await prisma.emailOtp.findFirst({ where: { email }, orderBy: { createdAt: 'desc' } })
   if (latest && Date.now() - latest.createdAt.getTime() < RESEND_COOLDOWN_SECONDS * 1000) {
     throw new AppError(429, `Please wait ${RESEND_COOLDOWN_SECONDS} seconds before requesting another code`)
@@ -32,7 +34,7 @@ export async function issueOtp(email, purpose = 'verify') {
   const text = PURPOSE_TEXT[purpose] || PURPOSE_TEXT.verify
   try {
     await sendEmail({
-      to: email,
+      to,
       subject: text.subject,
       html: `<p>Your code is <b style="font-size:20px">${code}</b>.</p>
              <p>It expires in ${OTP_TTL_MINUTES} minutes. ${text.note}</p>`,

@@ -26,6 +26,7 @@ import Complaints from './pages/parent/Complaints'
 import Profile from './pages/parent/Profile'
 import SavedTutors from './pages/parent/SavedTutors'
 import ChildProgress from './pages/parent/ChildProgress'
+import ProgressReport from './pages/parent/ProgressReport'
 import ProfileSetup from './pages/tutor/ProfileSetup'
 import VerificationStatus from './pages/tutor/VerificationStatus'
 import ProfilePreview from './pages/tutor/ProfilePreview'
@@ -71,6 +72,7 @@ export default function App() {
           <Route path="profile" element={<Profile />} />
           <Route path="favourites" element={<SavedTutors />} />
           <Route path="children/:id/progress" element={<ChildProgress />} />
+          <Route path="children/:id/report" element={<ProgressReport />} />
         </Route>
       </Route>
 

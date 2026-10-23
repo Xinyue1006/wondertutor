@@ -406,8 +406,11 @@ model SessionSummary {
   id           Int      @id @default(autoincrement())
   bookingId    Int      @unique
   booking      Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  content      String   @db.Text
-  progressNote String?  @db.Text
+  content      String   @db.Text          // what the lesson was about (the summary)
+  progressNote String?  @db.Text          // the tutor's observations of how the child is doing
+  topics       String?  @db.Text          // topics covered, e.g. "Fractions, Decimals"
+  homework     String?  @db.Text          // homework / follow-up work for the child to do before the next lesson
+  recommendations String? @db.Text        // what the tutor recommends next (practice, revision, extra lessons)
   createdAt    DateTime @default(now())
 }
 

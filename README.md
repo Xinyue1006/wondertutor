@@ -129,6 +129,16 @@ Also built for the Parent Portal and Admin (Xin Yue):
   `Child.gradeYear` records the school year the grade is true for, so a child is never moved twice and a server that
   was off on 1 January catches up; the parent gets an in-app notice and can correct the grade in My Children.
   Code: `backend/src/services/progression.service.js` (run by the scheduler).
+- **Homework and follow-up work**: a lesson summary now also holds topics covered, the tutor's observations, homework and
+  recommendations (`SessionSummary.topics / homework / recommendations`, all optional). The progress page shows them per lesson and
+  highlights the latest homework. The Tutor Portal's summary form (Yan Hsi) is where tutors write them.
+- **Historical progress report** (My Children → Learning progress → Progress report, `GET /parent/children/:id/report`): every completed
+  lesson in a chosen period (all time, this year, last 3 months, or dates), optionally for one subject, with totals, a per-subject
+  table and the tutor's notes. It can be printed or saved as PDF (browser Print) and downloaded as CSV.
+- **Change login email** (My Profile → Password & email): needs the current password, sends a 6-digit code to the NEW address
+  (stored under an account-specific key, 10-minute expiry, 5 attempts), changes nothing until the code is entered, then emails the
+  OLD address a notice. Google-only accounts are pointed to their Google account. API: `POST /auth/change-email/request` and `/confirm`
+  (works for every role, so the Tutor Portal can reuse it).
 - **Child language and goals**: preferred learning language and academic goals are saved per child; the language
   is also a soft criterion in matching ("Teaches in Mandarin").
 - **Compare tutors**: tick up to three tutors on Find a Tutor, the match results or Saved Tutors and compare them side by side.
