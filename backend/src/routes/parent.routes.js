@@ -38,6 +38,7 @@ router.post('/children', children.createChild)
 router.put('/children/:id', children.updateChild)
 router.delete('/children/:id', children.deleteChild)
 router.get('/children/:id/progress', children.childProgress)
+router.get('/children/:id/report', children.childReport)
 
 router.get('/catalog', tutors.catalog)
 router.get('/tutors', tutors.browseTutors)

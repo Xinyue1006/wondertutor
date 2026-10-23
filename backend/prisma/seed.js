@@ -8,6 +8,14 @@ import { PrismaClient } from '@prisma/client'
 import { addDays, mytParts, mytToDate, todayMyt } from '../src/utils/time.js'
 import { findLocation } from '../src/data/catalog.js'
 
+// Topics shown on the demo lesson summaries
+const SEED_TOPICS = {
+  Mathematics: 'Fractions, decimals and word problems',
+  English: 'Reading comprehension and sentence structure',
+  Science: 'Plants and the water cycle',
+  'Bahasa Melayu': 'Karangan and tatabahasa',
+}
+
 const prisma = new PrismaClient()
 
 const DEMO_PARENT = { email: 'parent@wondertutor.local', password: 'Parent1234' }
@@ -442,7 +450,10 @@ async function seedDemoParent(tutors, hash) {
       summary: {
         create: {
           content: `Covered ${h.subject} topics for ${h.child.name}'s level with guided practice and a short quiz.`,
-          progressNote: 'Good progress. Please revise the practice sheet before the next lesson.',
+          progressNote: 'Good progress. Confident with the basics, needs more speed on timed questions.',
+          topics: SEED_TOPICS[h.subject] || 'Revision of the current school topics',
+          homework: 'Finish the practice sheet (pages 12-13) and correct the mistakes marked in red.',
+          recommendations: 'Ten minutes of daily practice, and a short timed quiz in the next lesson.',
         },
       },
       ...(h.mode === 'PHYSICAL' && {

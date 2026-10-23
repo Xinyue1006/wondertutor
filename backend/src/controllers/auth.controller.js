@@ -7,6 +7,8 @@ import { env } from '../config/env.js'
 import { AppError } from '../utils/AppError.js'
 import { signToken } from '../services/token.service.js'
 import { issueOtp, checkOtp } from '../services/otp.service.js'
+import { sendEmail } from '../services/email.service.js'
+import { escapeHtml, notify } from '../services/notification.service.js'
 import { verifyRecaptcha } from '../services/recaptcha.service.js'
 import { tutorStatusForUser } from '../services/tutorSetup.service.js'
 import { cleanPreferences, preferencesSchema } from '../utils/preferences.js'
@@ -182,6 +184,55 @@ export async function resetPassword(req, res) {
   // Proving access to the inbox also verifies the email (useful for an account that never finished signup)
   await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await bcrypt.hash(newPassword, 12), isEmailVerified: true } })
   res.json({ message: 'Your password has been reset. You can now log in.' })
+}
+
+// ───────────── Change login email (needs the password, and a code sent to the NEW address) ─────────────
+// The code is stored under a key that includes the account id, so it cannot clash with, or be used for, a sign-up or password
+// reset of the same address, and somebody else asking for a code for your address cannot disturb yours.
+const changeKey = (userId, newEmail) => `change:${userId}:${newEmail}`
+
+// POST /api/auth/change-email/request { newEmail, password }
+export async function requestEmailChange(req, res) {
+  const { newEmail, password } = z
+    .object({ newEmail: emailRule, password: z.string().min(1, 'Enter your password').max(200, 'Incorrect password') })
+    .parse(req.body)
+  const user = req.user
+  // A Google account's email is the Google address it signs in with, so it is changed in the Google account, not here
+  if (!user.passwordHash) throw new AppError(400, 'This account signs in with Google, so its email is managed by your Google account.')
+  if (!(await bcrypt.compare(password, user.passwordHash))) throw new AppError(400, 'Incorrect password')
+  if (newEmail === user.email) throw new AppError(400, 'That is already your email address')
+  if (await prisma.user.findUnique({ where: { email: newEmail } })) throw new AppError(409, 'That email address is already used by another account')
+  await issueOtp(changeKey(user.id, newEmail), 'change', newEmail)
+  res.json({ message: `We sent a 6-digit code to ${newEmail}. Enter it to finish changing your email.` })
+}
+
+// POST /api/auth/change-email/confirm { newEmail, code }
+export async function confirmEmailChange(req, res) {
+  const { newEmail, code } = z.object({ newEmail: emailRule, code: otpCode }).parse(req.body)
+  const user = req.user
+  await checkOtp(changeKey(user.id, newEmail), code)
+  const oldEmail = user.email
+  let updated
+  try {
+    // isEmailVerified: the code proved the new inbox is theirs
+    updated = await prisma.user.update({ where: { id: user.id }, data: { email: newEmail, isEmailVerified: true } })
+  } catch (err) {
+    // Somebody registered this address between the request and the confirmation
+    if (err.code === 'P2002') throw new AppError(409, 'That email address is already used by another account')
+    throw err
+  }
+  // Tell the OLD address, so a hijacked session cannot move the account away without the real owner noticing
+  try {
+    await sendEmail({
+      to: oldEmail,
+      subject: 'Your WonderTutor login email was changed',
+      html: `<p>The login email of your WonderTutor account was changed to <b>${escapeHtml(newEmail)}</b>.</p><p>If this was not you, reset your password straight away and contact us.</p>`,
+    })
+  } catch (err) {
+    console.error('Email-change notice failed:', err.message)
+  }
+  await notify(user.id, { type: 'EMAIL_CHANGED', title: 'Login email changed', message: `Your login email is now ${newEmail}.` })
+  res.json({ message: 'Your email has been changed. Use it the next time you log in.', user: await userResponse(updated) })
 }
 
 // POST /api/auth/login { email, password, recaptchaToken }
