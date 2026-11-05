@@ -27,7 +27,7 @@ const renderLogin = () =>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/parent" element={<div>PARENT HOME</div>} />
-        <Route path="/tutor/setup" element={<div>TUTOR SETUP</div>} />
+        <Route path="/tutor" element={<div>TUTOR HOME</div>} />
       </Routes>
     </MemoryRouter>,
   )
@@ -59,12 +59,12 @@ describe('Login with reCAPTCHA', () => {
     expect(await screen.findByText('PARENT HOME')).toBeInTheDocument()
   })
 
-  test('a tutor who has not finished the setup is taken to it after logging in', async () => {
+  test('a tutor who is not verified yet still goes to the tutor portal after logging in', async () => {
     loginImpl = async () => ({ role: 'TUTOR', tutorStatus: 'NOT_SUBMITTED' })
     renderLogin()
     await fill()
     await userEvent.click(screen.getByRole('checkbox', { name: /I'm not a robot/ }))
     await userEvent.click(screen.getByRole('button', { name: 'Log in' }))
-    expect(await screen.findByText('TUTOR SETUP')).toBeInTheDocument()
+    expect(await screen.findByText('TUTOR HOME')).toBeInTheDocument()
   })
 })

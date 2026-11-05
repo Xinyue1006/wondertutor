@@ -5,7 +5,7 @@ import { vi } from 'vitest'
 let auth = { user: null, loading: false }
 vi.mock('../context/AuthContext', () => ({ useAuth: () => auth }))
 
-import ProtectedRoute, { afterLogin, homeFor, VerifiedTutorRoute } from '../components/ProtectedRoute'
+import ProtectedRoute, { afterLogin, homeFor } from '../components/ProtectedRoute'
 
 // Shows where the login page was asked to return to
 function LoginStub() {
@@ -71,47 +71,31 @@ describe('role-based route protection', () => {
   })
 })
 
-describe('tutor verification gate', () => {
+describe('tutors without verification', () => {
   const renderTutorAt = (path) =>
     render(
       <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route element={<ProtectedRoute roles={['TUTOR']} />}>
-            <Route path="/tutor/verification" element={<div>VERIFICATION STATUS</div>} />
-            <Route path="/tutor/setup" element={<div>PROFILE SETUP</div>} />
-            <Route element={<VerifiedTutorRoute />}>
-              <Route path="/tutor" element={<div>TUTOR DASHBOARD</div>} />
-              <Route path="/tutor/earnings" element={<div>EARNINGS</div>} />
-            </Route>
+            <Route path="/tutor" element={<div>TUTOR DASHBOARD</div>} />
+            <Route path="/tutor/earnings" element={<div>EARNINGS</div>} />
           </Route>
         </Routes>
       </MemoryRouter>,
     )
 
-  test('an unverified tutor is sent from a teaching page to the verification status page', () => {
-    auth = { user: { role: 'TUTOR', tutorStatus: 'UNDER_REVIEW' }, loading: false }
-    renderTutorAt('/tutor/earnings')
-    expect(screen.getByText('VERIFICATION STATUS')).toBeInTheDocument()
-    expect(screen.queryByText('EARNINGS')).not.toBeInTheDocument()
+  test('a tutor who is not verified can open every tutor page', () => {
+    for (const status of ['NOT_SUBMITTED', 'UNDER_REVIEW', 'CHANGES_REQUESTED']) {
+      auth = { user: { role: 'TUTOR', tutorStatus: status }, loading: false }
+      const { unmount } = renderTutorAt('/tutor/earnings')
+      expect(screen.getByText('EARNINGS')).toBeInTheDocument()
+      unmount()
+    }
   })
 
-  test('an unverified tutor can still open the setup', () => {
-    auth = { user: { role: 'TUTOR', tutorStatus: 'NOT_SUBMITTED' }, loading: false }
-    renderTutorAt('/tutor/setup')
-    expect(screen.getByText('PROFILE SETUP')).toBeInTheDocument()
-  })
-
-  test('a verified tutor reaches the dashboard', () => {
-    auth = { user: { role: 'TUTOR', tutorStatus: 'VERIFIED' }, loading: false }
-    renderTutorAt('/tutor')
-    expect(screen.getByText('TUTOR DASHBOARD')).toBeInTheDocument()
-  })
-
-  test('after login a tutor goes to setup, status or dashboard depending on verification', () => {
-    expect(afterLogin({ role: 'TUTOR', tutorStatus: 'NOT_SUBMITTED' })).toBe('/tutor/setup')
-    expect(afterLogin({ role: 'TUTOR', tutorStatus: 'UNDER_REVIEW' })).toBe('/tutor/verification')
-    expect(afterLogin({ role: 'TUTOR', tutorStatus: 'CHANGES_REQUESTED' }, '/tutor/earnings')).toBe('/tutor/verification')
-    expect(afterLogin({ role: 'TUTOR', tutorStatus: 'UNDER_REVIEW' }, '/tutor/preview')).toBe('/tutor/preview')
+  test('after login every tutor goes to the tutor portal, verified or not', () => {
+    expect(afterLogin({ role: 'TUTOR', tutorStatus: 'NOT_SUBMITTED' })).toBe('/tutor')
+    expect(afterLogin({ role: 'TUTOR', tutorStatus: 'UNDER_REVIEW' }, '/tutor/earnings')).toBe('/tutor/earnings')
     expect(afterLogin({ role: 'TUTOR', tutorStatus: 'VERIFIED' })).toBe('/tutor')
   })
 })
