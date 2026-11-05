@@ -171,7 +171,7 @@ export default function ProfileSetup() {
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-3xl font-bold text-navy">{submitted ? 'Edit your tutor profile' : 'Set up your tutor profile'}</h1>
-          <p className="mt-1 text-slate-600">Parents only see you after Admin approves your documents. Your progress is saved as you go.</p>
+          <p className="mt-1 text-slate-600">Parents can find you once your subjects and rate are filled in. Verified tutors get a badge and appear higher in search. Your progress is saved as you go.</p>
         </div>
         <div className="flex items-center gap-3">
           <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${submitted ? 'bg-brand-50 text-brand-700' : 'bg-accent-100 text-amber-900'}`}>

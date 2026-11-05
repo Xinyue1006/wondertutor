@@ -33,7 +33,7 @@ export default function ProfilePreview() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-3xl font-bold text-navy">Preview of your profile</h1>
-          <p className="mt-1 text-slate-600">This is how parents will see you{verified ? '' : ' once Admin verifies your documents'}.</p>
+          <p className="mt-1 text-slate-600">This is how parents see you{verified ? '' : '. The verified badge appears once Admin approves your documents'}.</p>
         </div>
         <Link to="/tutor/setup" className="btn-outline min-h-11 px-4"><Icon name="edit" className="h-4 w-4" /> Edit profile</Link>
       </div>

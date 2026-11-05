@@ -1,7 +1,7 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import PublicLayout from './layouts/PublicLayout'
 import AppLayout from './layouts/AppLayout'
-import ProtectedRoute, { afterLogin, VerifiedTutorRoute } from './components/ProtectedRoute'
+import ProtectedRoute, { afterLogin } from './components/ProtectedRoute'
 import Placeholder from './components/Placeholder'
 import { useAuth } from './context/AuthContext'
 
@@ -79,18 +79,15 @@ export default function App() {
       {/* Tutor Portal: Yan Hsi */}
       <Route element={<ProtectedRoute roles={['TUTOR']} />}>
         <Route path="/tutor" element={<AppLayout />}>
-          {/* Onboarding: open to every tutor */}
+          {/* Every page is open to every tutor; verification only adds the badge and search priority */}
+          <Route index element={<Placeholder title="Tutor Dashboard" />} />
+          <Route path="availability" element={<Placeholder title="My Availability" />} />
+          <Route path="bookings" element={<Placeholder title="Booking Requests" />} />
+          <Route path="students" element={<Placeholder title="My Students" />} />
+          <Route path="earnings" element={<Placeholder title="Earnings & Withdrawals" />} />
           <Route path="setup" element={<ProfileSetup />} />
           <Route path="verification" element={<VerificationStatus />} />
           <Route path="preview" element={<ProfilePreview />} />
-          {/* Teaching features: only after Admin verification */}
-          <Route element={<VerifiedTutorRoute />}>
-            <Route index element={<Placeholder title="Tutor Dashboard" />} />
-            <Route path="availability" element={<Placeholder title="My Availability" />} />
-            <Route path="bookings" element={<Placeholder title="Booking Requests" />} />
-            <Route path="students" element={<Placeholder title="My Students" />} />
-            <Route path="earnings" element={<Placeholder title="Earnings & Withdrawals" />} />
-          </Route>
         </Route>
       </Route>
 

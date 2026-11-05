@@ -191,8 +191,9 @@ export default function Signup() {
       const res = await api.post('/auth/verify-otp', { email: form.email, code: otp })
       try { sessionStorage.removeItem(DRAFT_KEY) } catch { /* ignore */ }
       saveSession(res.data.token, res.data.user, true)
-      // A new tutor goes on to the profile setup (step 4); a parent goes to their dashboard
-      navigate(afterLogin(res.data.user))
+      // A new tutor goes on to the profile setup (step 4, "Complete profile"); they may leave it and use the portal
+      // straight away. A parent goes to their dashboard.
+      navigate(res.data.user.role === 'TUTOR' ? '/tutor/setup' : afterLogin(res.data.user))
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -249,7 +250,7 @@ export default function Signup() {
             <RoleCard
               active={role === 'TUTOR'} onClick={() => chooseRole('TUTOR')} img="/img/art/role-tutor.jpg" tone="yellow"
               title="I'm a Tutor" desc="Teach, set your schedule and earn."
-              points={['Set your own availability and rate', 'Get paid per completed session', 'Profile reviewed by Admin before going live', 'Build your teaching profile']}
+              points={['Set your own availability and rate', 'Get paid per completed session', 'Verified badge after Admin review', 'Build your teaching profile']}
             />
           </div>
           <div className="mx-auto mt-5 grid max-w-[560px] gap-3 sm:grid-cols-2">
@@ -481,7 +482,7 @@ function TutorAccount({ form, set, terms, setTerms, setCaptcha, error, setError,
             {[
               ['bg-brand-500', 'Verify your email', `6-digit code, valid ${OTP_MINUTES} minutes`],
               ['bg-accent', 'Set up your profile', 'Subjects, rate, photo, documents'],
-              ['bg-ok', 'Admin review', 'Go live once your documents are approved'],
+              ['bg-ok', 'Admin review', 'Verified badge and higher in search once approved'],
             ].map(([dot, title, sub]) => (
               <li key={title} className="flex gap-3">
                 <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${dot}`} aria-hidden="true" />

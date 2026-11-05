@@ -9,6 +9,7 @@ import api from '../api/client'
 import { timeAgo } from '../lib/format'
 import { MatchingProvider } from '../assistant/MatchingContext'
 import AssistantWidget from '../assistant/AssistantWidget'
+import TutorStatusBanner from '../components/TutorStatusBanner'
 
 // Top nav items per role (matches the UI_v1 mockups)
 const NAV = {
@@ -25,6 +26,8 @@ const NAV = {
     ['/tutor/bookings', 'Bookings'],
     ['/tutor/students', 'Students'],
     ['/tutor/earnings', 'Earnings'],
+    ['/tutor/setup', 'My Profile'],
+    ['/tutor/verification', 'Verification'],
   ],
   ADMIN: [
     ['/admin', 'Dashboard'],
@@ -36,16 +39,9 @@ const NAV = {
   ],
 }
 
-// A tutor waiting for Admin verification only sees the onboarding pages (see VerifiedTutorRoute)
-const TUTOR_ONBOARDING_NAV = [
-  ['/tutor/verification', 'Verification status'],
-  ['/tutor/setup', 'Profile setup'],
-  ['/tutor/preview', 'Preview profile'],
-]
-
 export default function AppLayout() {
   const { user } = useAuth()
-  const items = user.role === 'TUTOR' && user.tutorStatus !== 'VERIFIED' ? TUTOR_ONBOARDING_NAV : NAV[user.role] || []
+  const items = NAV[user.role] || []
   const isParent = user.role === 'PARENT'
 
   const shell = (
@@ -92,6 +88,7 @@ export default function AppLayout() {
         </nav>
       </header>
       <main className="mx-auto w-full max-w-[81.25rem] flex-1 px-3 pb-16 pt-6 md:px-6">
+        {user.role === 'TUTOR' && <TutorStatusBanner />}
         <Outlet />
       </main>
       <AppFooter items={items} />
