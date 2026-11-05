@@ -10,8 +10,8 @@ export async function loadTutorProfile(req, res, next) {
   next()
 }
 
-// Teaching features (dashboard, availability, bookings, earnings) open only after Admin verifies the tutor.
-// Setup, verification status and the profile preview stay reachable so an unverified tutor can finish onboarding.
+// Not used by the tutor routes: every tutor may use every feature, and verification only adds the badge and
+// search priority. Kept for a future feature that should be limited to verified tutors (add it to that route only).
 export function requireVerifiedTutor(req, res, next) {
   if (!req.tutor?.isVerified) throw new AppError(403, 'Your profile is waiting for Admin verification')
   next()
