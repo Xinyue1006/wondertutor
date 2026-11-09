@@ -251,3 +251,8 @@ Restart both servers after changing `.env` files.
 
 ## Still to configure later
 - Payment gateway sandbox (Billplz / ToyyibPay / Stripe test mode). The pay dialog currently simulates the gateway.
+
+## Read-only AI Assistant (optional)
+
+The Book Robot panel has an **AI Assistant** tab (read-only questions about your own lessons, homework, payments, complaints, notifications, policies and tutor recommendations) next to the unchanged **Guided Tutor Search**. It is off by default: set `AI_ASSISTANT_ENABLED=true`, `GEMINI_API_KEY` and `GEMINI_MODEL` in `backend/.env` to turn it on. Design, API contract, privacy notes, configuration and the evaluation set are in [docs/AI_ASSISTANT.md](docs/AI_ASSISTANT.md).
+

@@ -12,20 +12,14 @@ import { AppError } from '../../utils/AppError.js'
 import { bookingInclude, toBookingDto } from '../../services/booking.dto.js'
 import { id } from '../../utils/validators.js'
 import { PAYMENT_DEADLINE_MINUTES } from '../../services/lifecycle.service.js'
-import { mytParts, mytToDate } from '../../utils/time.js'
+import { mytParts } from '../../utils/time.js'
 import { billplzConfigured, createBill, getBill, signatureIsValid } from '../../services/billplz.service.js'
 import { settlePayment } from '../../services/payment.service.js'
 import { randomBytes } from 'node:crypto'
+// Amount/total rules are shared with the AI assistant (services/paymentSummary.service.js)
+import { PAID_STATUSES, lessonAmount, money, mytMonthStart, sumDecimal } from '../../services/paymentSummary.service.js'
 
 export const SANDBOX_BANKS = ['Maybank2u', 'CIMB Clicks', 'Public Bank', 'RHB Now', 'Hong Leong Connect', 'Bank Islam']
-
-const money = (d) => Number(d ?? 0)
-
-// Amount = agreed hourly price x lesson hours. Decimal maths only: never floats for money.
-function lessonAmount(booking) {
-  const hours = new Prisma.Decimal(booking.endAt - booking.startAt).div(3600000)
-  return new Prisma.Decimal(booking.agreedPrice).mul(hours).toDecimalPlaces(2)
-}
 
 // GET /parent/payments
 export async function paymentsOverview(req, res) {
@@ -43,11 +37,10 @@ export async function paymentsOverview(req, res) {
   ])
 
   // "This month" is the Malaysian calendar month, whatever time zone the server runs in
-  const today = mytParts(new Date()).date
-  const startOfMonth = mytToDate(`${today.slice(0, 8)}01`, '00:00')
-  const paid = payments.filter((p) => p.status === 'PAID' || p.status === 'PARTIALLY_REFUNDED')
+  const startOfMonth = mytMonthStart()
+  const paid = payments.filter((p) => PAID_STATUSES.includes(p.status))
   // Totals are added up as Decimals and only turned into numbers at the end (no floating-point drift)
-  const sum = (items, amountOf) => money(items.reduce((t, x) => t.add(amountOf(x)), new Prisma.Decimal(0)))
+  const sum = (items, amountOf) => money(sumDecimal(items, amountOf))
 
   res.json({
     required: awaiting.map((b) => ({ ...toBookingDto(b), totalAmount: money(lessonAmount(b)) })),

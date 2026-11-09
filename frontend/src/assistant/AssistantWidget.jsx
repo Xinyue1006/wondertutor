@@ -1,6 +1,10 @@
 // "Book Robot": floating bottom-right button + right-side chat panel (Parent Portal only).
-// The chat is a GUIDED requirement-collection flow (quick-reply buttons + some free text).
-// It is not an ML model: it fills the same criteria as the wizard and calls the same matching service.
+// Two clearly separated modes:
+//   - "AI Assistant" (AiChat.jsx): read-only questions answered by a language model through server-side tools. Only
+//     offered when the backend says it is enabled; anything it shows is marked as AI output.
+//   - "Guided Tutor Search" (below): the original GUIDED requirement-collection flow (quick-reply buttons + some free
+//     text, deterministic keyword parsing). It is not an ML model: it fills the same criteria as the wizard and calls
+//     the same matching service. It always works, including when the AI is switched off or unavailable.
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Robot from '../components/ui/Robot'
@@ -12,6 +16,9 @@ import { DAY_SHORT, hhmmLabel } from '../lib/format'
 import { gradeLabel, LEVELS, levelLabel } from '../lib/education'
 import { childSubjects, subjectsForLevel } from '../lib/subjects'
 import { TIME_PRESETS, defaultRange, rangeKey, rangeLabel } from '../lib/times'
+import AiChat from './AiChat'
+import { useAuth } from '../context/AuthContext'
+import { useAssistantCapabilities } from './aiApi'
 
 let nextId = 1
 const uid = () => nextId++
@@ -135,9 +142,72 @@ export default function AssistantWidget() {
   )
 }
 
-// ───────────── chat panel ─────────────
+// ───────────── chat panel (mode switch) ─────────────
 
 function ChatPanel() {
+  const { setChatOpen } = useMatching()
+  const { user } = useAuth()
+  const caps = useAssistantCapabilities()
+  const aiOn = Boolean(caps?.enabled)
+  const [mode, setMode] = useState(null) // null until capabilities are known: AI first when it is available
+  const active = mode || (aiOn ? 'ai' : 'guided')
+
+  // Escape closes the panel (a dialog open on top, e.g. lesson details, gets the Escape key first)
+  useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && !document.querySelector('[role=dialog]') && setChatOpen(false)
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [setChatOpen])
+
+  const tab = (id, label) => (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active === id}
+      onClick={() => setMode(id)}
+      className={`min-h-9 flex-1 rounded-lg px-2 text-[13px] font-bold ${active === id ? 'bg-white text-navy shadow-sm' : 'text-slate-500 hover:text-navy'}`}
+    >
+      {label}
+    </button>
+  )
+
+  return (
+    <aside aria-label="AI Tutor Assistant" className="pop-in fixed bottom-28 right-4 top-24 z-40 flex w-[min(390px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-brand-100">
+      <header className="bg-gradient-to-r from-brand-50 to-white px-4 pb-2 pt-3">
+        <div className="flex items-center gap-3">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow ring-1 ring-brand-100">
+            <Robot className="h-10 w-10" sparkles={false} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-lg font-extrabold text-navy">AI Tutor Assistant</div>
+            <div className="text-xs text-slate-500">{active === 'ai' ? 'Ask about your lessons, payments and tutors' : 'Your learning matchmaker'}</div>
+          </div>
+          <button onClick={() => setChatOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Minimise">
+            <Icon name="minus" className="h-[18px] w-[18px]" />
+          </button>
+          <button onClick={() => setChatOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Close">
+            <Icon name="x" className="h-[18px] w-[18px]" />
+          </button>
+        </div>
+        <div role="tablist" aria-label="Assistant mode" className="mt-2 flex gap-1 rounded-xl bg-brand-50 p-1">
+          {tab('ai', 'AI Assistant')}
+          {tab('guided', 'Guided Tutor Search')}
+        </div>
+      </header>
+      {/* Both stay mounted so switching tabs never loses a conversation */}
+      <div className={active === 'ai' ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}>
+        <AiChat key={user?.id ?? 'none'} capabilities={caps} onUseGuided={() => setMode('guided')} />
+      </div>
+      <div className={active === 'guided' ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}>
+        <GuidedChat />
+      </div>
+    </aside>
+  )
+}
+
+// ───────────── guided tutor search (deterministic, no AI) ─────────────
+
+function GuidedChat() {
   const m = useMatching()
   const navigate = useNavigate()
   const { catalog, kids, kidsLoaded, criteria, setCriteria, setChatOpen, loadError, reloadShared } = m
@@ -149,14 +219,6 @@ function ChatPanel() {
   const input = useRef(null)
   const started = useRef(false)
 
-  // Opening the panel puts the cursor in the message box; Escape closes it again
-  useEffect(() => {
-    input.current?.focus()
-    // A dialog open on top (e.g. lesson details) gets the Escape key first
-    const onKey = (e) => e.key === 'Escape' && !document.querySelector('[role=dialog]') && setChatOpen(false)
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [setChatOpen])
 
   // The conversation lives for as long as the portal is open; closing the panel just hides it
   useEffect(() => {
@@ -246,26 +308,13 @@ function ChatPanel() {
   }
 
   return (
-    <aside aria-label="AI Tutor Assistant" className="pop-in fixed bottom-28 right-4 top-24 z-40 flex w-[min(390px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-brand-100">
-      <header className="flex items-center gap-3 bg-gradient-to-r from-brand-50 to-white px-4 py-3">
-        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow ring-1 ring-brand-100">
-          <Robot className="h-10 w-10" sparkles={false} />
-        </span>
-        <div className="flex-1">
-          <div className="text-lg font-extrabold text-navy">AI Tutor Assistant</div>
-          <div className="text-xs text-slate-500">Your learning matchmaker</div>
-        </div>
-        <button onClick={restart} title="Start over" className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Start over">
-          <Icon name="refresh" className="h-[18px] w-[18px]" />
+    <>
+      <div className="flex items-center justify-between border-b border-slate-100 bg-white px-4 py-1.5 text-xs text-slate-500">
+        <span>Step-by-step search (no AI)</span>
+        <button onClick={restart} className="flex min-h-9 items-center gap-1 rounded-lg px-2 font-semibold text-brand-600 hover:bg-brand-50" aria-label="Start over">
+          <Icon name="refresh" className="h-3.5 w-3.5" /> Start over
         </button>
-        <button onClick={() => setChatOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Minimise">
-          <Icon name="minus" className="h-[18px] w-[18px]" />
-        </button>
-        <button onClick={() => setChatOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Close">
-          <Icon name="x" className="h-[18px] w-[18px]" />
-        </button>
-      </header>
-
+      </div>
       {/* aria-live: each new message from the assistant is read out by screen readers */}
       <div ref={scroller} aria-live="polite" className="flex-1 space-y-3 overflow-y-auto bg-brand-25 px-4 py-4">
         {!catalog && loadError && (
@@ -293,7 +342,7 @@ function ChatPanel() {
           <Icon name="send" className="h-[18px] w-[18px]" />
         </button>
       </form>
-    </aside>
+    </>
   )
 }
 

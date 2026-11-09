@@ -15,6 +15,8 @@ import * as calendar from '../controllers/parent/calendar.controller.js'
 import * as account from '../controllers/parent/account.controller.js'
 import { rateLimit } from '../middleware/rateLimit.js'
 import { dashboard } from '../controllers/parent/dashboard.controller.js'
+import * as assistant from '../controllers/parent/assistant.controller.js'
+import { env } from '../config/env.js'
 
 const router = validateIdParams(Router()) // every :id in these URLs must be a positive whole number
 router.use(requireAuth, requireRole('PARENT'), loadParentProfile)
@@ -73,5 +75,10 @@ router.post('/payments/checkout', payments.checkout)
 router.post('/payments/:id/confirm', payments.confirmPayment)
 router.post('/payments/return', payments.gatewayReturn)
 router.get('/payments/:id/receipt', payments.getReceipt)
+
+// Read-only AI assistant (Phase 1). Messages are limited per logged-in user, on top of the general API limit.
+router.get('/assistant/capabilities', assistant.capabilities)
+router.post('/assistant/messages', rateLimit({ name: 'assistant', windowMs: 60_000, max: env.ai.messagesPerMinute, keyBy: (req) => req.user.id }), assistant.postMessage)
+router.delete('/assistant/conversations/:conversationId', assistant.deleteConversation)
 
 export default router

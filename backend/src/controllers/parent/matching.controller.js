@@ -1,10 +1,8 @@
 import { z } from 'zod'
 import { prisma } from '../../config/prisma.js'
-import { CHARACTERISTICS, LANGUAGES, MAX_GRADE, SUBJECTS, findLocation } from '../../data/catalog.js'
+import { CHARACTERISTICS, LANGUAGES, MAX_GRADE, SUBJECTS } from '../../data/catalog.js'
 import { hhmm as hhmmRule, id, optionalText } from '../../utils/validators.js'
-import { rankTutors } from '../../services/matching.service.js'
-import { toTutorCard } from '../../services/tutor.service.js'
-import { activeTutors } from './tutors.controller.js'
+import { runMatchingForParent } from '../../services/matchingApp.service.js'
 
 const hhmm = hhmmRule()
 
@@ -32,20 +30,8 @@ export const criteriaSchema = z.object({
   .refine((c) => !(c.timeStart && c.timeEnd) || c.timeStart < c.timeEnd, { message: 'The end time must be after the start time', path: ['timeEnd'] })
   .refine((c) => c.budgetMin == null || c.budgetMax == null || c.budgetMin <= c.budgetMax, { message: 'The minimum budget cannot be more than the maximum', path: ['budgetMax'] })
 
-async function runMatching(criteria, parentId) {
-  const loc = criteria.location ? findLocation(criteria.location) : null
-  const c = { ...criteria, lat: loc?.lat, lng: loc?.lng, grade: criteria.grade ?? undefined, budgetMax: criteria.budgetMax ?? undefined }
-  const tutors = await activeTutors(c.subject, c.level)
-  const ranked = rankTutors(tutors, c)
-  const favourites = new Set(
-    (await prisma.favouriteTutor.findMany({ where: { parentId }, select: { tutorId: true } })).map((f) => f.tutorId),
-  )
-  return ranked.map(({ tutor, match }) => ({
-    ...toTutorCard(tutor, c.subject),
-    isFavourite: favourites.has(tutor.id),
-    match: { score: match.score, label: match.label, reasons: match.reasons, distanceKm: match.distanceKm },
-  }))
-}
+// The retrieval + ranking lives in services/matchingApp.service.js so the AI assistant can reuse it without saving
+const runMatching = (criteria, parentId) => runMatchingForParent(criteria, parentId)
 
 // POST /parent/matching: run the matching and save the search for traceability (MatchingRequest)
 export async function createMatching(req, res) {

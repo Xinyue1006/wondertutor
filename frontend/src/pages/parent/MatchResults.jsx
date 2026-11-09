@@ -84,6 +84,12 @@ export default function MatchResults() {
       <Link to="/parent/find-tutor/match" className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-brand-500 hover:underline">
         <Icon name="arrow-left" className="h-4 w-4" /> Back to Matching Preferences
       </Link>
+      {/* Results opened from the AI assistant are not saved as a search (read-only Phase 1); a refresh shows the last saved search */}
+      {result.temporary && (
+        <p role="note" className="mb-3 rounded-xl bg-brand-50 px-4 py-2 text-sm text-navy">
+          These results come from the AI assistant and are not saved. Use Matching Preferences to save a search.
+        </p>
+      )}
       <PageTitle
         title="Here are your recommended tutors"
         subtitle={`We found ${result.total} tutor${result.total === 1 ? '' : 's'} that match your requirements.${tutors.length !== result.total && result.total > 0 ? ` Showing ${tutors.length} with your filters.` : ''}`}
