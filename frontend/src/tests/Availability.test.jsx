@@ -36,6 +36,12 @@ describe('tutor availability page', () => {
     expect(cell(LOCKED_NAME)).toHaveAttribute('title', 'Booked lesson on this day. Cancel or reschedule it first.')
   })
 
+  test('each row shows its time as a range', async () => {
+    await setup()
+    expect(screen.getByText('07:00–08:00')).toBeInTheDocument()
+    expect(screen.getByText('21:00–22:00')).toBeInTheDocument()
+  })
+
   test('a load failure offers Try again', async () => {
     api.get.mockRejectedValueOnce(new Error('Server is down'))
     api.get.mockResolvedValueOnce({ data: LOADED })

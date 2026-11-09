@@ -29,7 +29,6 @@ import ChildProgress from './pages/parent/ChildProgress'
 import ProgressReport from './pages/parent/ProgressReport'
 import ProfileSetup from './pages/tutor/ProfileSetup'
 import Availability from './pages/tutor/Availability'
-import VerificationStatus from './pages/tutor/VerificationStatus'
 import ProfilePreview from './pages/tutor/ProfilePreview'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import AdminUsers from './pages/admin/AdminUsers'
@@ -87,7 +86,8 @@ export default function App() {
           <Route path="students" element={<Placeholder title="My Students" />} />
           <Route path="earnings" element={<Placeholder title="Earnings & Withdrawals" />} />
           <Route path="setup" element={<ProfileSetup />} />
-          <Route path="verification" element={<VerificationStatus />} />
+          {/* Verification now lives on My Profile; notifications already sent still link to this address */}
+          <Route path="verification" element={<Navigate to="/tutor/setup" replace />} />
           <Route path="preview" element={<ProfilePreview />} />
         </Route>
       </Route>

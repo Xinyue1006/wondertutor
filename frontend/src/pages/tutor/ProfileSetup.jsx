@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import api, { errorMessage } from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
 import PhotoPicker, { uploadDocument, uploadError } from '../../components/PhotoPicker'
+import VerificationCard from '../../components/VerificationCard'
 import Icon from '../../components/ui/Icon'
 import { ErrorBox, LoadError, Spinner } from '../../components/ui/Common'
 import { LEVELS, gradeLabel } from '../../lib/education'
@@ -72,6 +73,7 @@ export default function ProfileSetup() {
   const [savedAt, setSavedAt] = useState(null)
   const [confirmed, setConfirmed] = useState(false)
   const heading = useRef(null)
+  const statusCard = useRef(null)
 
   const load = useCallback(async () => {
     setLoadError('')
@@ -80,10 +82,12 @@ export default function ProfileSetup() {
       setProfile(p.data)
       setForm(toForm(p.data))
       setCatalog(c.data)
+      // Admin may have decided since login: keep the banner in step with the server
+      setUser((u) => (u.tutorStatus === p.data.status ? u : { ...u, tutorStatus: p.data.status }))
     } catch (err) {
       setLoadError(errorMessage(err))
     }
-  }, [])
+  }, [setUser])
   useEffect(() => { load() }, [load])
 
   // Keyboard and screen-reader users start each step at its heading
@@ -131,7 +135,7 @@ export default function ProfileSetup() {
     setBusy(true)
     try {
       if (!checkStep(step, form, profile)) await save()
-      navigate('/tutor/verification')
+      navigate('/tutor')
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -153,7 +157,7 @@ export default function ProfileSetup() {
       const res = await api.post('/tutor/submit-for-verification')
       setProfile(res.data)
       setUser((u) => ({ ...u, tutorStatus: res.data.status }))
-      navigate('/tutor/verification')
+      statusCard.current?.scrollIntoView({ block: 'center' }) // the new status is shown at the top of this page
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -174,12 +178,10 @@ export default function ProfileSetup() {
           <p className="mt-1 text-slate-600">Parents can find you once your subjects and rate are filled in. Verified tutors get a badge and appear higher in search. Your progress is saved as you go.</p>
         </div>
         <div className="flex items-center gap-3">
-          <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${submitted ? 'bg-brand-50 text-brand-700' : 'bg-accent-100 text-amber-900'}`}>
-            <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" /> {submitted ? 'Submitted for review' : 'Profile not submitted'}
-          </span>
           <button type="button" onClick={saveAndExit} disabled={busy} className="btn-outline min-h-11 px-4">Save and exit</button>
         </div>
       </div>
+      <VerificationCard ref={statusCard} profile={profile} onUpload={() => goTo('documents')} />
       <div className="mb-5 max-w-xs">
         <div className="flex justify-between text-xs font-semibold text-navy"><span>Progress</span><span>{progress}%</span></div>
         <div className="mt-1 h-2 rounded-full bg-brand-100" role="progressbar" aria-label="Setup progress" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
@@ -221,7 +223,7 @@ export default function ProfileSetup() {
             {step !== 'review' ? (
               <button disabled={busy} className="btn-primary ml-auto min-h-11 px-6">{busy ? 'Saving…' : 'Save and continue'}</button>
             ) : submitted ? (
-              <button type="button" onClick={() => navigate('/tutor/verification')} className="btn-primary ml-auto min-h-11 px-6">Back to verification status</button>
+              <button type="button" onClick={() => navigate('/tutor')} className="btn-primary ml-auto min-h-11 px-6">Done</button>
             ) : (
               <button type="button" onClick={submit} disabled={busy || !confirmed} className="btn-primary ml-auto min-h-11 px-6">
                 {busy ? 'Submitting…' : 'Submit for verification'}

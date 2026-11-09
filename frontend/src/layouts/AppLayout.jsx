@@ -27,7 +27,6 @@ const NAV = {
     ['/tutor/students', 'Students'],
     ['/tutor/earnings', 'Earnings'],
     ['/tutor/setup', 'My Profile'],
-    ['/tutor/verification', 'Verification'],
   ],
   ADMIN: [
     ['/admin', 'Dashboard'],

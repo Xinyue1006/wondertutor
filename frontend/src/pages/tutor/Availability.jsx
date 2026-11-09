@@ -169,26 +169,13 @@ export default function Availability() {
 
       <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <section className="card min-w-0 p-4 md:p-5" aria-label="Weekly hours">
-          <div className="mb-3 flex flex-wrap items-center gap-3">
-            <p className="font-display text-lg font-bold text-navy">{total} {total === 1 ? 'hour' : 'hours'} a week</p>
-            <button type="button" onClick={() => edit((prev) => clearHours(prev, locked))} className="btn-outline min-h-11 px-4">Clear all</button>
-            <button type="button" onClick={save} disabled={!dirty || busy} className="btn-primary ml-auto min-h-11 px-5">{busy ? 'Saving…' : 'Save availability'}</button>
-          </div>
-
-          {/* One message at a time in a reserved space: if it vanished mid-drag the grid would jump under the pointer */}
-          <div className="mb-3 min-h-11">
-            {saveError ? <ErrorBox>{saveError}</ErrorBox> : notice ? (
-              <p role="status" className="flex items-center gap-2 rounded-lg bg-ok-50 px-3 py-2.5 text-sm text-green-800"><Icon name="check-circle" className="h-4 w-4 shrink-0" /> {notice}</p>
-            ) : total === 0 ? (
-              <p role="status" className="rounded-lg bg-accent-50 px-3 py-2.5 text-sm text-amber-900">Parents can't book you until you add hours.</p>
-            ) : null}
-          </div>
+          <p className="mb-3 font-display text-lg font-bold text-navy">{total} {total === 1 ? 'hour' : 'hours'} a week</p>
 
           <Legend />
 
           {/* The grid scrolls inside this box on small screens, so the page itself never scrolls sideways */}
           <div ref={gridBox} className="overflow-x-auto rounded-lg border border-brand-100" onPointerMove={moveDrag} onContextMenu={(e) => { if (drag.current) e.preventDefault() }}>
-            <div role="group" aria-label="Availability by day and hour" className="grid w-max min-w-full select-none grid-cols-[3.75rem_repeat(7,minmax(4.75rem,1fr))]">
+            <div role="group" aria-label="Availability by day and hour" className="grid w-max min-w-full select-none grid-cols-[5.75rem_repeat(7,minmax(4.75rem,1fr))]">
               <div className="sticky left-0 z-10 border-b border-r border-brand-100 bg-brand-25" />
               {DAYS.map((day) => (
                 <div key={day.value} className="border-b border-brand-100 bg-brand-25 px-1 py-1.5 text-center">
@@ -203,6 +190,20 @@ export default function Availability() {
             </div>
           </div>
           <p className="mt-2 text-xs text-slate-600">Click or tap an hour to switch it on or off. To set several, drag with a mouse, or press and hold on a phone and then drag. Nothing changes for parents until you press Save availability.</p>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button type="button" onClick={() => edit((prev) => clearHours(prev, locked))} className="btn-outline min-h-11 px-4">Clear all</button>
+            <button type="button" onClick={save} disabled={!dirty || busy} className="btn-primary ml-auto min-h-11 px-5">{busy ? 'Saving…' : 'Save availability'}</button>
+          </div>
+
+          {/* Below the buttons, so the result of Save is in view and a message appearing never moves the grid during a drag */}
+          <div className="mt-3">
+            {saveError ? <ErrorBox>{saveError}</ErrorBox> : notice ? (
+              <p role="status" className="flex items-center gap-2 rounded-lg bg-ok-50 px-3 py-2.5 text-sm text-green-800"><Icon name="check-circle" className="h-4 w-4 shrink-0" /> {notice}</p>
+            ) : total === 0 ? (
+              <p role="status" className="rounded-lg bg-accent-50 px-3 py-2.5 text-sm text-amber-900">Parents can't book you until you add hours.</p>
+            ) : null}
+          </div>
         </section>
 
         <AddHours onAdd={(days, from, to) => edit((prev) => addHours(prev, days, from, to))} />
@@ -232,7 +233,7 @@ function Legend() {
 function Row({ hour, cells, locked, onPress, onKeyToggle }) {
   return (
     <>
-      <div className="sticky left-0 z-10 flex items-center justify-center border-b border-r border-brand-100 bg-white text-xs font-medium text-slate-600">{hour}</div>
+      <div className="sticky left-0 z-10 flex items-center justify-center border-b border-r border-brand-100 bg-white whitespace-nowrap text-xs font-medium text-slate-600">{hour}–{hourEnd(hour)}</div>
       {DAYS.map((day) => {
         const key = cellKey(day.value, hour)
         const isLocked = locked.has(key)

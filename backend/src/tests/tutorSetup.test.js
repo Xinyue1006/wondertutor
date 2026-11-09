@@ -242,7 +242,7 @@ describe('verification', () => {
     const doc = await prisma.qualification.findFirst({ where: { tutor: { userId: user.id } } })
     await api(admin.token).post(`/admin/qualifications/${doc.id}/review`, { status: 'APPROVED' })
     const note = await prisma.notification.findFirst({ where: { userId: user.id, type: 'QUALIFICATION_REVIEWED' } })
-    expect(note.link).toBe('/tutor/verification')
+    expect(note.link).toBe('/tutor/setup')
   })
 })
 

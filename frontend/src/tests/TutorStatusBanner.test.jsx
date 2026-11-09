@@ -21,7 +21,7 @@ describe('tutor status banner', () => {
 
   test('a tutor under review is told what verification will give them', () => {
     renderAt('/tutor/earnings', 'UNDER_REVIEW')
-    expect(screen.getByRole('link', { name: 'View status' })).toHaveAttribute('href', '/tutor/verification')
+    expect(screen.getByRole('link', { name: 'View status' })).toHaveAttribute('href', '/tutor/setup')
   })
 
   test('nothing is shown to a verified tutor, or on the setup and status pages', () => {

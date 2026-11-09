@@ -166,7 +166,7 @@ Matches `WonderTutor_Mockups_All.pdf` pages 1 to 7:
 - **Profile setup** (`/tutor/setup`): basic information (gender, emergency contact, home area), teaching information
   (subjects and grades, hourly rate, experience, mode, languages, teaching style, about me), qualifications and an identity
   document (PDF/JPG/PNG to Cloudinary), profile photo and portfolio, review and submit. Each step saves a draft.
-- **Verification status** (`/tutor/verification`): not submitted, under review, changes requested (with Admin's reason),
+- **Verification status** (a card at the top of My Profile, `/tutor/setup`): not submitted, under review, changes requested (with Admin's reason),
   or verified. A tutor is verified once Admin approves **an identity document and a qualification**.
   **Every tutor can use every tutor feature straight after sign-up.** Verification only adds the verified badge and lists
   the tutor before unverified ones in Find a Tutor and matching. Until then a banner on the tutor pages says what to do next.

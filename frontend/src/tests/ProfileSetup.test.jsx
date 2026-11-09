@@ -80,6 +80,35 @@ describe('tutor profile setup', () => {
   })
 })
 
+describe('verification on My Profile', () => {
+  test('a new tutor sees that nothing has been submitted', async () => {
+    setup(NEW_TUTOR)
+    expect(await screen.findByRole('heading', { name: 'Verification' })).toBeInTheDocument()
+    expect(screen.getByText('Not submitted')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Upload a new document' })).not.toBeInTheDocument()
+  })
+
+  test('a verified tutor sees the verified state', async () => {
+    setup({ ...COMPLETE, status: 'VERIFIED', isVerified: true, submittedAt: '2026-10-20T10:00:00Z', documents: COMPLETE.documents.map((d) => ({ ...d, status: 'APPROVED' })) })
+    expect(await screen.findByText('Verified', { selector: 'section span' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Preview my profile' })).toHaveAttribute('href', '/tutor/preview')
+  })
+
+  test("a rejected document shows Admin's reason and the button opens the Qualifications step", async () => {
+    const documents = [{ ...COMPLETE.documents[0], status: 'REJECTED', reviewNote: 'Photo is blurry' }, COMPLETE.documents[1]]
+    setup({ ...COMPLETE, status: 'CHANGES_REQUESTED', submittedAt: '2026-10-20T10:00:00Z', documents })
+    expect(await screen.findByText('Changes requested')).toBeInTheDocument()
+    expect(screen.getByText(/Photo is blurry/, { selector: 'li' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Upload a new document' }))
+    expect(await screen.findByRole('heading', { name: 'Qualifications' })).toBeInTheDocument()
+  })
+
+  test('a removed document is listed as missing', async () => {
+    setup({ ...COMPLETE, status: 'CHANGES_REQUESTED', submittedAt: '2026-10-20T10:00:00Z', documents: [COMPLETE.documents[1]] })
+    expect(await screen.findByText(/none uploaded/)).toHaveTextContent('Identity document')
+  })
+})
+
 describe('tutor profile setup: editing and documents', () => {
   test('Back keeps what was typed in the step', async () => {
     setup(COMPLETE)

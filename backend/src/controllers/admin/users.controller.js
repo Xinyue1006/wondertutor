@@ -155,7 +155,7 @@ export async function reviewQualification(req, res) {
     message: status === 'APPROVED'
       ? `"${q.title}" was approved.${verified ? ' Your profile now shows the verified badge.' : ''}`
       : `"${q.title}" was rejected: ${note}. Please upload a new document.`,
-    link: '/tutor/verification', // shows the decision and, after a rejection, the reason and the re-upload button
+    link: '/tutor/setup', // My Profile shows the decision and, after a rejection, the reason and the upload button
   })
   res.json({ ok: true })
 }
