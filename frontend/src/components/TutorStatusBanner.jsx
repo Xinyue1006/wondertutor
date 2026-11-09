@@ -32,7 +32,7 @@ export default function TutorStatusBanner() {
   return (
     <div role="status" className="mb-5 flex flex-wrap items-center gap-3 rounded-xl border border-accent-100 bg-accent-50 px-4 py-3 text-sm text-amber-900">
       <Icon name="info" className="h-5 w-5 shrink-0" />
-      <p className="min-w-0 flex-1">{message.text}</p>
+      <p className="min-w-0 flex-1 basis-60">{message.text}</p>
       <Link to={message.to} className="btn-outline min-h-11 shrink-0 border-amber-300 bg-white px-4 text-amber-900">{message.cta}</Link>
     </div>
   )

@@ -28,6 +28,7 @@ import SavedTutors from './pages/parent/SavedTutors'
 import ChildProgress from './pages/parent/ChildProgress'
 import ProgressReport from './pages/parent/ProgressReport'
 import ProfileSetup from './pages/tutor/ProfileSetup'
+import Availability from './pages/tutor/Availability'
 import VerificationStatus from './pages/tutor/VerificationStatus'
 import ProfilePreview from './pages/tutor/ProfilePreview'
 import AdminDashboard from './pages/admin/AdminDashboard'
@@ -81,7 +82,7 @@ export default function App() {
         <Route path="/tutor" element={<AppLayout />}>
           {/* Every page is open to every tutor; verification only adds the badge and search priority */}
           <Route index element={<Placeholder title="Tutor Dashboard" />} />
-          <Route path="availability" element={<Placeholder title="My Availability" />} />
+          <Route path="availability" element={<Availability />} />
           <Route path="bookings" element={<Placeholder title="Booking Requests" />} />
           <Route path="students" element={<Placeholder title="My Students" />} />
           <Route path="earnings" element={<Placeholder title="Earnings & Withdrawals" />} />

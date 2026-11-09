@@ -4,6 +4,7 @@ import { validateIdParams } from '../middleware/params.js'
 import { requireAuth, requireRole } from '../middleware/auth.js'
 import { loadTutorProfile } from '../middleware/tutor.js'
 import * as profile from '../controllers/tutor/profile.controller.js'
+import * as availability from '../controllers/tutor/availability.controller.js'
 
 const router = validateIdParams(Router()) // every :id in these URLs must be a positive whole number
 router.use(requireAuth, requireRole('TUTOR'), loadTutorProfile)
@@ -23,5 +24,7 @@ router.post('/submit-for-verification', profile.submitForVerification)
 
 // Teaching features: availability, requests, sessions and earnings go below this line
 router.get('/dashboard', profile.dashboard)
+router.get('/availability', availability.getSchedule)
+router.put('/availability', availability.updateSchedule)
 
 export default router
