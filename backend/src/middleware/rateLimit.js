@@ -6,7 +6,12 @@
 import { AppError } from '../utils/AppError.js'
 import { env } from '../config/env.js'
 
-export function rateLimit({ name, windowMs, max, keyBy = (req) => req.ip, enabled = env.nodeEnv !== 'test' }) {
+// Responses that count as a failed attempt when failuresOnly is on: a guess was rejected or the account refused.
+const FAILED_STATUSES = new Set([401, 403])
+
+// failuresOnly: successful requests are not counted. Each request still takes a try when it arrives and gives it
+// back on finish if it did not fail, so a burst of simultaneous guesses cannot all get past the limit.
+export function rateLimit({ name, windowMs, max, keyBy = (req) => req.ip, enabled = env.nodeEnv !== 'test', failuresOnly = false }) {
   const hits = new Map() // key -> { count, resetAt }
 
   // Forget old entries now and then so the map cannot grow without limit
@@ -25,12 +30,21 @@ export function rateLimit({ name, windowMs, max, keyBy = (req) => req.ip, enable
       entry = { count: 0, resetAt: now + windowMs }
       hits.set(key, entry)
     }
-    entry.count += 1
-    if (entry.count > max) {
+    const atLimit = failuresOnly && entry.count >= max // a blocked request does not take a try
+    if (!atLimit) entry.count += 1
+    if (atLimit || entry.count > max) {
       const seconds = Math.ceil((entry.resetAt - now) / 1000)
       res.set('Retry-After', String(seconds))
       const minutes = Math.ceil(seconds / 60)
       return next(new AppError(429, `Too many attempts. Please try again in ${minutes} minute${minutes === 1 ? '' : 's'}.`))
+    }
+    if (failuresOnly) {
+      res.on('finish', () => {
+        if (FAILED_STATUSES.has(res.statusCode)) return
+        entry.count -= 1
+        // Nothing counted: forget the entry, so the window starts at the first failure
+        if (entry.count <= 0 && hits.get(key) === entry) hits.delete(key)
+      })
     }
     next()
   }

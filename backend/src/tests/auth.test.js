@@ -62,14 +62,14 @@ describe('forgot password', () => {
 
 describe('rate limiting', () => {
   // A tiny app with the real limiter switched on (it is off for the rest of the test suite)
-  async function tinyServer(limiter) {
+  async function tinyServer(limiter, handler = (req, res) => res.json({ ok: true })) {
     const app = express()
     app.use(express.json())
-    app.post('/try', limiter, (req, res) => res.json({ ok: true }))
+    app.post('/try', limiter, handler)
     app.use(errorHandler)
     const server = await new Promise((resolve) => { const s = app.listen(0, () => resolve(s)) })
     const url = `http://127.0.0.1:${server.address().port}/try`
-    const post = (email) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) })
+    const post = (email, password) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) })
     return { server, post }
   }
 
@@ -94,5 +94,73 @@ describe('rate limiting', () => {
     await new Promise((r) => setTimeout(r, 200))
     expect((await post()).status).toBe(200)
     await new Promise((r) => server.close(r))
+  })
+
+  describe('failuresOnly', () => {
+    const limiter = (name, over = {}) => rateLimit({ name, windowMs: 60_000, max: 3, keyBy: (req) => req.body.email, enabled: true, failuresOnly: true, ...over })
+    // Behaves like login: the right password succeeds, anything else is a 401
+    const login = (req, res) => (req.body.password === 'right' ? res.json({ ok: true }) : res.status(401).json({ message: 'Incorrect email or password' }))
+    const statuses = (responses) => responses.map((r) => r.status)
+
+    test('successful requests are never counted', async () => {
+      const { server, post } = await tinyServer(limiter('f1'), login)
+      for (let i = 0; i < 4; i++) expect((await post('a@x.test', 'right')).status).toBe(200)
+      await new Promise((r) => server.close(r))
+    })
+
+    test('after max failures the next request is blocked, even with the right password', async () => {
+      const { server, post } = await tinyServer(limiter('f2'), login)
+      for (let i = 0; i < 3; i++) expect((await post('a@x.test', 'wrong')).status).toBe(401)
+      const blocked = await post('a@x.test', 'right')
+      expect(blocked.status).toBe(429)
+      expect(Number(blocked.headers.get('retry-after'))).toBeGreaterThan(0)
+      expect((await blocked.json()).message).toMatch(/Too many attempts/)
+      await new Promise((r) => server.close(r))
+    })
+
+    test('successes between failures do not use up the budget', async () => {
+      const { server, post } = await tinyServer(limiter('f3'), login)
+      const seq = []
+      for (const password of ['wrong', 'right', 'right', 'wrong', 'wrong']) seq.push(await post('a@x.test', password))
+      expect(statuses(seq)).toEqual([401, 200, 200, 401, 401])
+      expect((await post('a@x.test', 'right')).status).toBe(429)
+      await new Promise((r) => server.close(r))
+    })
+
+    test('two emails have separate budgets', async () => {
+      const { server, post } = await tinyServer(limiter('f4'), login)
+      for (let i = 0; i < 3; i++) await post('a@x.test', 'wrong')
+      expect((await post('a@x.test', 'wrong')).status).toBe(429)
+      expect((await post('b@x.test', 'wrong')).status).toBe(401)
+      await new Promise((r) => server.close(r))
+    })
+
+    test('a blocked request does not extend the window', async () => {
+      const { server, post } = await tinyServer(limiter('f5', { windowMs: 200, max: 1 }), login)
+      expect((await post('a@x.test', 'wrong')).status).toBe(401)
+      await new Promise((r) => setTimeout(r, 120))
+      expect((await post('a@x.test', 'wrong')).status).toBe(429) // would push the window past 250 ms if it extended it
+      await new Promise((r) => setTimeout(r, 130))
+      expect((await post('a@x.test', 'right')).status).toBe(200)
+      await new Promise((r) => server.close(r))
+    })
+
+    test('only 401 and 403 count: other errors give the try back', async () => {
+      const respond = (req, res) => res.status(Number(req.body.password)).json({ message: 'x' })
+      const { server, post } = await tinyServer(limiter('f6'), respond)
+      for (const code of [400, 400, 500, 502, 400]) expect((await post('a@x.test', String(code))).status).toBe(code)
+      for (const code of [401, 403, 401]) expect((await post('a@x.test', String(code))).status).toBe(code)
+      expect((await post('a@x.test', '401')).status).toBe(429)
+      await new Promise((r) => server.close(r))
+    })
+
+    test('guesses sent at the same moment cannot get past the limit', async () => {
+      const slow = (req, res) => setTimeout(() => login(req, res), 50)
+      const { server, post } = await tinyServer(limiter('f7'), slow)
+      const results = statuses(await Promise.all(Array.from({ length: 10 }, () => post('a@x.test', 'wrong'))))
+      expect(results.filter((s) => s === 401)).toHaveLength(3)
+      expect(results.filter((s) => s === 429)).toHaveLength(7)
+      await new Promise((r) => server.close(r))
+    })
   })
 })
