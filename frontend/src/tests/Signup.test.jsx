@@ -221,3 +221,37 @@ describe('signup: tutor', () => {
     expect(screen.getByRole('button', { name: 'Verify and continue' })).toBeEnabled()
   })
 })
+
+describe('signup: arriving from Log In with an unverified account', () => {
+  const open = () => {
+    sessionStorage.clear()
+    api.get.mockResolvedValue({ data: { subjects: [], locations: [], tutors: [] } })
+    return render(<MemoryRouter initialEntries={[{ pathname: '/signup', state: { verifyEmail: 'miki@example.com' } }]}><Signup /></MemoryRouter>)
+  }
+
+  test('opens on the code screen for that email with the resend wait running, and sends nothing itself', () => {
+    open()
+    expect(screen.getByText('Check your email')).toBeInTheDocument()
+    expect(screen.getByText('miki@example.com')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Resend code in 1:00/ })).toBeDisabled()
+    expect(api.post).not.toHaveBeenCalled()
+  })
+
+  test('Change email asks for the role first and keeps the email', async () => {
+    open()
+    await userEvent.click(screen.getByRole('button', { name: 'Change email' }))
+    expect(screen.getByRole('radiogroup', { name: 'I am joining as' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /^Continue as Parent/ }))
+    expect(screen.getByLabelText(/Email Address/)).toHaveValue('miki@example.com')
+  })
+})
+
+describe('signup: contact details', () => {
+  test('there is no photo upload at sign-up; parents add a photo later in My Profile', async () => {
+    setup()
+    await userEvent.click(screen.getByRole('button', { name: /^Continue as/ }))
+    expect(screen.getByLabelText(/Phone Number/)).toBeInTheDocument()
+    expect(screen.queryByText('Profile Photo')).not.toBeInTheDocument()
+    expect(screen.queryByText(/once photo storage is connected/)).not.toBeInTheDocument()
+  })
+})

@@ -164,3 +164,25 @@ describe('rate limiting', () => {
     })
   })
 })
+
+describe('login with an unknown email', () => {
+  const MESSAGE = 'Incorrect email or password'
+
+  test('gets the same 401 as a wrong password on a real account', async () => {
+    const { user } = await makeParent()
+    const unknown = await api().post('/auth/login', { email: 'nobody@nowhere.test', password: 'Whatever123' })
+    const wrong = await api().post('/auth/login', { email: user.email, password: 'Whatever123' })
+    expect(unknown.status).toBe(401)
+    expect(unknown.message).toBe(MESSAGE)
+    expect(wrong.status).toBe(401)
+    expect(wrong.message).toBe(MESSAGE)
+  })
+
+  test('an account with no password (Google only) also gets the same 401', async () => {
+    const { user } = await makeParent()
+    await prisma.user.update({ where: { id: user.id }, data: { passwordHash: null } })
+    const res = await api().post('/auth/login', { email: user.email, password: 'Whatever123' })
+    expect(res.status).toBe(401)
+    expect(res.message).toBe(MESSAGE)
+  })
+})
