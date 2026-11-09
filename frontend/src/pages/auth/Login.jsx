@@ -1,14 +1,15 @@
 import { useId, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { errorMessage } from '../../api/client'
+import api, { errorMessage } from '../../api/client'
 import { afterLogin } from '../../components/ProtectedRoute'
 import GoogleButton from '../../components/GoogleButton'
-import Recaptcha, { RECAPTCHA_SITE_KEY } from '../../components/Recaptcha'
+import Recaptcha, { RECAPTCHA_SITE_KEY, resetRecaptcha } from '../../components/Recaptcha'
 import Icon from '../../components/ui/Icon'
 import { ErrorBox } from '../../components/ui/Common'
 
 const EMAIL_OK = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const NEEDS_VERIFICATION = 'Please verify your email before logging in' // the server's 403 for an unverified account
 
 // One labelled field with its own error line directly under it (icon + words, not colour alone).
 // `action` sits on the right of the label row (the "Forgot password?" link).
@@ -43,6 +44,8 @@ export default function Login() {
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
   const [busy, setBusy] = useState(false)
+  const [resending, setResending] = useState(false)
+  const [resendError, setResendError] = useState('')
   // Set when someone uses "Continue with Google" without an account: we ask Parent or Tutor, then create it
   const [newGoogle, setNewGoogle] = useState(null)
 
@@ -66,9 +69,25 @@ export default function Login() {
     setFieldErrors((f) => ({ ...f, [field]: undefined }))
   }
 
+  // Way forward for someone who left the sign-up code screen: email a new code and reopen that screen
+  async function sendNewCode() {
+    const email = form.email.trim()
+    setResending(true)
+    setResendError('')
+    try {
+      await api.post('/auth/resend-otp', { email })
+      navigate('/signup', { state: { verifyEmail: email } })
+    } catch (err) {
+      setResendError(errorMessage(err))
+    } finally {
+      setResending(false)
+    }
+  }
+
   async function onSubmit(e) {
     e.preventDefault()
     setError('')
+    setResendError('')
     // Check the fields first so each problem is shown next to the field it belongs to
     const found = {}
     if (!form.email.trim()) found.email = 'Enter your email address.'
@@ -90,7 +109,7 @@ export default function Login() {
       setError(errorMessage(err))
       // A reCAPTCHA token works once, so a failed attempt needs a fresh tick
       if (RECAPTCHA_SITE_KEY) {
-        window.grecaptcha?.reset()
+        resetRecaptcha()
         setCaptcha('')
       }
     } finally {
@@ -186,6 +205,12 @@ export default function Login() {
 
           {/* Server answers (wrong password, deactivated account...) sit right above the button that caused them */}
           <ErrorBox>{error}</ErrorBox>
+          {error === NEEDS_VERIFICATION && form.email.trim() && (
+            <div>
+              <button type="button" disabled={resending} onClick={sendNewCode} className="btn-outline min-h-11 w-full">{resending ? 'Sending…' : 'Send me a new code'}</button>
+              {resendError && <p role="alert" className="mt-1 text-sm font-medium text-red-700">{resendError}</p>}
+            </div>
+          )}
           <button disabled={busy} className="btn-primary h-11 w-full text-base">{busy ? 'Logging in…' : 'Log in'}</button>
 
           <div className="flex items-center gap-3 text-sm text-slate-500">

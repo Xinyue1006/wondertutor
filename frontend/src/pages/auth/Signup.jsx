@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import api, { errorMessage } from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
 import { afterLogin } from '../../components/ProtectedRoute'
@@ -8,7 +8,7 @@ import GoogleButton from '../../components/GoogleButton'
 import PlaceSearch from '../../components/PlaceSearch'
 import SubjectPicker from '../../components/SubjectPicker'
 import { childSubjects, keepAllowed } from '../../lib/subjects'
-import Recaptcha, { RECAPTCHA_SITE_KEY } from '../../components/Recaptcha'
+import Recaptcha, { RECAPTCHA_SITE_KEY, resetRecaptcha } from '../../components/Recaptcha'
 import { ErrorBox } from '../../components/ui/Common'
 import OtpInput from '../../components/OtpInput'
 import PasswordHint from '../../components/PasswordHint'
@@ -51,21 +51,22 @@ export default function Signup() {
   const navigate = useNavigate()
   const { saveSession } = useAuth()
   const [draft] = useState(loadDraft)
-  const [step, setStep] = useState(0)
+  // Sent here from Log In with an unverified account: a new code was just emailed, so start on the code screen
+  const verifyEmail = useLocation().state?.verifyEmail
+  const [step, setStep] = useState(verifyEmail ? 2 : 0)
   const [role, setRole] = useState(draft?.role || 'PARENT')
   const [section, setSection] = useState(SECTIONS[draft?.role || 'PARENT'][0].id)
-  const [form, setForm] = useState({ ...emptyForm, ...(draft?.form || {}) })
+  const [form, setForm] = useState({ ...emptyForm, ...(draft?.form || {}), ...(verifyEmail && { email: verifyEmail }) })
   const [kids, setKids] = useState((draft?.kids || []).map((k) => ({ ...k, subjects: childSubjects(k) })))
   const [prefs, setPrefs] = useState({ ...emptyPreferences(), ...(draft?.prefs || {}) })
   const [subjects, setSubjects] = useState([])
   const [subjectLevels, setSubjectLevels] = useState(null) // which levels each subject exists at
-  const [photo, setPhoto] = useState(null)
   const [captcha, setCaptcha] = useState('')
   const [terms, setTerms] = useState(false)
   const [otp, setOtp] = useState('')
   // Seconds until another code can be requested, and until the current code expires
-  const [cooldown, setCooldown] = useState(0)
-  const [expiresIn, setExpiresIn] = useState(0)
+  const [cooldown, setCooldown] = useState(verifyEmail ? RESEND_SECONDS : 0)
+  const [expiresIn, setExpiresIn] = useState(verifyEmail ? OTP_MINUTES * 60 : 0)
   const [resent, setResent] = useState(false)
   useEffect(() => {
     if (!cooldown && !expiresIn) return
@@ -179,6 +180,11 @@ export default function Signup() {
     } catch (err) {
       setError(errorMessage(err))
     } finally {
+      // A reCAPTCHA token works once, so the next attempt needs a fresh tick
+      if (RECAPTCHA_SITE_KEY) {
+        resetRecaptcha()
+        setCaptcha('')
+      }
       setBusy(false)
     }
   }
@@ -191,8 +197,9 @@ export default function Signup() {
       const res = await api.post('/auth/verify-otp', { email: form.email, code: otp })
       try { sessionStorage.removeItem(DRAFT_KEY) } catch { /* ignore */ }
       saveSession(res.data.token, res.data.user, true)
-      // A new tutor goes on to the profile setup (step 4); a parent goes to their dashboard
-      navigate(afterLogin(res.data.user))
+      // A new tutor goes on to the profile setup (step 4, "Complete profile"); they may leave it and use the portal
+      // straight away. A parent goes to their dashboard.
+      navigate(res.data.user.role === 'TUTOR' ? '/tutor/setup' : afterLogin(res.data.user))
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -249,7 +256,7 @@ export default function Signup() {
             <RoleCard
               active={role === 'TUTOR'} onClick={() => chooseRole('TUTOR')} img="/img/art/role-tutor.jpg" tone="yellow"
               title="I'm a Tutor" desc="Teach, set your schedule and earn."
-              points={['Set your own availability and rate', 'Get paid per completed session', 'Profile reviewed by Admin before going live', 'Build your teaching profile']}
+              points={['Set your own availability and rate', 'Get paid per completed session', 'Verified badge after Admin review', 'Build your teaching profile']}
             />
           </div>
           <div className="mx-auto mt-5 grid max-w-[560px] gap-3 sm:grid-cols-2">
@@ -281,20 +288,17 @@ export default function Signup() {
               <button
                 key={s.id}
                 type="button"
-                disabled={s.locked}
                 onClick={() => { setError(''); setSection(s.id) }}
-                title={s.locked ? 'Completed in the Tutor Portal after your email is verified' : ''}
                 className={`flex min-h-11 w-full items-center gap-3 rounded-lg border px-4 py-3 text-left text-sm font-medium transition ${
                   section === s.id ? 'border-brand-500 bg-white text-brand-600 shadow-card' : 'border-transparent text-navy hover:bg-white/70'
-                } ${s.locked ? 'cursor-not-allowed opacity-55' : ''}`}
+                }`}
               >
                 <Icon name={s.icon} className="h-[18px] w-[18px] shrink-0" />
                 <span className="min-w-0 flex-1">
                   {s.label}
                   {s.optional && !isDone(s.id) && <span className="block text-xs font-normal text-slate-600">Optional</span>}
                 </span>
-                {s.locked && <Icon name="lock" className="ml-auto h-3.5 w-3.5" />}
-                {!s.locked && isDone(s.id) && <Icon name="check-circle" className="ml-auto h-4 w-4 shrink-0 text-ok" aria-label="Completed" />}
+                {isDone(s.id) && <Icon name="check-circle" className="ml-auto h-4 w-4 shrink-0 text-ok" aria-label="Completed" />}
               </button>
             ))}
            </div>
@@ -328,23 +332,6 @@ export default function Signup() {
                         <Input label="Create Password" required type="password" value={form.password} onChange={set('password')} placeholder="At least 8 characters" autoComplete="new-password" />
                         <Input label="Confirm Password" required type="password" value={form.confirmPassword} onChange={set('confirmPassword')} placeholder="Re-enter your password" autoComplete="new-password" />
                         <p className="text-xs text-slate-600 md:col-span-2">Use a letter and a number. Your email is your login.</p>
-                        {role === 'TUTOR' && (
-                          <>
-                            <Input label="Emergency Contact Name" required value={form.emergencyContactName} onChange={set('emergencyContactName')} placeholder="e.g. Lee Siew Ling" />
-                            <Phone label="Emergency Contact Number" required value={form.emergencyContactPhone} onChange={set('emergencyContactPhone')} />
-                            <fieldset className="md:col-span-2">
-                              <legend className="mb-1.5 text-sm font-semibold text-navy">Gender <span className="text-red-600">*</span></legend>
-                              <div className="flex flex-wrap gap-x-6 text-sm text-navy">
-                                {[['MALE', 'Male'], ['FEMALE', 'Female'], ['UNSPECIFIED', 'Prefer not to say']].map(([v, l]) => (
-                                  <label key={v} className="flex min-h-11 cursor-pointer items-center gap-2">
-                                    <input type="radio" name="gender" className="h-4 w-4 accent-brand-500" checked={form.gender === v} onChange={() => setForm({ ...form, gender: v })} /> {l}
-                                  </label>
-                                ))}
-                              </div>
-                              <p className="text-xs text-slate-600">Your emergency contact stays private. It is never shown on your public profile.</p>
-                            </fieldset>
-                          </>
-                        )}
                       </div>
                     )}
 
@@ -358,9 +345,6 @@ export default function Signup() {
                             hint="Type your town or postcode, anywhere in Malaysia. We use it to rank tutors by distance. Your exact address is only needed when you book a physical lesson."
                           />
                         )}
-                        <div className="md:col-span-2">
-                          <PhotoUpload photo={photo} setPhoto={setPhoto} />
-                        </div>
                       </div>
                     )}
 
@@ -417,7 +401,8 @@ export default function Signup() {
               {cooldown > 0 ? `Resend code in ${clock(cooldown)}` : 'Resend code'}
             </button>
             {' · '}
-            <button type="button" onClick={() => { setError(''); setStep(1) }} className="min-h-11 font-semibold text-brand-600 hover:underline">Change email</button>
+            {/* Arriving from Log In with no draft, the role is unknown, so ask for it before showing a form */}
+            <button type="button" onClick={() => { setError(''); setStep(verifyEmail && !draft?.role ? 0 : 1) }} className="min-h-11 font-semibold text-brand-600 hover:underline">Change email</button>
           </p>
           <p className="rounded-lg bg-brand-50 px-4 py-3 text-left text-sm text-navy">
             The code works for {OTP_MINUTES} minutes. After {OTP_TRIES} wrong tries it stops working and you need to request a new one. Check your spam folder if the email is slow.
@@ -481,7 +466,7 @@ function TutorAccount({ form, set, terms, setTerms, setCaptcha, error, setError,
             {[
               ['bg-brand-500', 'Verify your email', `6-digit code, valid ${OTP_MINUTES} minutes`],
               ['bg-accent', 'Set up your profile', 'Subjects, rate, photo, documents'],
-              ['bg-ok', 'Admin review', 'Go live once your documents are approved'],
+              ['bg-ok', 'Admin review', 'Verified badge and higher in search once approved'],
             ].map(([dot, title, sub]) => (
               <li key={title} className="flex gap-3">
                 <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${dot}`} aria-hidden="true" />
@@ -586,34 +571,6 @@ function Phone({ label, required, value, onChange }) {
         <input className="input h-11" inputMode="tel" placeholder="e.g. 12 345 6789" value={value} onChange={onChange} />
       </div>
     </label>
-  )
-}
-
-// Preview only for now: photo storage (Cloudinary) is wired in a later milestone
-function PhotoUpload({ photo, setPhoto }) {
-  const ref = useRef(null)
-  return (
-    <div>
-      <span className="mb-1.5 block text-sm font-semibold text-navy">Profile Photo</span>
-      <div className="flex items-center gap-4 rounded-xl border border-dashed border-brand-200 bg-white p-4">
-        {photo ? (
-          <img src={photo} alt="" className="h-14 w-14 rounded-full object-cover" />
-        ) : (
-          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-50 text-brand-500"><Icon name="camera" className="h-6 w-6" /></span>
-        )}
-        <div>
-          <button type="button" onClick={() => ref.current?.click()} className="text-sm font-bold text-brand-500 hover:underline">Upload Photo</button>
-          <div className="text-xs text-slate-500">JPG, PNG (Max 5MB) · saved to your profile once photo storage is connected</div>
-        </div>
-        <input
-          ref={ref} type="file" accept="image/png,image/jpeg" className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0]
-            if (f && f.size <= 5 * 1024 * 1024) setPhoto(URL.createObjectURL(f))
-          }}
-        />
-      </div>
-    </div>
   )
 }
 

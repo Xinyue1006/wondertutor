@@ -1,6 +1,7 @@
 // Tutor profile setup and verification [YH].
 // A new tutor fills in the setup wizard as a draft, submits it, and Admin reviews the uploaded documents.
-// Until Admin approves an identity document AND a qualification, the tutor only reaches setup, status and preview.
+// Tutors can use every feature before that; once Admin approves an identity document AND a qualification
+// the tutor gets the verified badge and is listed before unverified tutors in search and matching.
 import { prisma } from '../config/prisma.js'
 import { AppError } from '../utils/AppError.js'
 import { findLocation } from '../data/catalog.js'

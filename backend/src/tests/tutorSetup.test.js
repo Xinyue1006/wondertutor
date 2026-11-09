@@ -1,5 +1,6 @@
 // Tutor sign-up and onboarding: reCAPTCHA on login, sign-up without profile details, the setup draft,
-// submitting for verification, Admin approval of an identity document + a qualification, and the verification gate.
+// submitting for verification, Admin approval of an identity document + a qualification, and that every tutor
+// can use the tutor features whether or not they are verified.
 import bcrypt from 'bcrypt'
 import { prisma } from '../config/prisma.js'
 import { env } from '../config/env.js'
@@ -215,7 +216,7 @@ describe('verification', () => {
     expect(removed.status).toBe(200)
     expect(removed.isVerified).toBe(false)
     expect((await api(token).get('/auth/me')).user.tutorStatus).toBe('CHANGES_REQUESTED')
-    expect((await api(token).get('/tutor/dashboard')).status).toBe(403)
+    expect((await api(token).get('/tutor/dashboard')).status).toBe(200) // losing the badge locks nothing
 
     // A new identity document goes back to Admin; approving it restores the badge
     await api(token).post('/tutor/documents', { kind: 'IDENTITY', title: 'NRIC', documentUrl: DOC })
@@ -245,15 +246,11 @@ describe('verification', () => {
   })
 })
 
-describe('verification gate', () => {
-  test('an unverified tutor reaches setup but not the teaching features; a verified tutor reaches both', async () => {
+describe('access without verification', () => {
+  test('a tutor who just signed up can use the tutor features before Admin verifies them', async () => {
     const { token, user } = await signUpTutor()
+    expect(user.tutorStatus).toBe('NOT_SUBMITTED')
     expect((await api(token).get('/tutor/profile')).status).toBe(200)
-    const blocked = await api(token).get('/tutor/dashboard')
-    expect(blocked.status).toBe(403)
-    expect(blocked.message).toMatch(/verification/)
-
-    await prisma.tutorProfile.updateMany({ where: { userId: user.id }, data: { isVerified: true } })
     expect((await api(token).get('/tutor/dashboard')).status).toBe(200)
   })
 

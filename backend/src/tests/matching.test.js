@@ -22,6 +22,17 @@ const tutor = (over = {}) => ({
 
 const base = { subject: 'Mathematics', level: 'PRIMARY', grade: 5, lat: 3.2087, lng: 101.6366 }
 
+describe('verified tutors come first', () => {
+  test('a verified tutor is listed before an unverified one even with a lower score; the score itself is unchanged', () => {
+    // The unverified tutor is closer to the child's grade range and cheaper, so it scores higher
+    const unverified = tutor({ id: 1, isVerified: false, qualifications: [], yearsExperience: 6 })
+    const verified = tutor({ id: 2, isVerified: true, latitude: 3.0565, longitude: 101.5851 }) // Subang Jaya, further away
+    const ranked = rankTutors([unverified, verified], base)
+    expect(ranked.map((x) => x.tutor.id)).toEqual([2, 1])
+    expect(scoreTutor(unverified, base).score).toBeGreaterThan(scoreTutor(verified, base).score)
+  })
+})
+
 describe('weights', () => {
   test('approved weights add up to 100', () => {
     expect(Object.values(WEIGHTS).reduce((a, b) => a + b, 0)).toBe(100)

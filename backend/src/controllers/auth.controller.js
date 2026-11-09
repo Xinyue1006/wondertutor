@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import bcrypt from 'bcrypt'
 import { currentSchoolYear } from '../services/progression.service.js'
 import { z } from 'zod'
@@ -235,6 +236,10 @@ export async function confirmEmailChange(req, res) {
   res.json({ message: 'Your email has been changed. Use it the next time you log in.', user: await userResponse(updated) })
 }
 
+// Compared when the account does not exist or has no password, so an unknown email takes as long as a real one
+// and the response time does not reveal which emails are registered. Random, so no typed password can match it.
+const DUMMY_HASH = bcrypt.hashSync(randomBytes(32).toString('hex'), 12)
+
 // POST /api/auth/login { email, password, recaptchaToken }
 // reCAPTCHA is checked before the password, so a bot cannot use this form to try passwords
 export async function login(req, res) {
@@ -249,8 +254,8 @@ export async function login(req, res) {
   await verifyRecaptcha(recaptchaToken)
 
   const user = await prisma.user.findUnique({ where: { email } })
-  const ok = user?.passwordHash && (await bcrypt.compare(password, user.passwordHash))
-  if (!ok) throw new AppError(401, 'Incorrect email or password')
+  const matches = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_HASH)
+  if (!user?.passwordHash || !matches) throw new AppError(401, 'Incorrect email or password')
   if (!user.isEmailVerified) throw new AppError(403, 'Please verify your email before logging in')
   if (user.status === 'DEACTIVATED') throw new AppError(403, 'Your account has been deactivated. Please contact Admin.')
 

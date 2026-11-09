@@ -3,6 +3,12 @@ import { loadScript } from '../lib/loadScript'
 
 export const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY
 
+// grecaptcha.reset() without an id resets the first widget ever made, which is gone after a remount
+let currentWidget = null
+export function resetRecaptcha() {
+  if (currentWidget !== null) window.grecaptcha?.reset(currentWidget)
+}
+
 // Google reCAPTCHA v2 checkbox. Renders nothing when no site key is configured (the backend then skips the check too).
 export default function Recaptcha({ onToken }) {
   const box = useRef(null)
@@ -19,6 +25,8 @@ export default function Recaptcha({ onToken }) {
           callback: onToken,
           'expired-callback': () => onToken(''),
         })
+        currentWidget = widget.current
+        onToken('') // a new, unticked widget: any token held from an earlier one is no longer valid
       })
     })
     return () => { cancelled = true }
