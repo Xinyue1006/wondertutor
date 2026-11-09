@@ -8,8 +8,8 @@ const router = Router()
 // Brute-force protection on everything that checks a password or a code, or sends an email
 const FIFTEEN_MIN = 15 * 60 * 1000
 export const limiters = {
-  login: rateLimit({ name: 'login', windowMs: FIFTEEN_MIN, max: 10, keyBy: byIpAndEmail }),
-  code: rateLimit({ name: 'code', windowMs: FIFTEEN_MIN, max: 10, keyBy: byIpAndEmail }),
+  login: rateLimit({ name: 'login', windowMs: FIFTEEN_MIN, max: 5, keyBy: byIpAndEmail }),
+  code: rateLimit({ name: 'code', windowMs: FIFTEEN_MIN, max: 5, keyBy: byIpAndEmail }),
   email: rateLimit({ name: 'email', windowMs: FIFTEEN_MIN, max: 5 }),
   // Changing the login email: counted per logged-in account, because the caller is known
   emailChange: rateLimit({ name: 'email-change', windowMs: FIFTEEN_MIN, max: 5, keyBy: (req) => req.user.id }),
