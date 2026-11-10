@@ -2,7 +2,9 @@
 // copying a week, isolation between tutors, and that the parent booking calendar reads the saved hours.
 import { prisma } from '../config/prisma.js'
 import { effectiveSlotsForDate, normaliseSlots } from '../services/availability.service.js'
-import { addDays } from '../utils/time.js'
+import { PAYMENT_DEADLINE_MINUTES } from '../services/lifecycle.service.js'
+import { paymentDeadline } from '../services/paymentWindow.js'
+import { addDays, mytParts, mytToDate } from '../utils/time.js'
 import { currentWeekStart, weekStartOf } from '../utils/week.js'
 import { MONDAY, api, makeBooking, makeParent, makeTutor, nextDate, resetDb, startServer, stopServer } from './helpers.js'
 
@@ -13,10 +15,10 @@ beforeAll(async () => {
 afterAll(stopServer)
 
 const TUESDAY = 2
-const slot = (dayOfWeek, startTime, endTime) => ({ dayOfWeek, startTime, endTime })
+const slot = (dayOfWeek, startTime, endTime, mode = 'BOTH') => ({ dayOfWeek, startTime, endTime, mode })
 const put = (token, slots) => api(token).put('/tutor/availability', { slots })
 const stored = (tutorId) => prisma.availabilitySlot.findMany({ where: { tutorId }, orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }] })
-const plain = (rows) => rows.map(({ dayOfWeek, startTime, endTime }) => slot(dayOfWeek, startTime, endTime))
+const plain = (rows) => rows.map(({ dayOfWeek, startTime, endTime, mode }) => slot(dayOfWeek, startTime, endTime, mode))
 
 // The Monday `n` weeks from the current week
 const week = (n) => addDays(currentWeekStart(), n * 7)
@@ -109,11 +111,11 @@ describe('booked hours', () => {
     return t
   }
 
-  test.each(['CONFIRMED', 'AWAITING_PAYMENT'])('a %s booking is listed as booked for its week', async (status) => {
-    const { token } = await withBooking(status)
+  test('a CONFIRMED booking is listed for its week as BOOKED', async () => {
+    const { token } = await withBooking('CONFIRMED')
     const date = nextDate(MONDAY)
     const res = await view(token, date)
-    expect(res.booked).toEqual([{ date, startTime: '15:00' }])
+    expect(res.booked).toEqual([{ date, startTime: '15:00', dayOfWeek: 1, state: 'BOOKED', teachingMode: 'ONLINE' }])
     expect(res.usual).toEqual([slot(1, '14:00', '17:00')])
   })
 
@@ -318,7 +320,7 @@ describe('booked-hour lock per scope', () => {
     const { tutor, token } = await makeTutor()
     const sunday = addDays(week(1), 6)
     await book(tutor, sunday, '22:00')
-    expect((await view(token, week(1))).booked).toEqual([{ date: sunday, startTime: '22:00' }])
+    expect((await view(token, week(1))).booked).toEqual([{ date: sunday, startTime: '22:00', dayOfWeek: 0, state: 'BOOKED', teachingMode: 'ONLINE' }])
     expect((await view(token, week(2))).booked).toEqual([])
   })
 })
@@ -387,6 +389,322 @@ describe('copying a week', () => {
     const { token } = await makeTutor({ availability: usual })
     expect((await copy(token, addDays(week(1), 1), [week(2)])).status).toBe(400)
     expect((await copy(token, week(-1), [week(2)])).status).toBe(400)
+  })
+})
+
+describe('teaching mode of a slot', () => {
+  const usual = [slot(1, '14:00', '16:00', 'ONLINE'), slot(1, '16:00', '18:00', 'PHYSICAL')]
+
+  test('hours sent without a mode are BOTH', async () => {
+    const { token } = await makeTutor()
+    const res = await put(token, [{ dayOfWeek: 1, startTime: '09:00', endTime: '10:00' }])
+    expect(res.usual).toEqual([slot(1, '09:00', '10:00', 'BOTH')])
+  })
+
+  test('touching hours stay apart when the mode differs and join when it is the same', () => {
+    expect(normaliseSlots(usual)).toEqual(usual)
+    expect(normaliseSlots([slot(1, '14:00', '15:00', 'ONLINE'), slot(1, '15:00', '16:00', 'ONLINE')])).toEqual([slot(1, '14:00', '16:00', 'ONLINE')])
+  })
+
+  test('one hour cannot have two modes', async () => {
+    const { token } = await makeTutor()
+    const res = await put(token, [slot(1, '14:00', '16:00', 'ONLINE'), slot(1, '15:00', '17:00', 'PHYSICAL')])
+    expect(res.status).toBe(400)
+    expect(res.message).toBe('An hour cannot have two teaching modes')
+  })
+
+  test('an unknown mode is refused', async () => {
+    const { token } = await makeTutor()
+    const res = await put(token, [slot(1, '14:00', '16:00', 'TELEPATHY')])
+    expect(res.status).toBe(400)
+    expect(res.message).toBe('Choose online, physical or both')
+  })
+
+  test('the usual hours keep their modes and the view says what the profile offers', async () => {
+    const { tutor, token } = await makeTutor()
+    const res = await put(token, usual)
+    expect(res.usual).toEqual(usual)
+    await prisma.tutorProfile.update({ where: { id: tutor.id }, data: { offersOnline: true, offersPhysical: false } })
+    expect((await view(token, week(1))).offers).toEqual({ online: true, physical: false })
+  })
+
+  test('a week with the same hours but another mode counts as changed', async () => {
+    const { tutor, token } = await makeTutor({ availability: [slot(1, '14:00', '16:00', 'ONLINE')] })
+    expect((await putWeek(token, week(1), [slot(1, '14:00', '16:00', 'ONLINE')])).override).toBeNull()
+    const res = await putWeek(token, week(1), [slot(1, '14:00', '16:00', 'PHYSICAL')])
+    expect(res.override).toEqual([slot(1, '14:00', '16:00', 'PHYSICAL')])
+    expect(await overrides(tutor.id)).toBe(1)
+  })
+
+  test('copying a week carries the modes', async () => {
+    const { token } = await makeTutor()
+    await putWeek(token, week(1), usual)
+    await copy(token, week(1), [week(2)])
+    expect((await view(token, week(2))).override).toEqual(usual)
+  })
+
+  test('effectiveSlotsForDate returns the mode', async () => {
+    const { tutor, token } = await makeTutor()
+    await putWeek(token, week(1), usual)
+    expect(await effectiveSlotsForDate(tutor.id, week(1))).toEqual(usual)
+  })
+})
+
+describe('teaching mode checks', () => {
+  const ONLINE_ONLY = { online: true, physical: false }
+  const PHYSICAL_ONLY = { online: false, physical: true }
+  const HOUR_15 = (mode) => [slot(1, '14:00', '15:00'), slot(1, '15:00', '16:00', mode), slot(1, '16:00', '17:00')]
+  const usual = [slot(1, '14:00', '17:00')]
+  const bookIn = async (tutor, date, status, teachingMode) => {
+    const { parent, child } = await makeParent()
+    return makeBooking({ parent, child, tutor, date, start: '15:00', status, extra: { teachingMode } })
+  }
+  const label = (date) => new RegExp(`^Mon ${Number(date.slice(8))} [A-Z][a-z]{2}, 15:00 `)
+
+  test('an online-only tutor cannot save a physical hour for a week, and nothing is saved', async () => {
+    const { tutor, token } = await makeTutor(ONLINE_ONLY)
+    const res = await putWeek(token, week(1), [slot(1, '09:00', '10:00', 'PHYSICAL')])
+    expect(res.status).toBe(400)
+    expect(res.message).toBe('Your profile offers online lessons only')
+    expect(await overrides(tutor.id)).toBe(0)
+  })
+
+  test.each(['ONLINE', 'BOTH'])('an online-only tutor can save a %s hour for a week', async (mode) => {
+    const { token } = await makeTutor(ONLINE_ONLY)
+    expect((await putWeek(token, week(1), [slot(1, '09:00', '10:00', mode)])).status).toBe(200)
+  })
+
+  test('a physical-only tutor cannot save an online usual hour', async () => {
+    const { tutor, token } = await makeTutor({ ...PHYSICAL_ONLY, availability: usual })
+    const res = await put(token, [slot(1, '09:00', '10:00', 'ONLINE')])
+    expect(res.status).toBe(400)
+    expect(res.message).toBe('Your profile offers physical lessons only')
+    expect(plain(await stored(tutor.id))).toEqual(usual)
+  })
+
+  test.each(['PHYSICAL', 'ONLINE', 'BOTH'])('a tutor offering both can save a %s hour', async (mode) => {
+    const { token } = await makeTutor()
+    expect((await put(token, [slot(1, '09:00', '10:00', mode)])).status).toBe(200)
+  })
+
+  test.each(['PHYSICAL', 'ONLINE', 'BOTH'])('a tutor with neither switched on can save a %s hour', async (mode) => {
+    const { token } = await makeTutor({ online: false, physical: false })
+    expect((await put(token, [slot(1, '09:00', '10:00', mode)])).status).toBe(200)
+  })
+
+  test('a quick add must be a mode the profile offers, and one with no mode is fine', async () => {
+    const { token } = await makeTutor(ONLINE_ONLY)
+    const preset = { label: 'Evenings', days: [1], from: '17:00', to: '21:00' }
+    const refused = await api(token).put('/tutor/availability/quick-add', { presets: [{ ...preset, mode: 'PHYSICAL' }] })
+    expect(refused.status).toBe(400)
+    expect(refused.message).toBe('Your profile offers online lessons only')
+    expect((await api(token).put('/tutor/availability/quick-add', { presets: [preset] })).status).toBe(200)
+  })
+
+  test('a paid physical lesson stops its hour becoming online only', async () => {
+    const { tutor, token } = await makeTutor({ availability: usual })
+    await bookIn(tutor, week(1), 'CONFIRMED', 'PHYSICAL')
+    const res = await putWeek(token, week(1), HOUR_15('ONLINE'))
+    expect(res.status).toBe(409)
+    expect(res.message).toMatch(label(week(1)))
+    expect(res.message).toContain('has a booked lesson')
+    expect((await putWeek(token, week(1), HOUR_15('PHYSICAL'))).status).toBe(200)
+    expect((await putWeek(token, week(1), HOUR_15('BOTH'))).status).toBe(200)
+  })
+
+  test('a held online lesson can have its hour opened to both but not made physical only', async () => {
+    const { tutor, token } = await makeTutor({ availability: [slot(1, '15:00', '16:00', 'ONLINE')] })
+    await bookIn(tutor, week(1), 'AWAITING_PAYMENT', 'ONLINE')
+    const res = await putWeek(token, week(1), [slot(1, '15:00', '16:00', 'PHYSICAL')])
+    expect(res.status).toBe(409)
+    expect(res.message).toContain('is held until a parent pays')
+    expect((await putWeek(token, week(1), [slot(1, '15:00', '16:00', 'BOTH')])).status).toBe(200)
+  })
+
+  test('the usual hours cannot strand a lesson either', async () => {
+    const { tutor, token } = await makeTutor({ availability: usual })
+    await bookIn(tutor, week(1), 'CONFIRMED', 'PHYSICAL')
+    expect((await put(token, HOUR_15('ONLINE'))).status).toBe(409)
+  })
+
+  test('copying skips a week whose lesson the source mode would strand, with the reason', async () => {
+    const { tutor, token } = await makeTutor({ availability: usual })
+    await bookIn(tutor, week(2), 'CONFIRMED', 'PHYSICAL')
+    await putWeek(token, week(1), HOUR_15('ONLINE'))
+    const res = await copy(token, week(1), [week(2), week(3)])
+    expect(res.copied).toEqual([week(3)])
+    expect(res.skipped).toHaveLength(1)
+    expect(res.skipped[0].weekStart).toBe(week(2))
+    expect(res.skipped[0].reason).toMatch(new RegExp(`^Mon ${Number(week(2).slice(8))} [A-Z][a-z]{2}, 15:00 has a booked lesson$`))
+  })
+
+  test('the week view gives each hour its lesson mode', async () => {
+    const { tutor, token } = await makeTutor({ availability: usual })
+    await bookIn(tutor, week(1), 'CONFIRMED', 'PHYSICAL')
+    expect((await view(token, week(1))).booked[0].teachingMode).toBe('PHYSICAL')
+  })
+})
+
+describe('quick adds', () => {
+  const preset = (over = {}) => ({ label: 'Evenings', days: [1, 3], from: '17:00', to: '21:00', mode: 'ONLINE', ...over })
+  const saveQuick = (token, presets) => api(token).put('/tutor/availability/quick-add', { presets })
+
+  test('a tutor starts with none of their own', async () => {
+    const { token } = await makeTutor()
+    expect((await view(token, week(1))).quickAdd).toBeNull()
+  })
+
+  test('saved quick adds come back with the week and belong to that tutor', async () => {
+    const { token } = await makeTutor()
+    const { token: other } = await makeTutor()
+    const res = await saveQuick(token, [preset(), preset({ label: 'Weekend', days: [6, 0], mode: 'BOTH' })])
+    expect(res.status).toBe(200)
+    expect(res.quickAdd).toHaveLength(2)
+    expect((await view(token, week(1))).quickAdd[0]).toEqual(preset())
+    expect((await view(other, week(1))).quickAdd).toBeNull()
+  })
+
+  test('saving an empty list keeps it empty rather than going back to the built-in ones', async () => {
+    const { token } = await makeTutor()
+    await saveQuick(token, [])
+    expect((await view(token, week(1))).quickAdd).toEqual([])
+  })
+
+  test('the name is trimmed', async () => {
+    const { token } = await makeTutor()
+    expect((await saveQuick(token, [preset({ label: '  Evenings  ' })])).quickAdd[0].label).toBe('Evenings')
+  })
+
+  test.each([
+    ['a blank name', { label: '   ' }, 'Give the quick add a name'],
+    ['a long name', { label: 'x'.repeat(41) }, 'Keep the name to 40 characters'],
+    ['no days', { days: [] }, 'Choose at least one day'],
+    ['a repeated day', { days: [1, 1] }, 'Choose valid days of the week'],
+    ['a day out of range', { days: [7] }, 'Choose valid days of the week'],
+    ['a backwards time', { from: '18:00', to: '09:00' }, 'Choose whole hours between 07:00 and 22:00'],
+    ['a part hour', { from: '09:30' }, 'Choose whole hours between 07:00 and 22:00'],
+    ['an unknown mode', { mode: 'TELEPATHY' }, 'Choose online, physical or both'],
+  ])('%s is refused', async (_, over, message) => {
+    const { token } = await makeTutor()
+    const res = await saveQuick(token, [preset(over)])
+    expect(res.status).toBe(400)
+    expect(res.message).toBe(message)
+  })
+
+  test('at most 8 can be kept', async () => {
+    const { token } = await makeTutor()
+    expect((await saveQuick(token, Array.from({ length: 8 }, () => preset()))).status).toBe(200)
+    const res = await saveQuick(token, Array.from({ length: 9 }, () => preset()))
+    expect(res.status).toBe(400)
+    expect(res.message).toBe('Keep to 8 quick adds')
+  })
+
+  test('saving quick adds does not change the hours', async () => {
+    const { tutor, token } = await makeTutor({ availability: [slot(1, '14:00', '17:00')] })
+    await saveQuick(token, [preset()])
+    expect(plain(await stored(tutor.id))).toEqual([slot(1, '14:00', '17:00')])
+  })
+
+  test('a parent cannot save quick adds', async () => {
+    const { token } = await makeParent()
+    expect((await saveQuick(token, [preset()])).status).toBe(403)
+  })
+})
+
+describe('held and booked hours', () => {
+  const usual = [slot(1, '14:00', '17:00')]
+  const heldAt = (hour, payBy) => ({ extra: { payBy }, status: 'AWAITING_PAYMENT', start: hour })
+
+  async function setup(bookings, date = week(1)) {
+    const t = await makeTutor({ availability: usual })
+    const { parent, child } = await makeParent()
+    const made = []
+    for (const b of bookings) made.push(await makeBooking({ parent, child, tutor: t.tutor, date, start: '15:00', ...b }))
+    return { ...t, made }
+  }
+  const startOf = (date, time) => mytToDate(date, time)
+  const inTheWindow = (date, time) => new Date(startOf(date, time).getTime() - 3 * 3_600_000)
+  // The label the service prints: "Mon 23 Nov, 16:00", in Malaysia time
+  const labelOf = (instant) => {
+    const { date, time, dow } = mytParts(instant)
+    const month = new Date(`${date}T00:00:00Z`).toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' })
+    return `${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dow]} ${Number(date.slice(8))} ${month}, ${time}`
+  }
+  const heldText = (hourLabel, payBy) => `${hourLabel} is held until a parent pays (by ${labelOf(payBy)})`
+  const hour = (date, time) => labelOf(startOf(date, time))
+
+  test('an AWAITING_PAYMENT booking is PENDING_PAYMENT and held until its deadline', async () => {
+    const payBy = inTheWindow(week(1), '15:00')
+    const { token, made } = await setup([heldAt('15:00', payBy)])
+    const [entry] = (await view(token, week(1))).booked
+    expect(entry).toEqual({ date: week(1), startTime: '15:00', dayOfWeek: 1, state: 'PENDING_PAYMENT', holdUntil: paymentDeadline(made[0]).toISOString(), teachingMode: 'ONLINE' })
+    expect(entry.holdUntil).toBe(payBy.toISOString())
+  })
+
+  test('with no payBy the hold ends before the lesson by the old rule', async () => {
+    const { token, made } = await setup([heldAt('15:00', null)])
+    const [entry] = (await view(token, week(1))).booked
+    expect(entry.holdUntil).toBe(new Date(made[0].startAt.getTime() - PAYMENT_DEADLINE_MINUTES * 60_000).toISOString())
+  })
+
+  test('a paid lesson wins when two bookings share an hour', async () => {
+    const { token } = await setup([heldAt('15:00', inTheWindow(week(1), '15:00')), { status: 'CONFIRMED' }])
+    expect((await view(token, week(1))).booked.map((b) => b.state)).toEqual(['BOOKED'])
+  })
+
+  test.each(['PENDING', 'COUNTER_OFFERED'])('a %s booking does not hold the hour', async (status) => {
+    const { token } = await setup([{ status }])
+    expect((await view(token, week(1))).booked).toEqual([])
+    expect((await putWeek(token, week(1), [])).status).toBe(200)
+  })
+
+  test('a past held booking does not appear', async () => {
+    const date = addDays(currentWeekStart(), -7)
+    const { token } = await setup([{ status: 'AWAITING_PAYMENT' }], date)
+    expect((await view(token, date)).booked).toEqual([])
+  })
+
+  test('a held hour blocks saving a week, with the pay-by time', async () => {
+    const payBy = inTheWindow(week(1), '15:00')
+    const { tutor, token } = await setup([heldAt('15:00', payBy)])
+    const res = await putWeek(token, week(1), [slot(1, '14:00', '15:00')])
+    expect(res.status).toBe(409)
+    expect(res.message).toBe(`${heldText(hour(week(1), '15:00'), payBy)}. It is released if the parent does not pay in time.`)
+    expect(await overrides(tutor.id)).toBe(0)
+  })
+
+  test('a held hour blocks saving the usual hours', async () => {
+    const payBy = inTheWindow(week(1), '15:00')
+    const { tutor, token } = await setup([heldAt('15:00', payBy)])
+    const res = await put(token, [])
+    expect(res.status).toBe(409)
+    expect(res.message).toContain(heldText(hour(week(1), '15:00'), payBy))
+    expect(plain(await stored(tutor.id))).toEqual(usual)
+  })
+
+  test('copying skips a week whose held hour would be lost, with the reason', async () => {
+    const payBy = inTheWindow(week(2), '15:00')
+    const { token } = await setup([heldAt('15:00', payBy)], week(2))
+    await putWeek(token, week(1), [slot(2, '09:00', '10:00')])
+    const res = await copy(token, week(1), [week(2), week(3)])
+    expect(res.copied).toEqual([week(3)])
+    expect(res.skipped).toEqual([{ weekStart: week(2), reason: heldText(hour(week(2), '15:00'), payBy) }])
+  })
+
+  test('a booked hour keeps its own wording, and a mix lists both', async () => {
+    const payBy = inTheWindow(week(1), '16:00')
+    const { token } = await setup([{ status: 'CONFIRMED' }, heldAt('16:00', payBy)])
+    const res = await putWeek(token, week(1), [])
+    expect(res.status).toBe(409)
+    expect(res.message).toBe(`${hour(week(1), '15:00')} has a booked lesson; ${heldText(hour(week(1), '16:00'), payBy)}. Booked lessons must be cancelled or rescheduled first, and held hours are released if the parent does not pay in time.`)
+  })
+
+  test('once the booking is cancelled the hour is free and the same save succeeds', async () => {
+    const { token, made } = await setup([heldAt('15:00', inTheWindow(week(1), '15:00'))])
+    expect((await putWeek(token, week(1), [])).status).toBe(409)
+    await prisma.booking.update({ where: { id: made[0].id }, data: { status: 'CANCELLED' } })
+    expect((await view(token, week(1))).booked).toEqual([])
+    expect((await putWeek(token, week(1), [])).status).toBe(200)
   })
 })
 

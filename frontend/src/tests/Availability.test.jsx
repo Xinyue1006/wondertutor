@@ -1,7 +1,7 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
-import { addDays, dateOfDay, nowInMalaysia, weekLabel, weekStartOf } from '../lib/availability'
+import { addDays, dateOfDay, malaysiaLabel, nowInMalaysia, weekLabel, weekStartOf } from '../lib/availability'
 
 vi.mock('../api/client', () => ({
   default: { get: vi.fn(), put: vi.fn(), post: vi.fn(), delete: vi.fn() },
@@ -44,8 +44,8 @@ import api from '../api/client'
 import Availability from '../pages/tutor/Availability'
 
 const bounds = { start: '07:00', end: '22:00' }
-const slot = (dayOfWeek, startTime, endTime) => ({ dayOfWeek, startTime, endTime })
-const LOCK_MESSAGE = 'That change would drop an hour with a booked lesson. Cancel or reschedule the lesson first.'
+const slot = (dayOfWeek, startTime, endTime, mode = 'BOTH') => ({ dayOfWeek, startTime, endTime, mode })
+const LOCK_MESSAGE = 'That change would drop a booked or held hour, so it was undone.'
 
 const FIRST = weekStartOf(nowInMalaysia().date)
 const LAST = addDays(FIRST, 26 * 7)
@@ -73,6 +73,9 @@ const select = (day, from, to) => act(() => calendar.select(span(day, from, to))
 const moved = (oldSpan, newSpan) => ({ oldEvent: oldSpan, event: newSpan, revert: vi.fn() })
 
 const button = (name) => screen.getByRole('button', { name })
+const expectWeek = (available, booked, held) => expect(screen.getByRole('list', { name: 'Your week' })).toHaveTextContent(`${available} Available${booked} Booked${held} Pending payment`)
+const lockedHour = (name) => screen.getByRole('img', { name })
+const BOOKED_NAME = /, booked$/
 const removeMode = () => userEvent.click(screen.getByRole('radio', { name: 'Remove hours' }))
 const usualScope = () => screen.getByRole('radio', { name: 'My usual hours' })
 const weekScope = () => screen.getByRole('radio', { name: /^This week only/ })
@@ -383,12 +386,12 @@ describe('copying this week', () => {
 })
 
 describe('editing the hours', () => {
-  test('draws the blocks, the booked hour and the weekly total', async () => {
+  test('draws the blocks, the booked hour and the week summary', async () => {
     await setup()
     expect(screen.getByText('14:00–17:00')).toBeInTheDocument()
     expect(screen.getByText('09:00–11:00')).toBeInTheDocument()
-    expect(screen.getByText('Booked lesson, locked').parentElement).toHaveAttribute('title', 'Booked lesson on this day. Cancel or reschedule it first.')
-    expect(screen.getByText('5 hours a week')).toBeInTheDocument()
+    expect(lockedHour(BOOKED_NAME)).toHaveAttribute('title', 'Booked lesson. Cancel or reschedule it first.')
+    expectWeek(4, 1, 0)
   })
 
   test('events sit on the real dates of the week', async () => {
@@ -406,7 +409,7 @@ describe('editing the hours', () => {
     await setup()
     select(2, '10:00', '12:00')
     expect(screen.getByText('10:00–12:00')).toBeInTheDocument()
-    expect(screen.getByText('7 hours a week')).toBeInTheDocument()
+    expectWeek(6, 1, 0)
   })
 
   test('in Remove mode a selection switches hours off and can split a block', async () => {
@@ -414,7 +417,7 @@ describe('editing the hours', () => {
     await removeMode()
     select(3, '09:00', '10:00')
     expect(screen.getByText('10:00–11:00')).toBeInTheDocument()
-    expect(screen.getByText('4 hours a week')).toBeInTheDocument()
+    expectWeek(3, 1, 0)
   })
 
   test('Remove mode never removes a booked hour', async () => {
@@ -422,7 +425,7 @@ describe('editing the hours', () => {
     await removeMode()
     select(1, '14:00', '17:00')
     expect(screen.getByText('15:00–16:00')).toBeInTheDocument()
-    expect(screen.getByText('3 hours a week')).toBeInTheDocument()
+    expectWeek(2, 1, 0)
   })
 
   test('blocks can only be moved in Add mode', async () => {
@@ -459,13 +462,13 @@ describe('editing the hours', () => {
   test('the booked hours of a week with an override do not lock the usual hours', async () => {
     await setup(changed({ booked: [{ date: dateOfDay(WEEK, 2), startTime: '10:00' }] }))
     await userEvent.click(usualScope())
-    expect(screen.queryByText('Booked lesson, locked')).not.toBeInTheDocument()
-    expect(screen.getByText('5 hours a week')).toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: BOOKED_NAME })).not.toBeInTheDocument()
+    expectWeek(5, 0, 0)
   })
 
   test('the booked hours are locked while editing that week', async () => {
     await setup(changed({ booked: [{ date: dateOfDay(WEEK, 2), startTime: '10:00' }] }))
-    expect(screen.getByText('Booked lesson, locked')).toBeInTheDocument()
+    expect(lockedHour(BOOKED_NAME)).toBeInTheDocument()
     await userEvent.click(button('Clear all'))
     expect(screen.getByText('10:00–11:00')).toBeInTheDocument()
   })
@@ -516,7 +519,7 @@ describe('editing the hours', () => {
     expect(screen.getByText('15:00–16:00')).toBeInTheDocument()
     expect(screen.getByText('09:00–11:00')).toBeInTheDocument()
     await userEvent.click(button('Clear all'))
-    expect(screen.getByText('1 hour a week')).toBeInTheDocument()
+    expectWeek(0, 1, 0)
   })
 
   test('a 409 is shown on the page and the changes are kept', async () => {
@@ -550,21 +553,39 @@ describe('hours that have already passed', () => {
     expect(calendar.eventAllow({ start: friday.start }, { start: friday.start })).toBe(true)
   })
 
-  test('in This week only they are drawn greyed and have no × button', async () => {
+  test('in This week only they are drawn as passed and have no × button', async () => {
     await setup(data())
     await asWeek()
     expect(screen.queryByRole('button', { name: /^Remove Monday/ })).not.toBeInTheDocument()
     expect(button('Remove Friday 09:00 to 12:00')).toBeInTheDocument()
-    const past = calendar.events.filter((e) => e.extendedProps.kind === 'pastBlock')
-    expect(past).toHaveLength(1)
-    expect(past[0].editable).toBe(false)
+    const past = calendar.events.filter((e) => e.extendedProps.kind === 'passed')
+    expect(past.length).toBeGreaterThan(0)
+    expect(past.every((e) => e.display === 'background' && e.classNames.includes('fc-passed'))).toBe(true)
+    expect(screen.getByRole('img', { name: /^Monday 16 Nov 07:00 to 22:00, passed$/ })).toHaveAttribute('title', 'Already passed')
+  })
+
+  test('the passed hours follow the clock while the page stays open', async () => {
+    vi.useRealTimers()
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'], now: new Date('2026-11-18T05:59:00Z') }) // 13:59 in Malaysia
+    const hours = [slot(3, '14:00', '15:00')]
+    await setup({ ...data(), usual: hours, effective: hours })
+    await asWeek()
+    const passedUntil = (end) => screen.queryByRole('img', { name: `Wednesday 18 Nov 07:00 to ${end}, passed` })
+    expect(passedUntil('14:00')).toBeInTheDocument()
+    expect(screen.getByText('14:00–15:00')).toBeInTheDocument()
+    await act(() => vi.advanceTimersByTimeAsync(60_000))
+    expect(passedUntil('15:00')).toBeInTheDocument()
+    expect(passedUntil('14:00')).not.toBeInTheDocument()
+    expect(screen.queryByText('14:00–15:00')).not.toBeInTheDocument()
   })
 
   test('in This week only, clearing leaves them as they were', async () => {
     await setup(data())
     await asWeek()
     await userEvent.click(button('Clear all'))
-    expect(screen.getByText('3 hours a week')).toBeInTheDocument()
+    expectWeek(0, 0, 0)
+    await userEvent.click(button('Save this week'))
+    expect(api.put.mock.calls[0][1].slots).toEqual([slot(1, '09:00', '12:00')])
   })
 
   test('in This week only, adding does not switch them on', async () => {
@@ -574,15 +595,350 @@ describe('hours that have already passed', () => {
     await userEvent.selectOptions(screen.getByLabelText('From'), '09:00')
     await userEvent.selectOptions(screen.getByLabelText('To'), '12:00')
     await userEvent.click(button('Add'))
-    expect(screen.getByText('6 hours a week')).toBeInTheDocument()
+    expectWeek(3, 0, 0) // only Friday: the past Tuesday hours stay off
   })
 
   test('in My usual hours every hour can still be changed', async () => {
     await setup(data())
     expect(calendar.selectAllow(monday)).toBe(true)
     expect(calendar.eventAllow({ start: monday.start }, { start: monday.start })).toBe(true)
-    expect(calendar.events.some((e) => e.extendedProps.kind === 'pastBackground')).toBe(false)
+    expect(calendar.events.some((e) => e.extendedProps.kind === 'passed')).toBe(false)
     await userEvent.click(button('Remove Monday 09:00 to 12:00'))
-    expect(screen.getByText('3 hours a week')).toBeInTheDocument()
+    expectWeek(3, 0, 0)
+  })
+})
+
+describe('teaching mode of a slot', () => {
+  const pick = (name) => userEvent.click(screen.getByRole('radio', { name }))
+  const both = { online: true, physical: true }
+  const saved = () => api.put.mock.calls[0][1].slots
+  const noBooked = (over = {}) => weekView({ booked: [], offers: both, ...over })
+
+  test('new hours take the chosen mode and are saved with it', async () => {
+    await setup(noBooked())
+    await pick('Online')
+    select(2, '10:00', '12:00')
+    await userEvent.click(button('Save usual hours'))
+    expect(saved()).toContainEqual(slot(2, '10:00', '12:00', 'ONLINE'))
+    expect(saved()).toContainEqual(slot(1, '14:00', '17:00', 'BOTH'))
+  })
+
+  test('the mode is written on the block', async () => {
+    await setup(noBooked({ usual: [slot(1, '14:00', '15:00', 'PHYSICAL')], effective: [slot(1, '14:00', '15:00', 'PHYSICAL')] }))
+    expect(screen.getByText('Physical', { selector: 'span' })).toBeInTheDocument()
+  })
+
+  test('hours of different modes are separate blocks', async () => {
+    await setup(noBooked())
+    await pick('Online')
+    select(1, '17:00', '19:00')
+    expect(screen.getByText('14:00–17:00')).toBeInTheDocument()
+    expect(screen.getByText('17:00–19:00')).toBeInTheDocument()
+  })
+
+  test('there is no Change mode option', async () => {
+    await setup(noBooked())
+    expect(within(screen.getByRole('radiogroup', { name: 'What dragging does' })).getAllByRole('radio')).toHaveLength(2)
+  })
+
+  test('adding existing hours again changes their mode and counts as unsaved', async () => {
+    await setup(noBooked())
+    await pick('Physical')
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Monday' }))
+    await userEvent.selectOptions(screen.getByLabelText('From'), '14:00')
+    await userEvent.selectOptions(screen.getByLabelText('To'), '15:00')
+    await userEvent.click(button('Add'))
+    expect(screen.getByText('15:00–17:00')).toBeInTheDocument()
+    expectWeek(5, 0, 0)
+    await userEvent.click(button('Save usual hours'))
+    expect(saved()).toContainEqual(slot(1, '14:00', '15:00', 'PHYSICAL'))
+  })
+
+  test('adding over a booked hour leaves its mode alone', async () => {
+    await setup(weekView({ offers: both }))
+    await pick('Online')
+    select(1, '14:00', '17:00')
+    await userEvent.click(button('Save usual hours'))
+    expect(saved()).toEqual(expect.arrayContaining([slot(1, '14:00', '15:00', 'ONLINE'), slot(1, '15:00', '16:00', 'BOTH'), slot(1, '16:00', '17:00', 'ONLINE')]))
+  })
+
+  test('Add many hours at once uses the chosen mode', async () => {
+    await setup(noBooked())
+    await pick('Online')
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Tuesday' }))
+    await userEvent.selectOptions(screen.getByLabelText('From'), '09:00')
+    await userEvent.selectOptions(screen.getByLabelText('To'), '12:00')
+    await userEvent.click(button('Add'))
+    await userEvent.click(button('Save usual hours'))
+    expect(saved()).toContainEqual(slot(2, '09:00', '12:00', 'ONLINE'))
+  })
+
+  test('a moved block keeps its mode', async () => {
+    const hours = [slot(3, '09:00', '11:00', 'ONLINE')]
+    await setup(noBooked({ usual: hours, effective: hours }))
+    await pick('Physical')
+    act(() => calendar.eventDrop(moved(span(3, '09:00', '11:00'), span(5, '13:00', '15:00'))))
+    await userEvent.click(button('Save usual hours'))
+    expect(saved()).toEqual([slot(5, '13:00', '15:00', 'ONLINE')])
+  })
+
+  test('a tutor who offers one mode has no choice to make', async () => {
+    await setup(noBooked({ offers: { online: false, physical: true } }))
+    expect(screen.getByText(/\(set in My Profile\)/)).toHaveTextContent('Teaching mode: Physical (set in My Profile)')
+    expect(screen.queryByRole('radio', { name: 'Both' })).not.toBeInTheDocument()
+    expect(screen.getAllByText('Physical', { selector: 'span' }).length).toBeGreaterThan(0)
+  })
+})
+
+describe('quick adds', () => {
+  const both = { online: true, physical: true }
+  const own = (over = {}) => ({ label: 'Evenings', days: [2, 4], from: '17:00', to: '19:00', mode: 'ONLINE', ...over })
+  const data = (quickAdd, over = {}) => weekView({ booked: [], offers: both, quickAdd, ...over })
+  const answerQuickAdd = () => api.put.mockImplementation((_, body) => Promise.resolve({ data: { quickAdd: body.presets } }))
+  const sent = () => api.put.mock.calls.at(-1)[1].presets
+  const choose = async (day, from, to) => {
+    await userEvent.click(screen.getByRole('checkbox', { name: day }))
+    await userEvent.selectOptions(screen.getByLabelText('From'), from)
+    await userEvent.selectOptions(screen.getByLabelText('To'), to)
+  }
+  const nameIt = (text) => userEvent.type(screen.getByLabelText('Quick add name'), text)
+
+  test('a tutor with none saved sees the built-in ones', async () => {
+    await setup(data(null))
+    expect(button('Weekday evenings 17:00–21:00')).toBeInTheDocument()
+    expect(button('Weekends 09:00–17:00')).toBeInTheDocument()
+  })
+
+  test('saved ones replace the built-in ones and show their details', async () => {
+    await setup(data([own()]))
+    expect(button('Evenings')).toHaveTextContent('Tue, Thu · 17:00–19:00 · Online')
+    expect(screen.queryByRole('button', { name: 'Weekends 09:00–17:00' })).not.toBeInTheDocument()
+  })
+
+  test('an empty list says so', async () => {
+    await setup(data([]))
+    expect(screen.getByText(/No quick adds yet/)).toBeInTheDocument()
+  })
+
+  test('using one adds its hours with its own mode, whatever mode is chosen above', async () => {
+    await setup(data([own()]))
+    await userEvent.click(screen.getByRole('radio', { name: 'Physical' }))
+    await userEvent.click(button('Evenings'))
+    await userEvent.click(button('Save usual hours'))
+    expect(api.put.mock.calls[0][1].slots).toContainEqual(slot(2, '17:00', '19:00', 'ONLINE'))
+  })
+
+  test('a built-in one uses the mode chosen above', async () => {
+    await setup(data(null))
+    await userEvent.click(screen.getByRole('radio', { name: 'Physical' }))
+    await userEvent.click(button('Weekends 09:00–17:00'))
+    await userEvent.click(button('Save usual hours'))
+    expect(api.put.mock.calls[0][1].slots).toContainEqual(slot(6, '09:00', '17:00', 'PHYSICAL'))
+  })
+
+  test('a saved mode the profile no longer offers falls back to the chosen one', async () => {
+    await setup(data([own()], { offers: { online: false, physical: true } }))
+    await userEvent.click(button('Evenings'))
+    await userEvent.click(button('Save usual hours'))
+    expect(api.put.mock.calls[0][1].slots).toContainEqual(slot(2, '17:00', '19:00', 'PHYSICAL'))
+  })
+
+  test('saving a new one sends the chosen days, times and mode and shows it', async () => {
+    await setup(data([own()]))
+    answerQuickAdd()
+    await userEvent.click(screen.getByRole('radio', { name: 'Physical' }))
+    await choose('Saturday', '09:00', '12:00')
+    await userEvent.click(button('Save as a quick add'))
+    await nameIt('Saturday class')
+    await userEvent.click(button('Save quick add'))
+    expect(api.put).toHaveBeenCalledWith('/tutor/availability/quick-add', { presets: expect.any(Array) })
+    expect(sent()).toEqual([own(), { label: 'Saturday class', days: [6], from: '09:00', to: '12:00', mode: 'PHYSICAL' }])
+    expect(await screen.findByRole('button', { name: 'Saturday class' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Quick add name')).not.toBeInTheDocument()
+  })
+
+  test('a name, a day and a valid time are needed', async () => {
+    await setup(data([]))
+    await userEvent.click(button('Save as a quick add'))
+    await userEvent.click(button('Save quick add'))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Choose at least one day.')
+    await choose('Monday', '09:00', '12:00')
+    await userEvent.click(button('Save quick add'))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Give the quick add a name.')
+    expect(api.put).not.toHaveBeenCalled()
+  })
+
+  test('editing loads it into the fields and replaces it', async () => {
+    await setup(data([own(), own({ label: 'Other' })]))
+    answerQuickAdd()
+    await userEvent.click(button('Edit Evenings'))
+    expect(screen.getByRole('checkbox', { name: 'Tuesday' })).toBeChecked()
+    expect(screen.getByLabelText('From')).toHaveValue('17:00')
+    expect(screen.getByRole('radio', { name: 'Online' })).toBeChecked()
+    expect(screen.getByLabelText('Quick add name')).toHaveValue('Evenings')
+    await userEvent.selectOptions(screen.getByLabelText('To'), '21:00')
+    await userEvent.click(button('Update quick add'))
+    expect(sent()).toEqual([own({ to: '21:00' }), own({ label: 'Other' })])
+  })
+
+  test('a built-in one can be edited, which keeps the other one', async () => {
+    await setup(data(null))
+    answerQuickAdd()
+    await userEvent.click(button('Edit Weekends 09:00–17:00'))
+    await userEvent.clear(screen.getByLabelText('Quick add name'))
+    await nameIt('Weekends')
+    await userEvent.click(button('Update quick add'))
+    expect(sent().map((p) => p.label)).toEqual(['Weekday evenings 17:00–21:00', 'Weekends'])
+  })
+
+  test('deleting asks first', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    await setup(data([own(), own({ label: 'Other' })]))
+    answerQuickAdd()
+    await userEvent.click(button('Delete Evenings'))
+    expect(api.put).not.toHaveBeenCalled()
+    await userEvent.click(button('Delete Evenings'))
+    expect(sent()).toEqual([own({ label: 'Other' })])
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Evenings' })).not.toBeInTheDocument())
+    confirm.mockRestore()
+  })
+
+  test('saving one leaves unsaved hours on the calendar', async () => {
+    await setup(data([own()]))
+    select(5, '10:00', '12:00')
+    answerQuickAdd()
+    await userEvent.click(button('Edit Evenings'))
+    await userEvent.click(button('Update quick add'))
+    await waitFor(() => expect(screen.queryByLabelText('Quick add name')).not.toBeInTheDocument())
+    expect(screen.getByText('10:00–12:00')).toBeInTheDocument()
+    expect(button('Save usual hours')).toBeEnabled()
+  })
+
+  test('a server error is shown and the form stays open', async () => {
+    await setup(data([own()]))
+    api.put.mockRejectedValueOnce(new Error('Keep to 8 quick adds'))
+    await userEvent.click(button('Edit Evenings'))
+    await userEvent.click(button('Update quick add'))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Keep to 8 quick adds')
+    expect(screen.getByLabelText('Quick add name')).toBeInTheDocument()
+  })
+
+  test('at the limit no new one can be saved', async () => {
+    await setup(data(Array.from({ length: 8 }, (_, i) => own({ label: `Set ${i}` }))))
+    expect(screen.queryByRole('button', { name: 'Save as a quick add' })).not.toBeInTheDocument()
+    expect(screen.getByText(/the most you can keep/)).toBeInTheDocument()
+  })
+})
+
+describe('slot states', () => {
+  const HOLD_UNTIL = '2026-11-30T08:00:00.000Z' // Mon 30 Nov, 16:00 in Malaysia
+  const bookedHour = () => ({ date: WEEK, startTime: '15:00', dayOfWeek: 1, state: 'BOOKED' })
+  const heldHour = () => ({ date: dateOfDay(WEEK, 3), startTime: '09:00', dayOfWeek: 3, state: 'PENDING_PAYMENT', holdUntil: HOLD_UNTIL })
+  const mixed = () => weekView({ booked: [bookedHour(), heldHour()] })
+  const HELD_NAME = /, pending payment$/
+  const kinds = (name) => calendar.events.filter((e) => e.classNames?.includes(name))
+
+  test('booked and held hours have their own classes, icons, tooltips and names', async () => {
+    await setup(mixed())
+    expect(kinds('fc-booked')).toHaveLength(1)
+    expect(kinds('fc-held')).toHaveLength(1)
+    expect(lockedHour(`Monday ${Number(WEEK.slice(8))} ${weekLabel(WEEK).split(' ').at(-1)} 15:00, booked`)).toBeInTheDocument()
+    const held = lockedHour(HELD_NAME)
+    expect(held).toHaveAttribute('title', `Held until ${malaysiaLabel(HOLD_UNTIL)} while the parent pays. It is released if they don't.`)
+    expect(held.querySelector('svg')).toBeInTheDocument()
+    expectWeek(3, 1, 1)
+  })
+
+  test('the legend has the five states', async () => {
+    await setup(mixed())
+    const items = within(screen.getByRole('list', { name: 'Legend' })).getAllByRole('listitem').map((li) => li.textContent)
+    expect(items).toEqual(['Available', 'Booked', 'Pending payment', 'Passed', 'Not available'])
+  })
+
+  test('Clear all keeps both kinds', async () => {
+    await setup(mixed())
+    await userEvent.click(button('Clear all'))
+    expectWeek(0, 1, 1)
+    expect(screen.getByText('15:00–16:00')).toBeInTheDocument()
+    expect(screen.getByText('09:00–10:00')).toBeInTheDocument()
+  })
+
+  test('a 409 about a held hour is shown as it is', async () => {
+    await setup(mixed())
+    const message = 'Wed 2 Dec, 09:00 is held until a parent pays (by Mon 30 Nov, 16:00). It is released if the parent does not pay in time.'
+    api.put.mockRejectedValueOnce(Object.assign(new Error('x'), { response: { status: 409, data: { message } } }))
+    select(2, '10:00', '12:00')
+    await userEvent.click(button('Save usual hours'))
+    expect(await screen.findByRole('alert')).toHaveTextContent(message)
+  })
+
+  describe('re-reading the week', () => {
+    const answerWith = (booked) => api.get.mockResolvedValue({ data: weekView({ booked }) })
+    const tick = () => act(() => vi.advanceTimersByTimeAsync(60_000))
+    const reloads = () => api.get.mock.calls.length
+    // The timer starts just after the page paints, so let that finish first
+    const settle = () => act(() => new Promise((resolve) => { setTimeout(resolve, 20) }))
+    const open = async (data) => {
+      await setup(data)
+      await settle()
+    }
+
+    beforeEach(() => vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] }))
+
+    test('after 60 seconds a held hour turns free without touching unsaved hours', async () => {
+      await open(mixed())
+      select(2, '10:00', '12:00')
+      expectWeek(5, 1, 1)
+      answerWith([bookedHour()])
+      await tick()
+      expect(screen.queryByRole('img', { name: HELD_NAME })).not.toBeInTheDocument()
+      expect(screen.getByText('10:00–12:00')).toBeInTheDocument()
+      expectWeek(6, 1, 0)
+      expect(button('Save usual hours')).toBeEnabled() // the added hours are still unsaved
+    })
+
+    test('a held hour that is paid turns booked', async () => {
+      await open(mixed())
+      answerWith([bookedHour(), { ...heldHour(), state: 'BOOKED', holdUntil: undefined }])
+      await tick()
+      expect(screen.queryByRole('img', { name: HELD_NAME })).not.toBeInTheDocument()
+      expectWeek(3, 2, 0)
+    })
+
+    test('a newly held hour becomes locked and adds nothing to the unsaved changes', async () => {
+      await open(weekView({ booked: [bookedHour()] }))
+      answerWith([bookedHour(), heldHour()])
+      await tick()
+      expect(lockedHour(HELD_NAME)).toBeInTheDocument()
+      expect(button('Save usual hours')).toBeDisabled()
+    })
+
+    test('the page also re-reads when the window regains focus', async () => {
+      await open(mixed())
+      const before = reloads()
+      await act(async () => { window.dispatchEvent(new Event('focus')) })
+      expect(reloads()).toBe(before + 1)
+    })
+
+    test('nothing is re-read while a save is running', async () => {
+      await open(mixed())
+      select(2, '10:00', '12:00')
+      let finish
+      api.put.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
+      await userEvent.click(button('Save usual hours'))
+      await settle()
+      const before = reloads()
+      await tick()
+      expect(reloads()).toBe(before)
+      await act(async () => { finish({ data: mixed() }) })
+    })
+
+    test('the timer stops when the page closes', async () => {
+      await open(mixed())
+      cleanup()
+      const before = reloads()
+      await tick()
+      expect(reloads()).toBe(before)
+    })
   })
 })

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { hhmm, ymd } from '../../utils/validators.js'
-import { DAY_END, DAY_START, MAX_ROWS, copyWeek, getWeekView, resetWeek, saveUsual, saveWeek } from '../../services/availability.service.js'
+import { DAY_END, DAY_START, MAX_QUICK_ADD, MAX_ROWS, copyWeek, getWeekView, resetWeek, saveQuickAdd, saveUsual, saveWeek } from '../../services/availability.service.js'
 import { WEEK_MESSAGE, currentWeekStart, weekStartOf } from '../../utils/week.js'
 
 const TIME_MESSAGE = `Choose whole hours between ${DAY_START} and ${DAY_END}`
@@ -15,12 +15,37 @@ const scheduleSchema = z
             dayOfWeek: z.number({ message: 'Choose a valid day of the week' }).int('Choose a valid day of the week').min(0, 'Choose a valid day of the week').max(6, 'Choose a valid day of the week'),
             startTime: wholeHour,
             endTime: wholeHour,
+            mode: z.enum(['ONLINE', 'PHYSICAL', 'BOTH'], { message: 'Choose online, physical or both' }).optional(),
           })
           .strict()
           .refine((s) => s.startTime < s.endTime, TIME_MESSAGE),
         { message: 'Send the weekly schedule as a list' },
       )
       .max(MAX_ROWS, 'Too many time ranges in the schedule'),
+  })
+  .strict()
+
+const DAY_MESSAGE = 'Choose valid days of the week'
+const quickAddSchema = z
+  .object({
+    presets: z
+      .array(
+        z
+          .object({
+            label: z.string({ message: 'Give the quick add a name' }).trim().min(1, 'Give the quick add a name').max(40, 'Keep the name to 40 characters'),
+            days: z
+              .array(z.number({ message: DAY_MESSAGE }).int(DAY_MESSAGE).min(0, DAY_MESSAGE).max(6, DAY_MESSAGE), { message: DAY_MESSAGE })
+              .min(1, 'Choose at least one day')
+              .refine((days) => new Set(days).size === days.length, DAY_MESSAGE),
+            from: wholeHour,
+            to: wholeHour,
+            mode: z.enum(['ONLINE', 'PHYSICAL', 'BOTH'], { message: 'Choose online, physical or both' }).optional(),
+          })
+          .strict()
+          .refine((p) => p.from < p.to, TIME_MESSAGE),
+        { message: 'Send the quick adds as a list' },
+      )
+      .max(MAX_QUICK_ADD, `Keep to ${MAX_QUICK_ADD} quick adds`),
   })
   .strict()
 
@@ -60,6 +85,12 @@ export async function updateWeek(req, res) {
 // DELETE /tutor/availability/weeks/:weekStart: puts that week back on the usual hours and returns the week view
 export async function deleteWeek(req, res) {
   res.json(await resetWeek(req.tutor.id, weekParam.parse(req.params.weekStart)))
+}
+
+// PUT /tutor/availability/quick-add { presets }: replaces the tutor's Quick add buttons, returns { quickAdd }
+export async function updateQuickAdd(req, res) {
+  const { presets } = quickAddSchema.parse(req.body)
+  res.json(await saveQuickAdd(req.tutor.id, presets))
 }
 
 // POST /tutor/availability/weeks/copy { from, to }: copies a saved week to other weeks, returns { copied, skipped }

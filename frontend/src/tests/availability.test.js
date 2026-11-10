@@ -1,5 +1,5 @@
 import {
-  DAYS, HOURS, addDays, addHours, cellKey, cellsToRanges, clearHours, dateOfDay, eventToRange, hourEnd, isPastHour, keepPast, keepsLocked, momentIsPast,
+  DAYS, HOURS, addDays, addHours, applyLockChanges, quickAddDetails, cellKey, modeChoices, modeOf, rangesToModes, sameModes, setCellModes, shownMode, cellsToRanges, clearHours, dateOfDay, eventToRange, hourEnd, isPastHour, keepPast, keepsLocked, malaysiaLabel, momentIsPast,
   moveRange, nowInMalaysia, pastCells, rangeToEvent, rangesToCells, removeRange, sameCells, shortDate, weekLabel, weekStartOf,
 } from '../lib/availability'
 
@@ -144,6 +144,13 @@ describe('Malaysia time and past hours', () => {
     expect(past.has('0-07:00')).toBe(false)
   })
 
+  test('a cell counts as passed once its hour has started, and not before', () => {
+    const past = pastCells('2026-11-16', { date: '2026-11-16', time: '09:00' })
+    expect(past.has('1-08:00')).toBe(true)
+    expect(past.has('1-09:00')).toBe(true)
+    expect(past.has('1-10:00')).toBe(false)
+  })
+
   test('a later week has no past hours', () => {
     expect(pastCells('2026-11-23', now).size).toBe(0)
   })
@@ -200,5 +207,72 @@ describe('moving, removing and the lock check', () => {
     const cells = rangesToCells([block])
     removeRange(cells, block, new Set())
     expect(cells.size).toBe(3)
+  })
+})
+
+describe('teaching mode per hour', () => {
+  const twoModes = (mode) => [{ dayOfWeek: 1, startTime: '09:00', endTime: '11:00', mode: 'ONLINE' }, { dayOfWeek: 1, startTime: '11:00', endTime: '12:00', mode }]
+
+  test('hours with different modes stay as separate ranges', () => {
+    const slots = twoModes('PHYSICAL')
+    expect(cellsToRanges(rangesToCells(slots), rangesToModes(slots))).toEqual(slots)
+  })
+
+  test('hours with the same mode join into one range', () => {
+    const slots = twoModes('ONLINE')
+    expect(cellsToRanges(rangesToCells(slots), rangesToModes(slots))).toEqual([{ dayOfWeek: 1, startTime: '09:00', endTime: '12:00', mode: 'ONLINE' }])
+  })
+
+  test('an hour with no entry is BOTH', () => {
+    expect(modeOf(new Map(), '1-09:00')).toBe('BOTH')
+    expect(rangesToModes([slot(1, '09:00', '10:00')]).get('1-09:00')).toBe('BOTH')
+  })
+
+  test('setCellModes leaves the skipped hours alone', () => {
+    const next = setCellModes(new Map([['1-09:00', 'ONLINE']]), [slot(1, '09:00', '11:00')], 'PHYSICAL', new Set(['1-09:00']))
+    expect(next.get('1-09:00')).toBe('ONLINE')
+    expect(next.get('1-10:00')).toBe('PHYSICAL')
+  })
+
+  test('sameModes only looks at hours that are on', () => {
+    expect(sameModes(new Set(['1-09:00']), new Map([['2-09:00', 'ONLINE']]), new Map())).toBe(true)
+    expect(sameModes(new Set(['1-09:00']), new Map([['1-09:00', 'ONLINE']]), new Map())).toBe(false)
+  })
+
+  test('the profile limits the choices', () => {
+    expect(modeChoices({ online: true, physical: true })).toEqual(['ONLINE', 'PHYSICAL', 'BOTH'])
+    expect(modeChoices({ online: true, physical: false })).toEqual(['ONLINE'])
+    expect(modeChoices({ online: false, physical: true })).toEqual(['PHYSICAL'])
+    expect(modeChoices({ online: false, physical: false })).toEqual(['ONLINE', 'PHYSICAL', 'BOTH'])
+  })
+
+  test('BOTH shows as the one mode a tutor offers', () => {
+    expect(shownMode('BOTH', { online: false, physical: true })).toBe('PHYSICAL')
+    expect(shownMode('BOTH', { online: true, physical: true })).toBe('BOTH')
+    expect(shownMode('ONLINE', { online: true, physical: false })).toBe('ONLINE')
+  })
+})
+
+describe('quick add details', () => {
+  test('Monday comes first and Sunday last, whatever order they were ticked in', () => {
+    expect(quickAddDetails({ days: [0, 3, 1], from: '17:00', to: '21:00', mode: 'ONLINE' })).toBe('Mon, Wed, Sun · 17:00–21:00 · Online')
+  })
+})
+
+describe('held hours', () => {
+  test('malaysiaLabel reads an instant in Malaysia time, across a midnight and a month', () => {
+    expect(malaysiaLabel('2026-11-23T08:00:00.000Z')).toBe('Mon 23 Nov, 16:00')
+    expect(malaysiaLabel('2026-11-30T17:30:00.000Z')).toBe('Tue 1 Dec, 01:30')
+  })
+
+  test('applyLockChanges switches a new hold on and leaves a released hour that the tutor opened', () => {
+    const open = new Set(['1-15:00'])
+    const next = applyLockChanges(new Set(['1-15:00', '2-09:00']), new Set(['1-15:00']), new Set(['3-10:00']), open)
+    expect([...next].sort()).toEqual(['1-15:00', '2-09:00', '3-10:00'])
+  })
+
+  test('applyLockChanges drops a released hour that was on only because of the hold', () => {
+    const next = applyLockChanges(new Set(['1-15:00', '2-09:00']), new Set(['1-15:00']), new Set(), new Set())
+    expect([...next]).toEqual(['2-09:00'])
   })
 })

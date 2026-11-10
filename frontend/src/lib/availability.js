@@ -28,6 +28,8 @@ export const PRESETS = [
   { label: 'Weekends 09:00–17:00', days: [6, 0], from: '09:00', to: '17:00' },
 ]
 
+export const MAX_QUICK_ADD = 8 // backend/src/services/availability.service.js has the same value
+
 export const cellKey = (dayOfWeek, hour) => `${dayOfWeek}-${hour}`
 
 export function rangesToCells(slots) {
@@ -37,17 +39,58 @@ export function rangesToCells(slots) {
   return cells
 }
 
-// Consecutive hours of a day become one range
-export function cellsToRanges(cells) {
+// Teaching mode per hour, kept beside the cell set. An hour with no entry is BOTH.
+export const MODE_LABELS = { ONLINE: 'Online', PHYSICAL: 'Physical', BOTH: 'Both' }
+export const modeOf = (modes, key) => modes.get(key) ?? 'BOTH'
+
+export function rangesToModes(slots) {
+  const modes = new Map()
+  for (const slot of slots) for (const key of rangesToCells([slot])) modes.set(key, slot.mode ?? 'BOTH')
+  return modes
+}
+
+// Gives every hour of the ranges this mode, except the hours in `skip` (booked, held or passed)
+export function setCellModes(modes, ranges, mode, skip) {
+  const next = new Map(modes)
+  for (const key of rangesToCells(ranges)) if (!skip.has(key)) next.set(key, mode)
+  return next
+}
+
+export const sameModes = (cells, a, b) => [...cells].every((key) => modeOf(a, key) === modeOf(b, key))
+
+// The modes the tutor can pick. The profile sets the limit; a profile with neither switched on is not limited yet.
+export function modeChoices(offers) {
+  if (offers && offers.online !== offers.physical) return [offers.online ? 'ONLINE' : 'PHYSICAL']
+  return ['ONLINE', 'PHYSICAL', 'BOTH']
+}
+
+// BOTH on a tutor who offers only one mode means that one mode
+export function shownMode(mode, offers) {
+  const choices = modeChoices(offers)
+  return mode === 'BOTH' && choices.length === 1 ? choices[0] : mode
+}
+
+// "Mon, Wed · 17:00–21:00 · Online", Monday first whatever order the days were ticked in
+export const quickAddDetails = ({ days, from, to, mode }) =>
+  `${DAYS.filter((d) => days.includes(d.value)).map((d) => d.short).join(', ')} · ${from}–${to} · ${MODE_LABELS[mode]}`
+
+// Consecutive hours of a day become one range. With `modes`, a change of mode starts a new range.
+export function cellsToRanges(cells, modes) {
   const ranges = []
   for (let dayOfWeek = 0; dayOfWeek <= 6; dayOfWeek++) {
     let open = null
+    let openMode
     for (const hour of [...HOURS, DAY_END]) {
-      const on = hour !== DAY_END && cells.has(cellKey(dayOfWeek, hour))
-      if (on && open === null) open = hour
-      if (!on && open !== null) {
-        ranges.push({ dayOfWeek, startTime: open, endTime: hour })
+      const key = cellKey(dayOfWeek, hour)
+      const on = hour !== DAY_END && cells.has(key)
+      const mode = on && modes ? modeOf(modes, key) : undefined
+      if (open !== null && (!on || mode !== openMode)) {
+        ranges.push({ dayOfWeek, startTime: open, endTime: hour, ...(modes && { mode: openMode }) })
         open = null
+      }
+      if (on && open === null) {
+        open = hour
+        openMode = mode
       }
     }
   }
@@ -84,6 +127,15 @@ export function moveRange(cells, oldRange, newRange) {
 
 // The lock check run on every move or resize: no booked hour may leave the schedule
 export const keepsLocked = (cells, locked) => [...locked].every((key) => cells.has(key))
+
+// After a re-read of the booked and held hours: a new one is switched on, and a released one stays on only if the
+// tutor's hours include it. Every other hour, saved or unsaved, is left alone.
+export function applyLockChanges(cells, before, after, open) {
+  const next = new Set(cells)
+  for (const key of before) if (!after.has(key) && !open.has(key)) next.delete(key)
+  for (const key of after) next.add(key)
+  return next
+}
 
 // Dates are "YYYY-MM-DD" strings handled at UTC midnight, so the browser's timezone can never shift them by a day
 export function addDays(date, n) {
@@ -143,6 +195,12 @@ export function keepPast(next, prev, past) {
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const dayMonth = (date) => `${Number(date.slice(8))} ${MONTHS[Number(date.slice(5, 7)) - 1]}`
 export const shortDate = dayMonth
+
+// "Mon 23 Nov, 16:00" in Malaysia time, for an instant sent by the server
+export function malaysiaLabel(instant) {
+  const { date, time } = nowInMalaysia(new Date(instant))
+  return `${DAYS.find((d) => d.value === dayOfDate(date)).short} ${dayMonth(date)}, ${time}`
+}
 
 // "16 – 22 Nov", "30 Nov – 6 Dec"; with the year, "16 – 22 Nov 2026"
 export function weekLabel(weekStart, withYear = false) {

@@ -5,25 +5,32 @@ import { AppError } from '../utils/AppError.js'
 import { addDays, mytParts, mytToDate, fromMinutes, toMinutes } from '../utils/time.js'
 import { assertEditableWeek, currentWeekStart, fromDbDate, isEditableWeek, lastWeekStart, toDbDate, weekStartOf } from '../utils/week.js'
 import { SLOT_BLOCKING } from './booking.service.js'
+import { paymentDeadline } from './paymentWindow.js'
 
 // First and last moment of the tutor's grid (frontend/src/lib/availability.js has the same two values)
 export const DAY_START = '07:00'
 export const DAY_END = '22:00'
 export const MAX_ROWS = 7 * 15 // every hour of every day, stored separately
+export const MAX_QUICK_ADD = 8 // frontend/src/lib/availability.js has the same value
 
 const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const HOUR = 60
 
-// Per weekday: sort the ranges, then join overlapping or touching ones (14-16 and 16-18 become 14-18)
+// Whether an hour with this slot mode can be booked as this teaching mode
+export const slotAllows = (slotMode, teachingMode) => slotMode === 'BOTH' || slotMode === teachingMode
+
+// Per weekday: sort the ranges, then join overlapping or touching ones of the same mode (14-16 and 16-18 become 14-18)
 export function normaliseSlots(slots) {
   const sorted = [...slots].sort((a, b) => a.dayOfWeek - b.dayOfWeek || toMinutes(a.startTime) - toMinutes(b.startTime))
   const merged = []
-  for (const { dayOfWeek, startTime, endTime } of sorted) {
+  for (const { dayOfWeek, startTime, endTime, mode = 'BOTH' } of sorted) {
     const last = merged[merged.length - 1]
-    if (last?.dayOfWeek === dayOfWeek && toMinutes(startTime) <= toMinutes(last.endTime)) {
+    const sameDay = last?.dayOfWeek === dayOfWeek
+    if (sameDay && mode !== last.mode && toMinutes(startTime) < toMinutes(last.endTime)) throw new AppError(400, 'An hour cannot have two teaching modes')
+    if (sameDay && mode === last.mode && toMinutes(startTime) <= toMinutes(last.endTime)) {
       if (toMinutes(endTime) > toMinutes(last.endTime)) last.endTime = endTime
-    } else merged.push({ dayOfWeek, startTime, endTime })
+    } else merged.push({ dayOfWeek, startTime, endTime, mode })
   }
   return merged
 }
@@ -52,20 +59,28 @@ async function bookedHours(tutorId, { week } = {}, db = prisma) {
       status: { in: SLOT_BLOCKING },
       startAt: week ? { gt: now, gte: mytToDate(week, '00:00'), lt: mytToDate(addDays(week, 7), '00:00') } : { gt: now },
     },
-    select: { startAt: true },
+    select: { startAt: true, status: true, payBy: true, teachingMode: true },
   })
   const seen = new Map()
-  for (const { startAt } of bookings) {
+  for (const { startAt, status, payBy, teachingMode } of bookings) {
     const { date, time, dow } = mytParts(startAt)
     const hour = fromMinutes(Math.floor(toMinutes(time) / HOUR) * HOUR)
-    seen.set(`${date} ${hour}`, { date, startTime: hour, dayOfWeek: dow })
+    const key = `${date} ${hour}`
+    const entry = status === 'CONFIRMED'
+      ? { date, startTime: hour, dayOfWeek: dow, state: 'BOOKED', teachingMode }
+      : { date, startTime: hour, dayOfWeek: dow, state: 'PENDING_PAYMENT', holdUntil: paymentDeadline({ payBy, startAt }).toISOString(), teachingMode }
+    // Two rows on one hour: a paid lesson wins, otherwise the hour stays held until the later deadline
+    const other = seen.get(key)
+    if (!other || (other.state !== 'BOOKED' && (entry.state === 'BOOKED' || entry.holdUntil > other.holdUntil))) seen.set(key, entry)
   }
   return [...seen.values()].sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime))
 }
 
-const covers = (slots, { dayOfWeek, startTime }) => {
+const covers = (slots, { dayOfWeek, startTime, teachingMode }) => {
   const m = toMinutes(startTime)
-  return slots.some((s) => s.dayOfWeek === dayOfWeek && toMinutes(s.startTime) <= m && m + HOUR <= toMinutes(s.endTime))
+  return slots.some(
+    (s) => s.dayOfWeek === dayOfWeek && toMinutes(s.startTime) <= m && m + HOUR <= toMinutes(s.endTime) && (!teachingMode || slotAllows(s.mode, teachingMode)),
+  )
 }
 
 // "Mon 23 Nov, 15:00"
@@ -74,10 +89,24 @@ const hourLabel = ({ date, startTime, dayOfWeek }) => {
   return `${DAY_SHORT[dayOfWeek]} ${day} ${MONTH_SHORT[month - 1]}, ${startTime}`
 }
 
+// holdUntil is an instant, so it is read back in Malaysia time before formatting
+function lockedHourText(hour) {
+  if (hour.state === 'BOOKED') return `${hourLabel(hour)} has a booked lesson`
+  const { date, time, dow } = mytParts(new Date(hour.holdUntil))
+  return `${hourLabel(hour)} is held until a parent pays (by ${hourLabel({ date, startTime: time, dayOfWeek: dow })})`
+}
+
+function lockedHoursAdvice(dropped) {
+  const booked = dropped.filter((h) => h.state === 'BOOKED').length
+  const held = dropped.length - booked
+  if (booked && held) return 'Booked lessons must be cancelled or rescheduled first, and held hours are released if the parent does not pay in time.'
+  if (booked) return `Cancel or reschedule ${booked === 1 ? 'it' : 'them'} first.`
+  return held === 1 ? 'It is released if the parent does not pay in time.' : 'They are released if the parents do not pay in time.'
+}
+
 function assertNoneDropped(dropped) {
   if (!dropped.length) return
-  const one = dropped.length === 1
-  throw new AppError(409, `${dropped.map(hourLabel).join('; ')} ${one ? 'has a booked lesson' : 'have booked lessons'}. Cancel or reschedule ${one ? 'it' : 'them'} first.`)
+  throw new AppError(409, `${dropped.map(lockedHourText).join('; ')}. ${lockedHoursAdvice(dropped)}`)
 }
 
 async function changedWeeks(tutorId, db = prisma) {
@@ -90,11 +119,12 @@ async function changedWeeks(tutorId, db = prisma) {
 }
 
 export async function getWeekView(tutorId, weekStart) {
-  const [usual, row, booked, changed] = await Promise.all([
+  const [usual, row, booked, changed, tutor] = await Promise.all([
     usualSlots(tutorId),
     weekOverride(tutorId, weekStart),
     bookedHours(tutorId, { week: weekStart }),
     changedWeeks(tutorId),
+    prisma.tutorProfile.findUnique({ where: { id: tutorId }, select: { offersOnline: true, offersPhysical: true, quickAdd: true } }),
   ])
   const override = row ? normaliseSlots(row.slots) : null
   return {
@@ -102,11 +132,28 @@ export async function getWeekView(tutorId, weekStart) {
     usual,
     override,
     effective: override ?? usual,
-    booked: booked.map(({ date, startTime }) => ({ date, startTime })),
+    booked, // both paid lessons and hours held for payment
     changedWeeks: changed,
+    offers: { online: tutor.offersOnline, physical: tutor.offersPhysical }, // the profile limits which modes can be chosen
+    quickAdd: tutor.quickAdd,
     limits: { first: currentWeekStart(), last: lastWeekStart() },
     bounds: { start: DAY_START, end: DAY_END },
   }
+}
+
+// The profile limits the modes: a tutor offering one mode cannot save the other. Neither switched on means not limited yet.
+async function assertModesOffered(tutorId, slots, db = prisma) {
+  const { offersOnline, offersPhysical } = await db.tutorProfile.findUnique({ where: { id: tutorId }, select: { offersOnline: true, offersPhysical: true } })
+  if (offersOnline === offersPhysical) return
+  const only = offersOnline ? 'ONLINE' : 'PHYSICAL'
+  const other = offersOnline ? 'PHYSICAL' : 'ONLINE'
+  if (slots.some((s) => s.mode === other)) throw new AppError(400, `Your profile offers ${only.toLowerCase()} lessons only`)
+}
+
+// Replaces the whole list. Saved at once, separately from the hours on the calendar.
+export async function saveQuickAdd(tutorId, presets) {
+  await assertModesOffered(tutorId, presets)
+  return prisma.tutorProfile.update({ where: { id: tutorId }, data: { quickAdd: presets }, select: { quickAdd: true } })
 }
 
 // Stores a week's hours. Hours equal to the usual ones remove the override, so a week only counts as changed if it differs.
@@ -120,6 +167,7 @@ async function writeWeek(tutorId, weekStart, merged, tx) {
 // A booking only depends on its own week, so a week's save is checked against the bookings inside that week
 export async function saveWeek(tutorId, weekStart, slots) {
   assertEditableWeek(weekStart)
+  await assertModesOffered(tutorId, slots)
   const merged = normaliseSlots(slots)
   await prisma.$transaction(async (tx) => {
     assertNoneDropped((await bookedHours(tutorId, { week: weekStart }, tx)).filter((h) => !covers(merged, h)))
@@ -158,7 +206,7 @@ export async function copyWeek(tutorId, fromWeekStart, toWeekStarts) {
         if (!lost.length) await writeWeek(tutorId, weekStart, source, tx)
         return lost
       })
-      if (dropped.length) skipped.push({ weekStart, reason: `${hourLabel(dropped[0])} has a booked lesson` })
+      if (dropped.length) skipped.push({ weekStart, reason: lockedHourText(dropped[0]) })
       else copied.push(weekStart)
     }
   }
@@ -167,6 +215,7 @@ export async function copyWeek(tutorId, fromWeekStart, toWeekStarts) {
 
 // Weeks with an override do not depend on the usual hours, so only bookings in the other weeks are checked
 export async function saveUsual(tutorId, slots, viewWeek) {
+  await assertModesOffered(tutorId, slots)
   const merged = normaliseSlots(slots)
   await prisma.$transaction(async (tx) => {
     const overridden = new Set(await changedWeeks(tutorId, tx))

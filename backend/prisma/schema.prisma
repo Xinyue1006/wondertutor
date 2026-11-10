@@ -40,6 +40,13 @@ enum TeachingMode {
   ONLINE // online = tutor only pastes a meeting link; no in-system video / no-show automation
 }
 
+// How an available hour can be taught. BOTH lets the parent choose when booking.
+enum SlotMode {
+  ONLINE
+  PHYSICAL
+  BOTH
+}
+
 // What an uploaded verification document is. Admin needs both kinds approved before a tutor is verified.
 enum DocumentKind {
   QUALIFICATION // degree, diploma, teaching certificate
@@ -217,6 +224,7 @@ model TutorProfile {
   longitude             Float?
   offersPhysical        Boolean   @default(true)
   offersOnline          Boolean   @default(false)
+  quickAdd              Json?     // the tutor's Quick add buttons on the availability page; null = the built-in ones
   commissionRate        Decimal?  @db.Decimal(5, 2) // per-tutor override; null = use platform base rate
   isVerified            Boolean   @default(false)
   verificationSubmittedAt DateTime? // set when the tutor submits the setup for Admin review; null = still a draft
@@ -277,6 +285,7 @@ model AvailabilitySlot {
   dayOfWeek Int          // 0 = Sunday ... 6 = Saturday
   startTime String       // "HH:mm"
   endTime   String       // "HH:mm"
+  mode      SlotMode     @default(BOTH)
 }
 
 // One week that differs from the usual hours above: while a row exists, its slots replace the usual hours for that
@@ -298,6 +307,7 @@ model AvailabilityWeekSlot {
   dayOfWeek Int              // 0 = Sunday ... 6 = Saturday
   startTime String           // "HH:mm"
   endTime   String           // "HH:mm"
+  mode      SlotMode         @default(BOTH)
 }
 
 model BankAccount {
@@ -350,6 +360,7 @@ model Booking {
   counterPrice    Decimal?      @db.Decimal(10, 2) // tutor's counter-offer
   agreedPrice     Decimal?      @db.Decimal(10, 2)
   status          BookingStatus @default(PENDING)
+  payBy           DateTime?     // when an accepted booking must be paid; null for older bookings
   rejectionReason String?
   cancelReason    String?
   cancelledById   Int?

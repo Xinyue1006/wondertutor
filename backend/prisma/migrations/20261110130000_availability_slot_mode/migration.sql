@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE `AvailabilitySlot` ADD COLUMN `mode` ENUM('ONLINE', 'PHYSICAL', 'BOTH') NOT NULL DEFAULT 'BOTH';
+
+-- AlterTable
+ALTER TABLE `AvailabilityWeekSlot` ADD COLUMN `mode` ENUM('ONLINE', 'PHYSICAL', 'BOTH') NOT NULL DEFAULT 'BOTH';

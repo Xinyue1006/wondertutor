@@ -177,13 +177,16 @@ html { scrollbar-gutter: stable; }
   --fc-bg-event-color: #e2e8f0;
   --fc-bg-event-opacity: 1;
 }
-.wt-calendar .fc-timegrid-slot { height: 2.75rem; }
+.wt-calendar .fc-timegrid-slot { height: 3rem; }
 .wt-calendar .fc-timegrid-event-harness-inset .fc-timegrid-event,
 .wt-calendar .fc-timegrid-event.fc-event-mirror { box-shadow: none; }
 .wt-calendar .fc-timegrid-slot-label-cushion { font-size: 0.75rem; white-space: nowrap; color: #475569; }
 /* A booked hour is always inside an available block, so it is lifted above the block to stay visible */
 .wt-calendar .fc-timegrid-col-bg .fc-timegrid-bg-harness:has(.fc-locked) { z-index: 4; }
 .wt-calendar .fc-timegrid-col-bg:has(.fc-locked) { z-index: 4; }
+.wt-calendar .fc-bg-event.fc-booked { background: #475569; color: #fff; }
+.wt-calendar .fc-bg-event.fc-held { background: repeating-linear-gradient(135deg, #fef3c7 0 6px, #fde68a 6px 12px); border: 1px dashed #b45309; color: #78350f; }
+.wt-calendar .fc-bg-event.fc-passed { background: #f1f5f9; color: #475569; }
 /* FullCalendar never starts a selection on a block, so in Remove mode drags pass through blocks to the grid below */
 .wt-calendar-remove .fc-timegrid-event-harness { pointer-events: none; }
 .wt-calendar-remove .fc-timegrid-event button { pointer-events: auto; }
