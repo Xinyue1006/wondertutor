@@ -6,6 +6,44 @@ function required(name) {
   return v
 }
 
+const intIn = (raw, def, min, max, name, problems) => {
+  if (raw === undefined || raw === '') return def
+  const n = Number(raw)
+  if (!Number.isInteger(n) || n < min || n > max) {
+    problems.push(`${name} must be a whole number between ${min} and ${max}`)
+    return def
+  }
+  return n
+}
+
+// AI assistant settings. Exported so tests can check the validation without restarting the process.
+export function readAiConfig(e) {
+  const problems = []
+  const enabled = String(e.AI_ASSISTANT_ENABLED || '').toLowerCase() === 'true'
+  const cfg = {
+    enabled,
+    apiKey: e.GEMINI_API_KEY || '',
+    model: (e.GEMINI_MODEL || '').trim(),
+    baseUrl: e.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta',
+    timeoutMs: intIn(e.AI_REQUEST_TIMEOUT_MS, 15000, 1000, 120000, 'AI_REQUEST_TIMEOUT_MS', problems),
+    maxToolRounds: intIn(e.AI_MAX_TOOL_ROUNDS, 4, 1, 8, 'AI_MAX_TOOL_ROUNDS', problems),
+    maxToolCalls: intIn(e.AI_MAX_TOOL_CALLS, 8, 1, 20, 'AI_MAX_TOOL_CALLS', problems),
+    conversationTtlMs: intIn(e.AI_CONVERSATION_TTL_MS, 1800000, 60000, 86400000, 'AI_CONVERSATION_TTL_MS', problems),
+    maxTurns: intIn(e.AI_MAX_TURNS, 20, 2, 100, 'AI_MAX_TURNS', problems),
+    maxConversationsPerUser: intIn(e.AI_MAX_CONVERSATIONS_PER_USER, 5, 1, 50, 'AI_MAX_CONVERSATIONS_PER_USER', problems),
+    maxConversations: intIn(e.AI_MAX_CONVERSATIONS, 1000, 10, 100000, 'AI_MAX_CONVERSATIONS', problems),
+    messagesPerMinute: intIn(e.AI_MESSAGES_PER_MINUTE, 10, 1, 120, 'AI_MESSAGES_PER_MINUTE', problems),
+    maxOutputTokens: intIn(e.AI_MAX_OUTPUT_TOKENS, 800, 64, 8192, 'AI_MAX_OUTPUT_TOKENS', problems),
+  }
+  // Only an ENABLED assistant with a broken configuration stops the server; disabled mode always starts.
+  if (enabled) {
+    if (!cfg.apiKey) problems.push('GEMINI_API_KEY is required when AI_ASSISTANT_ENABLED=true')
+    if (!cfg.model) problems.push('GEMINI_MODEL is required when AI_ASSISTANT_ENABLED=true (use a model name from the current Gemini documentation)')
+  }
+  if (enabled && problems.length) throw new Error(`Invalid AI assistant settings:\n- ${problems.join('\n- ')}`)
+  return cfg
+}
+
 export const env = {
   port: Number(process.env.PORT || 5000),
   nodeEnv: process.env.NODE_ENV || 'development',
@@ -33,6 +71,8 @@ export const env = {
     apiKey: process.env.CLOUDINARY_API_KEY,
     apiSecret: process.env.CLOUDINARY_API_SECRET,
   },
+  // Read-only AI assistant (Gemini). Off unless AI_ASSISTANT_ENABLED=true; disabled mode needs no key.
+  ai: readAiConfig(process.env),
 }
 
 export const isDev = env.nodeEnv !== 'production'

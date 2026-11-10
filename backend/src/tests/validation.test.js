@@ -2,7 +2,12 @@
 // the form can show, never a 500 or a silently "fixed" value.
 import { prisma } from '../config/prisma.js'
 import { api, makeAdmin, makeParent, makeTutor, nextDate, MONDAY, resetDb, startServer, stopServer } from './helpers.js'
-import { normalizePhone } from '../utils/validators.js'
+import { normalizePhone, password } from '../utils/validators.js'
+
+test('password limits use UTF-8 bytes so bcrypt cannot silently discard a suffix', () => {
+  expect(password.safeParse(`A1${'界'.repeat(23)}`).success).toBe(true)
+  expect(password.safeParse(`A1${'界'.repeat(24)}`).success).toBe(false)
+})
 
 beforeAll(async () => {
   await resetDb()

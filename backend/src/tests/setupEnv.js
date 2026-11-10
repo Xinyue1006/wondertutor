@@ -6,6 +6,10 @@ import { testDatabaseUrl } from '../../scripts/setup-test-db-url.js'
 process.env.DATABASE_URL = testDatabaseUrl(process.env.DATABASE_URL)
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret'
 process.env.NODE_ENV = 'test'
+// Local Gemini settings must never enable network calls or change CI behaviour.
+process.env.AI_ASSISTANT_ENABLED = 'false'
+process.env.GEMINI_API_KEY = ''
+process.env.GEMINI_MODEL = ''
 // Never send real emails / hit reCAPTCHA from tests
 process.env.SMTP_USER = ''
 process.env.RECAPTCHA_SECRET = ''

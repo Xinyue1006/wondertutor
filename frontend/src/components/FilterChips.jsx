@@ -10,7 +10,7 @@ export const countActive = (x) =>
 
 // The "Filters / Price / Rating / Availability / Location / Teaching Mode / Tutor Characteristics" chips,
 // shared by Find a Tutor (filters sent to the API) and the match results (filters applied in the browser)
-export default function FilterChips({ extra, setExtra, locationName }) {
+export default function FilterChips({ extra, setExtra, locationName, onClear }) {
   const active = countActive(extra)
   const toggle = (key, value) =>
     setExtra({ ...extra, [key]: extra[key].includes(value) ? extra[key].filter((x) => x !== value) : [...extra[key], value] })
@@ -24,6 +24,9 @@ export default function FilterChips({ extra, setExtra, locationName }) {
       >
         <Icon name="filter" className="h-4 w-4 text-brand-500" /> Filters
         {active > 0 && <span className="rounded-full bg-brand-500 px-1.5 text-xs text-white">{active}</span>}
+      </button>
+      <button onClick={onClear || (() => setExtra(NO_EXTRA))} className="min-h-10 px-2 text-sm font-semibold text-slate-600 hover:underline">
+        Clear filters
       </button>
 
       <FilterDropdown label="Price" active={extra.minPrice !== '' || extra.maxPrice !== ''}>

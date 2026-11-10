@@ -236,6 +236,7 @@ model TutorProfile {
   portfolio      PortfolioItem[]
   availability   AvailabilitySlot[]
   availabilityWeeks AvailabilityWeek[]
+  availabilityExceptions AvailabilityException[]
   bookings       Booking[]
   reviews        Review[]
   bankAccounts   BankAccount[]
@@ -517,4 +518,14 @@ model SystemSetting {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+// A date override replaces weekly hours. Empty ranges means unavailable all day.
+model AvailabilityException {
+  id Int @id @default(autoincrement())
+  tutorId Int
+  tutor TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  date String @db.VarChar(10)
+  ranges Json
+  @@unique([tutorId, date])
 }

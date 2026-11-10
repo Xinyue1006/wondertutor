@@ -1,3 +1,4 @@
+import { mediaLink } from '../../services/privateMedia.js'
 import { z } from 'zod'
 import { prisma } from '../../config/prisma.js'
 import { AppError } from '../../utils/AppError.js'
@@ -35,10 +36,13 @@ export async function updateComplaint(req, res) {
   if (!existing) throw new AppError(404, 'Complaint not found')
   if (['RESOLVED', 'DISMISSED'].includes(existing.status)) throw new AppError(400, 'This complaint is already closed')
 
-  const updated = await prisma.complaint.update({
-    where: { id: existing.id },
-    data: { status: data.status, adminResponse: data.adminResponse ?? existing.adminResponse, handledById: req.user.id },
-    include: complaintInclude,
+  const updated = await prisma.$transaction(async (tx) => {
+    const { count } = await tx.complaint.updateMany({
+      where: { id: existing.id, status: existing.status, updatedAt: existing.updatedAt },
+      data: { status: data.status, adminResponse: data.adminResponse ?? existing.adminResponse, handledById: req.user.id },
+    })
+    if (!count) throw new AppError(409, 'This complaint has just been updated. Please refresh and try again.')
+    return tx.complaint.findUnique({ where: { id: existing.id }, include: complaintInclude })
   })
   const label = { IN_PROGRESS: 'is being reviewed', RESOLVED: 'has been resolved', DISMISSED: 'was reviewed and closed' }[data.status]
   await notify(existing.filedById, {
@@ -170,7 +174,7 @@ export async function getComplaint(req, res) {
         refunds: b.payment.refunds.map((r) => ({ id: r.id, amount: Number(r.amount), type: r.type, status: r.status, reason: r.reason })),
       },
       attendance: b?.attendance && {
-        checkInAt: b.attendance.checkInAt, checkOutAt: b.attendance.checkOutAt, distanceMetres: b.attendance.checkInDistance, photoUrl: b.attendance.checkInPhotoUrl,
+        checkInAt: b.attendance.checkInAt, checkOutAt: b.attendance.checkOutAt, distanceMetres: b.attendance.checkInDistance, photoUrl: mediaLink(b.attendance.checkInPhotoUrl, 'wondertutor/attendance/' + b.id),
       },
       sessionSummary: b?.summary ? { content: b.summary.content, progressNote: b.summary.progressNote } : null,
       // Repeated violations: every other complaint against the same account, and the warnings it already has

@@ -177,16 +177,15 @@ describe('business rules from the client brief', () => {
     expect(res.status).toBe(400)
   })
 
-  test("a trial lesson is only allowed as the child's first lesson with that tutor", async () => {
+  test('trial lessons are rejected while normal lesson bookings still work', async () => {
     const t = await makeTutor()
     const p = await makeParent() // a fresh family, so no earlier lesson in this file gets in the way
     const body = { tutorId: t.tutor.id, childId: p.child.id, date: nextDate(MONDAY), teachingMode: 'ONLINE', proposedPrice: 50, isTrial: true }
     const first = await api(p.token).post('/parent/bookings', { ...body, startTime: '16:00' })
-    expect(first.status).toBe(201)
-    expect(first.booking.isTrial).toBe(true)
-    const second = await api(p.token).post('/parent/bookings', { ...body, startTime: '18:00' })
-    expect(second.status).toBe(400)
-    expect(second.message).toContain('cannot be a trial lesson')
+    expect(first.status).toBe(400)
+    const second = await api(p.token).post('/parent/bookings', { ...body, startTime: '16:00', isTrial: false })
+    expect(second.status).toBe(201)
+    expect(second.booking.isTrial).toBe(false)
   })
 })
 

@@ -48,7 +48,7 @@ export default function AppLayout() {
       {/* Same bar as the public pages (landing, login, signup): flat, full width, white, yellow underline on the current page */}
       <header className="sticky top-0 z-30 w-full bg-white">
         <div className="mx-auto flex max-w-[81.25rem] items-center justify-between gap-3 px-4 py-2 md:px-8">
-          <Link to={items[0]?.[0] || '/'} aria-label="WonderTutor dashboard" className="flex min-h-11 shrink-0 items-center"><Logo mark className="h-9 min-[360px]:hidden" /><Logo className="hidden h-9 min-[360px]:block" /></Link>
+          <Link to={items[0]?.[0] || '/'} aria-label="WonderTutor dashboard" className="flex min-h-11 min-w-0 items-center"><Logo className="h-7 max-w-full object-contain sm:h-9" /></Link>
           <nav aria-label="Main" className="hidden items-center gap-4 text-sm font-medium text-navy lg:flex xl:gap-7">
             {items.map(([to, label]) => (
               <NavLink
@@ -65,7 +65,7 @@ export default function AppLayout() {
               </NavLink>
             ))}
           </nav>
-          <div className="flex items-center gap-2 md:gap-4">
+          <div className="flex shrink-0 items-center gap-2 md:gap-4">
             <NotificationBell />
             <UserMenu />
           </div>

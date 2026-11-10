@@ -1,3 +1,4 @@
+import { mediaLink } from '../../services/privateMedia.js'
 import { z } from 'zod'
 import { prisma } from '../../config/prisma.js'
 import { AppError } from '../../utils/AppError.js'
@@ -58,32 +59,50 @@ const getThreshold = async () => Number((await prisma.systemSetting.findUnique({
 
 // GET /admin/users?role=&status=&q=&flagged=1
 export async function listUsers(req, res) {
-  const { role, status, q, flagged, review } = z
+  const { role, status, q, flagged, review, pending, page: requestedPage } = z
     .object({
       role: z.enum(['PARENT', 'TUTOR', 'ADMIN']).optional(),
       status: z.enum(['ACTIVE', 'DEACTIVATED']).optional(),
       q: z.string().trim().max(100, 'Search text is too long').optional(),
+      page: z.coerce.number().int().positive().default(1),
+      pending: z.enum(['1', 'true']).optional(),
       flagged: z.enum(['1', 'true']).optional(), // tutors below the rating threshold (the dashboard link)
       review: z.enum(['1', 'true']).optional(), // any account with a suspicious-account signal
     })
     .parse(Object.fromEntries(Object.entries(req.query).filter(([, v]) => v !== '')))
 
   const threshold = await getThreshold()
-  const users = await prisma.user.findMany({
-    where: {
+  const lowRating = { tutor: { is: { ratingCount: { gte: 3 }, ratingAvg: { lt: threshold } } } }
+  const reviewConditions = [lowRating]
+  if (review && !flagged) {
+    const [complaints, warnings] = await Promise.all([
+      prisma.complaint.groupBy({ by: ['againstUserId'], having: { againstUserId: { _count: { gte: COMPLAINTS_LIMIT } } } }),
+      prisma.accountWarning.groupBy({ by: ['userId'], having: { userId: { _count: { gte: WARNINGS_LIMIT } } } }),
+    ])
+    const ids = [...complaints.map(c => c.againstUserId), ...warnings.map(w => w.userId)].filter(id => id != null)
+    if (ids.length) reviewConditions.push({ id: { in: ids } })
+  }
+  const where = {
       ...(role && { role }),
       ...(status && { status }),
+      ...((pending || flagged) && { tutor: { is: { ...(flagged && lowRating.tutor.is), ...(pending && { qualifications: { some: { status: 'PENDING' } } }) } } }),
+      ...(review && !flagged && { AND: [{ OR: reviewConditions }] }),
       ...(q && { OR: [{ fullName: { contains: q } }, { email: { contains: q } }] }),
-    },
+  }
+  const pageSize = 25
+  const total = await prisma.user.count({ where })
+  const pages = Math.max(1, Math.ceil(total / pageSize))
+  const page = Math.min(requestedPage, pages)
+  const users = await prisma.user.findMany({
+    where,
     include: { tutor: { include: { qualifications: { select: { status: true } } } } },
-    orderBy: { createdAt: 'desc' },
-    take: 200,
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    skip: (page - 1) * pageSize,
+    take: pageSize,
   })
   const signals = await signalsFor(users.map((u) => u.id))
-  let items = users.map((u) => dto(u, threshold, { ...signals.get(u.id), threshold }))
-  if (flagged) items = items.filter((u) => u.tutor?.flagged)
-  if (review) items = items.filter((u) => u.suspicious.length > 0)
-  res.json({ threshold, users: items })
+  const items = users.map((u) => dto(u, threshold, { ...signals.get(u.id), threshold }))
+  res.json({ threshold, users: items, page, pages, total })
 }
 
 // GET /admin/users/:id: profile + qualifications to approve
@@ -111,7 +130,7 @@ export async function getUser(req, res) {
       ...dto(user, threshold, { ...signals.get(user.id), threshold }),
       warningHistory: warnings.map((w) => ({ id: w.id, reason: w.reason, issuedBy: w.issuedBy.fullName, createdAt: w.createdAt, complaintId: w.complaintId })),
       upcomingLessons,
-      qualifications: user.tutor?.qualifications ?? [],
+      qualifications: (user.tutor?.qualifications ?? []).map(q => ({ ...q, documentUrl: mediaLink(q.documentUrl, 'wondertutor/qualifications/' + user.id) })),
       subjects: user.tutor?.subjects ?? [],
       children: user.parent?.children.map((c) => ({ id: c.id, name: c.name, educationLevel: c.educationLevel, grade: c.grade })) ?? [],
     },

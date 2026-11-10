@@ -51,6 +51,13 @@ function toPayload(c) {
 
 export function MatchingProvider({ children }) {
   const { user } = useAuth()
+  // A parent-to-parent account switch can keep AppLayout mounted. Remount all
+  // account-scoped search state so prior children and AI results cannot survive.
+  return <AccountMatchingProvider key={user?.id ?? 'guest'}>{children}</AccountMatchingProvider>
+}
+
+function AccountMatchingProvider({ children }) {
+  const { user } = useAuth()
   const [catalog, setCatalog] = useState(null)
   const [kids, setKids] = useState([])
   const [kidsLoaded, setKidsLoaded] = useState(false)

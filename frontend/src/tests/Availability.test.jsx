@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
+import { MemoryRouter } from 'react-router-dom'
 import { addDays, dateOfDay, malaysiaLabel, nowInMalaysia, weekLabel, weekStartOf } from '../lib/availability'
 
 vi.mock('../api/client', () => ({
@@ -91,7 +92,7 @@ async function setup(data = weekView(), otherWeeks = {}) {
     data: url.includes('/weeks/') ? { ...data, override: body.slots, effective: body.slots } : { ...data, usual: body.slots, effective: data.override ?? body.slots },
   }))
   api.delete.mockResolvedValue({ data: { ...data, override: null, effective: data.usual, changedWeeks: [] } })
-  render(<Availability />)
+  render(<MemoryRouter><Availability /></MemoryRouter>)
   await screen.findByText('My availability')
 }
 
@@ -147,7 +148,7 @@ describe('the week on screen', () => {
   test('a load failure offers Try again', async () => {
     api.get.mockRejectedValueOnce(new Error('Server is down'))
     api.get.mockResolvedValueOnce({ data: weekView() })
-    render(<Availability />)
+    render(<MemoryRouter><Availability /></MemoryRouter>)
     expect(await screen.findByText('Server is down')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /Try again/ }))
     expect(await screen.findByText('My availability')).toBeInTheDocument()

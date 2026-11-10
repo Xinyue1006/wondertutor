@@ -50,6 +50,7 @@ export function checkPassword(v) {
   const s = v || ''
   if (s.length < 8) return 'Password must be at least 8 characters.'
   if (s.length > 72) return 'Password must be 72 characters or fewer.'
+  if (new TextEncoder().encode(s).length > 72) return 'Password must be 72 UTF-8 bytes or fewer; use fewer non-English characters.'
   if (!/[A-Za-z]/.test(s) || !/\d/.test(s)) return 'Password must contain a letter and a number.'
   return ''
 }

@@ -1,3 +1,4 @@
+import { mediaLink } from './privateMedia.js'
 // Tutor profile setup and verification [YH].
 // A new tutor fills in the setup wizard as a draft, submits it, and Admin reviews the uploaded documents.
 // Tutors can use every feature before that; once Admin approves an identity document AND a qualification
@@ -97,7 +98,7 @@ export function toSetupDto(t) {
     characteristics: t.characteristics || [],
     subjects: t.subjects.map(({ subject, educationLevel, minGrade, maxGrade }) => ({ subject, educationLevel, minGrade, maxGrade })),
     documents: t.qualifications.map(({ id, kind, title, institution, year, documentUrl, status, reviewNote, createdAt }) => ({
-      id, kind, title, institution, year, documentUrl, status, reviewNote, createdAt,
+      id, kind, title, institution, year, documentUrl: mediaLink(documentUrl, 'wondertutor/qualifications/' + t.user.id), status, reviewNote, createdAt,
     })),
     portfolio: t.portfolio.map(({ id, title, description, fileUrl }) => ({ id, title, description, fileUrl })),
     missing: missingForSubmit(t),

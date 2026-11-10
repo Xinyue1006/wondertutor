@@ -3,6 +3,7 @@ import { Router } from 'express'
 import { validateIdParams } from '../middleware/params.js'
 import { requireAuth, requireRole } from '../middleware/auth.js'
 import { loadTutorProfile } from '../middleware/tutor.js'
+import * as exceptions from '../controllers/tutor/availabilityExceptions.controller.js'
 import * as profile from '../controllers/tutor/profile.controller.js'
 import * as availability from '../controllers/tutor/availability.controller.js'
 
@@ -31,4 +32,7 @@ router.post('/availability/weeks/copy', availability.copySchedule)
 router.put('/availability/weeks/:weekStart', availability.updateWeek)
 router.delete('/availability/weeks/:weekStart', availability.deleteWeek)
 
+router.get('/availability/exceptions', exceptions.list)
+router.put('/availability/exceptions', exceptions.save)
+router.delete('/availability/exceptions/:date', exceptions.remove)
 export default router

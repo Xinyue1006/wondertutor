@@ -23,6 +23,26 @@ const answer = (b, rid, action) => api(parent.token).post(`/parent/bookings/${b.
 const hhmm = (d) => new Date(d).toLocaleTimeString('en-GB', { timeZone: 'Asia/Kuala_Lumpur', hour: '2-digit', minute: '2-digit' })
 
 describe('parent asks to reschedule', () => {
+  test('simultaneous requests create only one pending reschedule', async () => {
+    const t = await makeTutor()
+    const p = await makeParent()
+    const b = await makeBooking({ parent: p.parent, child: p.child, tutor: t.tutor, date, start: '16:00', status: 'CONFIRMED' })
+    const replies = await Promise.all([17, 18].map((hour) => api(p.token).post(`/parent/bookings/${b.id}/reschedule`, { date, startTime: `${hour}:00` })))
+    expect(replies.map((r) => r.status).sort()).toEqual([201, 409])
+    expect(await prisma.rescheduleRequest.count({ where: { bookingId: b.id, status: 'PENDING' } })).toBe(1)
+  })
+
+  test('a stale acceptance cannot move a booking cancelled after it was loaded', async () => {
+    const t = await makeTutor()
+    const p = await makeParent()
+    const b = await makeBooking({ parent: p.parent, child: p.child, tutor: t.tutor, date, start: '16:00', status: 'CONFIRMED' })
+    const snapshot = await full(b)
+    const request = await requestReschedule({ booking: snapshot, byUserId: p.user.id, date, startTime: '18:00' })
+    await prisma.booking.update({ where: { id: b.id }, data: { status: 'CANCELLED' } })
+    await expect(respondReschedule({ booking: snapshot, requestId: request.id, byUserId: t.user.id, accept: true })).rejects.toMatchObject({ status: 409 })
+    expect(hhmm((await full(b)).startAt)).toBe('16:00')
+    expect((await prisma.rescheduleRequest.findUnique({ where: { id: request.id } })).status).toBe('PENDING')
+  })
   let b, rid
   test('asking creates a pending request and tells the tutor', async () => {
     b = await confirmed('17:00')

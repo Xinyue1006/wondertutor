@@ -11,6 +11,7 @@ import { AppError } from '../../utils/AppError.js'
 import { subjectsOf } from '../../utils/childSubjects.js'
 import { sendEmail } from '../../services/email.service.js'
 import { renderEmail } from '../../services/notification.service.js'
+import { deleteUserSessions } from '../../services/assistant/session.js'
 
 // PUT /parent/account/email-reminders { enabled }
 export async function setEmailReminders(req, res) {
@@ -52,7 +53,7 @@ export async function exportMyData(req, res) {
     },
     address: req.parent.address,
     tutorPreferences: req.parent.preferences ?? null,
-    children: children.map((c) => ({ name: c.name, educationLevel: c.educationLevel, grade: c.grade, subjects: subjectsOf(c), notes: c.notes, photoUrl: c.photoUrl })),
+    children: children.map((c) => ({ name: c.name, educationLevel: c.educationLevel, grade: c.grade, gradeYear: c.gradeYear, subjects: subjectsOf(c), preferredLanguage: c.preferredLanguage, goals: c.goals, notes: c.notes, photoUrl: c.photoUrl })),
     bookings: bookings.map((b) => ({
       id: b.id,
       status: b.status,
@@ -94,7 +95,7 @@ const ACTIVE_STATUSES = ['PENDING', 'COUNTER_OFFERED', 'AWAITING_PAYMENT', 'CONF
 export async function deletionBlockers(parentId, userId) {
   const [bookings, refunds, complaints] = await Promise.all([
     prisma.booking.count({ where: { parentId, status: { in: ACTIVE_STATUSES } } }),
-    prisma.refund.count({ where: { status: 'PENDING', payment: { booking: { parentId } } } }),
+    prisma.refund.count({ where: { status: { in: ['PENDING', 'APPROVED'] }, payment: { booking: { parentId } } } }),
     prisma.complaint.count({ where: { filedById: userId, status: { in: ['OPEN', 'IN_PROGRESS'] } } }),
   ])
   return { bookings, refunds, complaints }
@@ -137,7 +138,7 @@ export async function deleteMyAccount(req, res) {
     // The address copied onto each booking, and the free-text the parent wrote to tutors
     prisma.booking.updateMany({ where: { parentId }, data: { location: null, latitude: null, longitude: null, messageToTutor: null } }),
     prisma.review.updateMany({ where: { parentId }, data: { photoUrl: null } }),
-    prisma.child.updateMany({ where: { parentId }, data: { name: 'Child', notes: null, photoUrl: null } }),
+    prisma.child.updateMany({ where: { parentId }, data: { name: 'Child', notes: null, goals: null, preferredLanguage: null, photoUrl: null } }),
     prisma.favouriteTutor.deleteMany({ where: { parentId } }),
     prisma.matchingRequest.deleteMany({ where: { parentId } }),
     prisma.notification.deleteMany({ where: { userId } }),
@@ -160,6 +161,8 @@ export async function deleteMyAccount(req, res) {
       },
     }),
   ])
+
+  deleteUserSessions(userId)
 
   // A last email to the old address as a record. It must never undo the deletion if it fails.
   try {

@@ -1,10 +1,12 @@
 // A child's learning progress, built from completed lessons (attendance + summaries come from the Tutor Portal).
+import { env } from '../config/env.js'
 import { prisma } from '../config/prisma.js'
 import { MONDAY, api, makeBooking, makeChild, makeParent, makeTutor, nextDate, resetDb, startServer, stopServer } from './helpers.js'
 import { addDays, mytToDate } from '../utils/time.js'
 
 let parent, tutor
 beforeAll(async () => {
+  Object.assign(env.cloudinary, { cloudName: 'demo', apiKey: 'fixture', apiSecret: 'test-secret' })
   await resetDb()
   await startServer()
   parent = await makeParent()
@@ -14,7 +16,7 @@ beforeAll(async () => {
   const a = await past(2, '16:00', { teachingMode: 'PHYSICAL', location: 'Kepong' })
   const b = await past(1, '16:00', { teachingMode: 'PHYSICAL', location: 'Kepong' })
   await past(1, '18:00') // online, no attendance (out of scope)
-  await prisma.attendance.create({ data: { bookingId: a.id, checkInAt: a.startAt, checkOutAt: a.endAt, checkInPhotoUrl: 'https://res.cloudinary.com/demo/x.jpg' } })
+  await prisma.attendance.create({ data: { bookingId: a.id, checkInAt: a.startAt, checkOutAt: a.endAt, checkInPhotoUrl: `https://res.cloudinary.com/demo/image/authenticated/v1/wondertutor/attendance/${a.id}/photo.jpg` } })
   await prisma.sessionSummary.create({ data: { bookingId: a.id, content: 'Fractions: adding unlike denominators', progressNote: 'Getting faster' } })
   await prisma.sessionSummary.create({ data: { bookingId: b.id, content: 'Word problems' } })
   // not completed: must not count
@@ -37,7 +39,10 @@ describe('learning progress', () => {
     expect([...times].sort((x, y) => y - x)).toEqual(times)
     const withPhoto = r.timeline.find((l) => l.attendance)
     expect(withPhoto.summary).toEqual({ content: 'Fractions: adding unlike denominators', progressNote: 'Getting faster', topics: null, homework: null, recommendations: null })
-    expect(withPhoto.attendance.checkInPhotoUrl).toMatch(/cloudinary/)
+    const params = new URL(withPhoto.attendance.checkInPhotoUrl).searchParams
+    expect(params.get('type')).toBe('authenticated')
+    expect(params.get('public_id')).toBe('wondertutor/attendance/' + withPhoto.bookingId + '/photo')
+    expect(Number(params.get('expires_at')) - Number(params.get('timestamp'))).toBeLessThanOrEqual(300)
   })
 
   test('a child with no lessons yet gets empty, not broken, progress', async () => {

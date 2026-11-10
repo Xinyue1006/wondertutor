@@ -404,7 +404,7 @@ function DocumentsStep({ profile, setProfile, onStatus }) {
     if (!file) return setError('Choose the file to upload.')
     setBusy(true)
     try {
-      const documentUrl = await uploadDocument(file)
+      const documentUrl = await uploadDocument(file, true)
       await api.post('/tutor/documents', {
         kind: doc.kind, title: doc.title.trim(), documentUrl,
         institution: doc.institution.trim() || null, year: doc.year ? Number(doc.year) : null,
@@ -445,7 +445,7 @@ function DocumentsStep({ profile, setProfile, onStatus }) {
               <li key={d.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-brand-100 p-3">
                 <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-50 text-brand-600"><Icon name="file" className="h-5 w-5" /></span>
                 <span className="min-w-0 flex-1">
-                  <a href={d.documentUrl} target="_blank" rel="noreferrer" className="block truncate font-semibold text-navy hover:underline">{d.title}</a>
+                  {d.documentUrl ? <a href={d.documentUrl} target="_blank" rel="noreferrer" className="block truncate font-semibold text-navy hover:underline">{d.title}</a> : <span className="block font-semibold text-navy">{d.title} (file unavailable)</span>}
                   <span className="text-xs text-slate-600">{d.kind === 'IDENTITY' ? 'Identity document' : [d.institution, d.year].filter(Boolean).join(' · ') || 'Qualification'}</span>
                   {d.status === 'REJECTED' && d.reviewNote && <span className="block text-xs text-red-700">Admin: {d.reviewNote}</span>}
                 </span>

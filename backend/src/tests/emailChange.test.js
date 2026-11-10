@@ -1,5 +1,6 @@
 // Changing the login email: the password is checked, a code goes to the NEW address, and the old address is told afterwards.
 import { prisma } from '../config/prisma.js'
+import { signToken } from '../services/token.service.js'
 import { outbox } from '../services/email.service.js'
 import { api, makeAdmin, makeParent, resetDb, startServer, stopServer } from './helpers.js'
 
@@ -50,7 +51,8 @@ describe('asking to change the email', () => {
   test('is only for logged-in users, and a Google-only account is pointed to Google', async () => {
     expect((await api().post('/auth/change-email/request', { newEmail: fresh(), password: 'x' })).status).toBe(401)
     const g = await makeParent()
-    await prisma.user.update({ where: { id: g.user.id }, data: { passwordHash: null, googleId: `g${Date.now()}` } })
+    const googleUser = await prisma.user.update({ where: { id: g.user.id }, data: { passwordHash: null, googleId: `g${Date.now()}` } })
+    g.token = signToken(googleUser)
     const res = await request(g.token, { newEmail: fresh() })
     expect(res.status).toBe(400)
     expect(res.message).toContain('Google')

@@ -67,9 +67,10 @@ export function AuthProvider({ children }) {
     return res.data.user
   }
 
-  function logout() {
+  function logout(message) {
     clearToken()
     setUser(null)
+    setNotice(typeof message === 'string' ? message : '')
   }
 
   return (

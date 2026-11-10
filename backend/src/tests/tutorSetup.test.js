@@ -7,13 +7,14 @@ import { env } from '../config/env.js'
 import { api, makeAdmin, makeParent, resetDb, startServer, stopServer } from './helpers.js'
 
 beforeAll(async () => {
+  env.cloudinary.cloudName = 'demo'
   await resetDb()
   await startServer()
 })
 afterAll(stopServer)
 
 const PHOTO = 'https://res.cloudinary.com/demo/image/upload/tutor.jpg'
-const DOC = 'https://res.cloudinary.com/demo/image/upload/cert.pdf'
+const docUrl = token => 'https://res.cloudinary.com/demo/image/authenticated/v1/wondertutor/qualifications/' + JSON.parse(Buffer.from(token.split('.')[1], 'base64url')).sub + '/cert.pdf'
 let n = 0
 const email = () => `newtutor${Date.now()}${++n}@test.local`
 
@@ -49,8 +50,11 @@ const COMPLETE_PROFILE = {
 
 async function completeSetup(token) {
   expect((await api(token).put('/tutor/profile', COMPLETE_PROFILE)).status).toBe(200)
-  expect((await api(token).post('/tutor/documents', { kind: 'IDENTITY', title: 'NRIC', documentUrl: DOC })).status).toBe(201)
-  expect((await api(token).post('/tutor/documents', { kind: 'QUALIFICATION', title: 'BSc Mathematics', institution: 'UM', year: 2020, documentUrl: DOC })).status).toBe(201)
+  for (const url of [PHOTO, docUrl(token).replace(/qualifications\/\d+/, 'qualifications/0')]) {
+    expect((await api(token).post('/tutor/documents', { kind: 'IDENTITY', title: 'NRIC', documentUrl: url })).status).toBe(400)
+  }
+  expect((await api(token).post('/tutor/documents', { kind: 'IDENTITY', title: 'NRIC', documentUrl: docUrl(token) })).status).toBe(201)
+  expect((await api(token).post('/tutor/documents', { kind: 'QUALIFICATION', title: 'BSc Mathematics', institution: 'UM', year: 2020, documentUrl: docUrl(token) })).status).toBe(201)
 }
 
 describe('login reCAPTCHA', () => {
@@ -66,7 +70,7 @@ describe('login reCAPTCHA', () => {
     // Answer Google's verify call ourselves; every other request goes to the test server as usual
     global.fetch = (url, opts) =>
       String(url).includes('recaptcha/api/siteverify')
-        ? Promise.resolve({ json: async () => ({ success: String(opts.body).includes('response=good') }) })
+        ? Promise.resolve(new Response(JSON.stringify({ success: String(opts.body).includes('response=good') }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
         : realFetch(url, opts)
 
     const missing = await api().post('/auth/login', { email: user.email, password: 'Test1234' })
@@ -134,12 +138,12 @@ describe('profile setup', () => {
 
     // Everything except the identity document
     await api(token).put('/tutor/profile', COMPLETE_PROFILE)
-    await api(token).post('/tutor/documents', { kind: 'QUALIFICATION', title: 'BSc Mathematics', documentUrl: DOC })
+    await api(token).post('/tutor/documents', { kind: 'QUALIFICATION', title: 'BSc Mathematics', documentUrl: docUrl(token) })
     const noId = await api(token).post('/tutor/submit-for-verification')
     expect(noId.status).toBe(400)
     expect(noId.message).toMatch(/Identity document/)
 
-    await api(token).post('/tutor/documents', { kind: 'IDENTITY', title: 'NRIC', documentUrl: DOC })
+    await api(token).post('/tutor/documents', { kind: 'IDENTITY', title: 'NRIC', documentUrl: docUrl(token) })
     const admin = await makeAdmin()
     const ok = await api(token).post('/tutor/submit-for-verification')
     expect(ok.status).toBe(200)
@@ -182,7 +186,7 @@ describe('verification', () => {
     expect(after.documents.find((d) => d.id === idDoc.id).reviewNote).toBe('Photo is blurry')
     expect((await api(token).get('/auth/me')).user.tutorStatus).toBe('CHANGES_REQUESTED')
 
-    await api(token).post('/tutor/documents', { kind: 'IDENTITY', title: 'NRIC (clear copy)', documentUrl: DOC })
+    await api(token).post('/tutor/documents', { kind: 'IDENTITY', title: 'NRIC (clear copy)', documentUrl: docUrl(token) })
     expect((await api(token).get('/auth/me')).user.tutorStatus).toBe('UNDER_REVIEW')
   })
 
@@ -207,7 +211,7 @@ describe('verification', () => {
     expect((await api(token).get('/auth/me')).user.tutorStatus).toBe('VERIFIED')
 
     // An extra pending certificate can come and go without touching the badge
-    await api(token).post('/tutor/documents', { kind: 'QUALIFICATION', title: 'Teaching certificate', documentUrl: DOC })
+    await api(token).post('/tutor/documents', { kind: 'QUALIFICATION', title: 'Teaching certificate', documentUrl: docUrl(token) })
     const extra = await prisma.qualification.findFirst({ where: { tutor: { userId: user.id }, status: 'PENDING' } })
     expect((await api(token).del(`/tutor/documents/${extra.id}`)).isVerified).toBe(true)
 
@@ -219,7 +223,7 @@ describe('verification', () => {
     expect((await api(token).get('/tutor/dashboard')).status).toBe(200) // losing the badge locks nothing
 
     // A new identity document goes back to Admin; approving it restores the badge
-    await api(token).post('/tutor/documents', { kind: 'IDENTITY', title: 'NRIC', documentUrl: DOC })
+    await api(token).post('/tutor/documents', { kind: 'IDENTITY', title: 'NRIC', documentUrl: docUrl(token) })
     expect((await api(token).get('/auth/me')).user.tutorStatus).toBe('UNDER_REVIEW')
     const replacement = await prisma.qualification.findFirst({ where: { tutor: { userId: user.id }, kind: 'IDENTITY' } })
     await api(admin.token).post(`/admin/qualifications/${replacement.id}/review`, { status: 'APPROVED' })

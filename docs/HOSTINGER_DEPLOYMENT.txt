@@ -1,0 +1,187 @@
+WONDERTUTOR HOSTINGER DEPLOYMENT AND ARCHITECTURE
+Reviewed 9 November 2026
+
+DECISION
+
+Use the existing React + Express + Prisma + MySQL modular monolith. Serve the
+built React app and /api on one HTTPS origin. This fits the present team and avoids
+duplicated authentication, cross-origin configuration and separate deployments.
+Do not split the parent, tutor and admin portals into microservices for this release.
+
+The actual Hostinger subscription and hPanel were not available for inspection.
+These instructions are a deployment proposal, not confirmation that a server has
+been configured. Current official guidance supports Express on Business/Unlimited
+and Cloud plans. If the existing plan lacks Node.js, static React hosting alone
+cannot run this backend; use a supported plan or a VPS.
+
+COMPONENTS
+
+Parent / Tutor / Admin browser
+             |
+          HTTPS
+             |
+    Hostinger TLS and reverse proxy
+             |
+    One Node.js Express application
+      |-- React production assets and SPA routing
+      |-- authentication, roles, validation, rate limits
+      |-- parent services and shared business rules
+      |-- admin user and complaint services
+      |-- bounded read-only AI orchestration
+      |
+      +--> Private MySQL via Prisma
+      +--> Billplz HTTPS API and signed callback
+      +--> SMTP TLS for important notifications
+      +--> Gemini HTTPS API with minimised data
+      +--> Google identity / reCAPTCHA verification
+
+Browser --> signed Cloudinary upload
+Hostinger cron --> finite housekeeping job --> same MySQL
+
+User roles are authorisation boundaries inside the application, not separate
+databases. Keep credentials and model keys on the server. Financial and child
+records remain authoritative in MySQL; the AI never decides payment status.
+
+HOSTINGER MANAGED NODE APP
+
+1. Use a currently supported Node LTS runtime that also satisfies package engines.
+   Node 22 or 24 is the proposed baseline; validate Prisma binaries on staging.
+2. Deploy from a dedicated reviewed release branch. Avoid automatic production
+   deployments from an actively edited student feature branch.
+3. Choose the repository root when building both folders in one app. Confirm the
+   exact root/output/entry settings in hPanel with a staging deployment; the root
+   package starts backend/src/server.js through npm start.
+4. Build React with its development build dependencies available:
+     npm --prefix frontend ci --include=dev
+     npm --prefix frontend run build
+     npm --prefix backend ci --include=dev
+   backend postinstall generates Prisma Client. Ship frontend/dist alongside
+   backend as app.js expects, or use the documented backend/public flat layout.
+   Do not ship .env, node_modules from Windows, .git, logs or local test reports.
+5. Keep schema migration as a controlled release step:
+     npm --prefix backend run db:deploy
+   The current root npm run build ALSO applies migrations. Do not use that command
+   casually against production: take a backup and inspect migrations first. A
+   future release pipeline should separate build, migration and activation.
+6. Start with npm start from the repository root. Let Hostinger supply PORT; do not
+   expose MySQL publicly. hPanel's exact entry-file requirement must be confirmed.
+7. Reload direct SPA URLs such as /parent/bookings. Check /api errors still return
+   JSON and HTTPS redirect/canonical domain handling works.
+
+MINIMUM ENVIRONMENT REVIEW
+
+- NODE_ENV=production
+- CLIENT_URL=https://your-canonical-domain (no trailing slash)
+- PORT from the hosting platform
+- DATABASE_URL for the correct production database and restricted application user
+- JWT_SECRET: random, private, at least 32 characters
+- SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS / MAIL_FROM: verified sender
+- GOOGLE_CLIENT_ID plus matching frontend ID and allowed production origin
+- RECAPTCHA_SECRET plus frontend site key and production domain registration
+- CLOUDINARY_*: production account; private delivery for identity/attendance media
+- BILLPLZ_API_KEY / COLLECTION_ID / X_SIGNATURE / BASE_URL: matching environment
+- AI_ASSISTANT_ENABLED=false initially; enable after synthetic live evaluation
+- SCHEDULER_ENABLED=false when using external cron
+
+Hostinger's current MySQL guide recommends 127.0.0.1 rather than localhost for
+its local Node/MySQL connection. Use the database credentials supplied by hPanel,
+URL-encode special password characters, and do not reuse development root access.
+
+The simulator is now blocked in production. Missing Billplz configuration means
+payments are unavailable; it cannot silently become free confirmed lessons.
+Billplz sandbox configuration can still demonstrate integration but is not real
+payment processing. The payment provider, collection and callback signing secret
+must all belong to the same environment. Complete sandbox acceptance before live.
+
+CRON AND HOUSEKEEPING
+
+Managed web/cloud Node hosting does not support always-running workers. Do not
+depend on the setInterval inside the API to enforce expiries or reminders.
+
+New finite command, from backend:
+  npm run jobs:run
+Equivalent script:
+  node scripts/run-housekeeping.js
+
+This is a REAL job on its configured DATABASE_URL. It does not automatically choose
+the test database. It expires stale bookings, sends reminders and performs school-
+year progression. Never invoke it on production until configuration is reviewed.
+
+Set SCHEDULER_ENABLED=false for the API and schedule the script every five minutes.
+Use Hostinger Advanced > Cron Jobs and its Node command. The current official
+guide says cron does not inherit app environment variables; explicitly load the
+protected environment file with --env-file. Use the actual path shown by hPanel:
+
+  /opt/alt/alt-nodejs22/root/bin/node --env-file=/actual/protected/config/.env /actual/deploy/backend/scripts/run-housekeeping.js
+
+The command above is a TEMPLATE, not a known valid path on your account. Managed
+cron command length is limited to 255 characters. If paths exceed that, use a
+short protected wrapper as permitted by the host. Cron schedules are in UTC;
+every-five-minute execution is timezone-independent, and business calculations
+already use Malaysian time. Do not put credentials or a cron key in a URL.
+
+The CLI holds a MySQL named lock on a dedicated connection to prevent overlapping
+CLI runs. The API timer also avoids overlapping itself. Do not run both timer and
+cron: they are different execution mechanisms. Stopping a job mid-notification can
+still leave partial delivery; the durable outbox described below is future work.
+Check cron exit status and output. Test one manual pass and a repeated pass against
+staging, then verify that a booking actually expires and reminders are not repeated.
+
+CANONICAL HOSTNAME AND PROCESS STATE
+
+Use one canonical hostname and redirect the other at the proxy. Hostinger's
+current limits guide notes that domain and www may run as separate processes.
+Assistant sessions and rate-limit counters currently live in process memory. A
+restart loses chat state; multiple processes do not share sessions or counters.
+Before scaling, move rate limits/session state to a shared store supported by the
+chosen environment. Do not assume a managed plan can run a local Redis service.
+
+RELIABILITY WORK BEFORE REAL MONEY
+
+1. Add a PaymentAttempt record with unique provider bill ID and an idempotency key.
+   A single mutable gatewayRef can lose an earlier bill when checkout is retried.
+2. Add daily reconciliation of provider transactions versus database settlements.
+3. Persist notification/email outbox entries in the same transaction as state
+   changes; process them from finite cron batches with retries and unique event IDs.
+4. Track refund approval separately from actual execution and provider reference.
+   A queued AUTO refund is not a completed bank transfer.
+5. Implement a common tutor/child locking protocol for ALL acceptance and reschedule
+   writers, including the teammate's services, before claiming no double booking.
+6. Add durable admin audit events for status/verification/complaint decisions.
+
+OPERATIONS
+
+- Keep dev, test, staging and production databases/credentials separate. Never run
+  seed/reset/evaluation scripts against production. Prefer a completely separate
+  database server/account for automated tests, not only a _test suffix.
+- Use encrypted off-host MySQL backups and perform a restore rehearsal. Define
+  recovery targets with the client; proposed initial RPO 24 hours, RTO 4 hours.
+  These are targets to agree and test, not guarantees. Provider snapshots are not
+  a substitute for application-consistent database backups.
+- Monitor public availability, database connectivity, API error/latency rates,
+  cron execution, failed email delivery and unmatched payment callbacks.
+- Redact personal data and secrets in logs. Define retention, access and deletion
+  procedures. Set alerts for downtime, job failures and payment reconciliation gaps.
+- Use explicit database connection budgets; cron adds a lock connection plus its
+  application queries, and multiple app processes multiply pool usage.
+- Test rolling release/restart, stale browser assets and API compatibility. Keep
+  the previous build available; database rollbacks need their own tested plan.
+
+WHEN A VPS IS JUSTIFIED
+
+Move to a Hostinger VPS when dedicated workers, persistent shared services, more
+control over private media/networking, or higher traffic make the managed plan
+insufficient. Proposed VPS: TLS reverse proxy -> supervised Node application,
+private MySQL (or managed DB), supervised worker, shared Redis if needed, encrypted
+off-host backups. Someone must own patching, firewall, monitoring and recovery.
+Do not buy extra infrastructure only to make the architecture diagram look complex.
+
+OFFICIAL REFERENCES checked 9 November 2026
+
+https://www.hostinger.com/support/how-to-deploy-a-nodejs-website-in-hostinger/
+https://www.hostinger.com/support/hostinger-node-js-limits-for-web-and-cloud-plans/
+https://www.hostinger.com/support/how-to-run-cron-jobs-for-node-js-websites-at-hostinger/
+https://www.hostinger.com/support/connecting-a-hostinger-mysql-database-to-a-node-js-application/
+https://www.hostinger.com/support/how-to-deploy-monorepos-with-npm-yarn-or-pnpm-on-hostinger/
+
+These pages establish platform capabilities, not confirmation of the client's plan.

@@ -20,20 +20,24 @@ export async function uploadImage(file) {
 
 // Verification documents (NRIC, certificates) may be a PDF or a photo. "auto" lets Cloudinary store either.
 export const DOCUMENT_TYPES = ['application/pdf', 'image/jpeg', 'image/png']
-export async function uploadDocument(file) {
+export async function uploadDocument(file, privateDocument = false) {
   if (!DOCUMENT_TYPES.includes(file.type)) throw new Error('Please choose a PDF, JPG or PNG file.')
   if (file.size > 10 * 1024 * 1024) throw new Error('The file must be 10MB or smaller.')
-  const { data: sig } = await api.post('/uploads/signature')
+  const { data: sig } = await api.post('/uploads/signature', privateDocument ? { purpose: 'qualification' } : {})
   const form = new FormData()
+  if (privateDocument) {
+    form.append('type', sig.type)
+    form.append('allowed_formats', sig.allowed_formats)
+  }
   form.append('file', file)
   form.append('api_key', sig.apiKey)
   form.append('timestamp', sig.timestamp)
   form.append('folder', sig.folder)
   form.append('signature', sig.signature)
-  const res = await fetch(`https://api.cloudinary.com/v1_1/${sig.cloudName}/auto/upload`, { method: 'POST', body: form })
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${sig.cloudName}/${privateDocument ? 'image' : 'auto'}/upload`, { method: 'POST', body: form })
   const json = await res.json()
   if (!res.ok) throw new Error(json.error?.message || 'Upload failed')
-  return json.secure_url
+  return privateDocument ? json.secure_url.replace(/(\/image\/authenticated\/)s--[a-zA-Z0-9_-]+--\//, '$1') : json.secure_url
 }
 
 // Message for a failed upload: a missing Cloudinary setup is explained instead of showing a raw 501

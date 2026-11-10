@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
@@ -315,6 +316,7 @@ export default function Availability() {
       <div className="mb-5">
         <h1 className="font-display text-2xl font-bold text-navy sm:text-3xl">My availability</h1>
         <p className="mt-1 text-slate-600">Your usual hours repeat every week. You can also change one week without touching the others.</p>
+        <Link to="/tutor/availability/dates" className="mt-1 inline-flex min-h-11 items-center text-sm font-semibold text-brand-600 hover:underline">Set different hours for one date</Link>
       </div>
 
       <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">

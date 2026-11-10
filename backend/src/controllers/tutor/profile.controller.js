@@ -1,3 +1,4 @@
+import { privateAsset, unsignedReference } from '../../services/privateMedia.js'
 import { z } from 'zod'
 import { prisma } from '../../config/prisma.js'
 import { AppError } from '../../utils/AppError.js'
@@ -74,7 +75,10 @@ const documentSchema = z.object({
 
 // POST /tutor/documents: a qualification or identity document for Admin to review (starts as PENDING)
 export async function addDocument(req, res) {
-  const doc = await setup.addDocument(req.tutor, documentSchema.parse(req.body))
+  const data = documentSchema.parse(req.body)
+  if (!privateAsset(data.documentUrl, 'wondertutor/qualifications/' + req.user.id))
+    throw new AppError(400, 'Upload this document through your verification form')
+  const doc = await setup.addDocument(req.tutor, { ...data, documentUrl: unsignedReference(data.documentUrl) })
   res.status(201).json({ id: doc.id })
 }
 
