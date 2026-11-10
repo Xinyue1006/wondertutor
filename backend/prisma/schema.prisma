@@ -227,6 +227,7 @@ model TutorProfile {
   qualifications Qualification[]
   portfolio      PortfolioItem[]
   availability   AvailabilitySlot[]
+  availabilityWeeks AvailabilityWeek[]
   bookings       Booking[]
   reviews        Review[]
   bankAccounts   BankAccount[]
@@ -276,6 +277,27 @@ model AvailabilitySlot {
   dayOfWeek Int          // 0 = Sunday ... 6 = Saturday
   startTime String       // "HH:mm"
   endTime   String       // "HH:mm"
+}
+
+// One week that differs from the usual hours above: while a row exists, its slots replace the usual hours for that
+// week only. No slots means not available at all that week.
+model AvailabilityWeek {
+  id        Int          @id @default(autoincrement())
+  tutorId   Int
+  tutor     TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  weekStart DateTime     @db.Date // the Monday of the week, Malaysia time
+  slots     AvailabilityWeekSlot[]
+
+  @@unique([tutorId, weekStart])
+}
+
+model AvailabilityWeekSlot {
+  id        Int              @id @default(autoincrement())
+  weekId    Int
+  week      AvailabilityWeek @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  dayOfWeek Int              // 0 = Sunday ... 6 = Saturday
+  startTime String           // "HH:mm"
+  endTime   String           // "HH:mm"
 }
 
 model BankAccount {

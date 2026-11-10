@@ -85,14 +85,20 @@ export function moveRange(cells, oldRange, newRange) {
 // The lock check run on every move or resize: no booked hour may leave the schedule
 export const keepsLocked = (cells, locked) => [...locked].every((key) => cells.has(key))
 
-// The schedule repeats every week, so the calendar shows one fixed reference week instead of real dates.
-// 2001-01-01 is a Monday: Monday to Saturday are the 1st to the 6th, Sunday (dayOfWeek 0) is the 7th.
-export const REF_MONDAY = '2001-01-01'
-const refDate = (dayOfWeek) => `2001-01-0${dayOfWeek === 0 ? 7 : dayOfWeek}`
+// Dates are "YYYY-MM-DD" strings handled at UTC midnight, so the browser's timezone can never shift them by a day
+export function addDays(date, n) {
+  const d = new Date(`${date}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().slice(0, 10)
+}
+export const dayOfDate = (date) => new Date(`${date}T00:00:00Z`).getUTCDay()
+// Weeks run Monday to Sunday; Sunday is dayOfWeek 0 but the last day of the week
+export const dateOfDay = (weekStart, dayOfWeek) => addDays(weekStart, dayOfWeek === 0 ? 6 : dayOfWeek - 1)
+export const weekStartOf = (date) => addDays(date, dayOfDate(date) === 0 ? -6 : 1 - dayOfDate(date))
 
-export const rangeToEvent = ({ dayOfWeek, startTime, endTime }) => ({
-  start: `${refDate(dayOfWeek)}T${startTime}:00`,
-  end: `${refDate(dayOfWeek)}T${endTime}:00`,
+export const rangeToEvent = ({ dayOfWeek, startTime, endTime }, weekStart) => ({
+  start: `${dateOfDay(weekStart, dayOfWeek)}T${startTime}:00`,
+  end: `${dateOfDay(weekStart, dayOfWeek)}T${endTime}:00`,
 })
 
 // The calendar runs in UTC, so the UTC getters read back exactly the hours that were drawn
@@ -103,3 +109,46 @@ export const eventToRange = (start, end) => ({
 })
 
 export const sameCells = (a, b) => a.size === b.size && [...a].every((key) => b.has(key))
+
+// The current date and time in Malaysia, whatever the computer's own timezone is
+export function nowInMalaysia(at = new Date()) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kuala_Lumpur', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+      .formatToParts(at).map((p) => [p.type, p.value]),
+  )
+  return { date: `${parts.year}-${parts.month}-${parts.day}`, time: `${parts.hour}:${parts.minute}` }
+}
+
+// An hour is over once it has started: a lesson can no longer be booked for it
+export const isPastHour = (date, hour, now) => date < now.date || (date === now.date && hour <= now.time)
+export const momentIsPast = (moment, now) => isPastHour(moment.toISOString().slice(0, 10), moment.toISOString().slice(11, 16), now)
+
+export function pastCells(weekStart, now) {
+  const past = new Set()
+  for (const { value } of DAYS)
+    for (const hour of HOURS) if (isPastHour(dateOfDay(weekStart, value), hour, now)) past.add(cellKey(value, hour))
+  return past
+}
+
+// Applied to every edit of a dated week: hours that are over stay exactly as they were
+export function keepPast(next, prev, past) {
+  const kept = new Set(next)
+  for (const key of past) {
+    if (prev.has(key)) kept.add(key)
+    else kept.delete(key)
+  }
+  return kept
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const dayMonth = (date) => `${Number(date.slice(8))} ${MONTHS[Number(date.slice(5, 7)) - 1]}`
+export const shortDate = dayMonth
+
+// "16 – 22 Nov", "30 Nov – 6 Dec"; with the year, "16 – 22 Nov 2026"
+export function weekLabel(weekStart, withYear = false) {
+  const end = addDays(weekStart, 6)
+  const [startYear, endYear] = [weekStart.slice(0, 4), end.slice(0, 4)]
+  if (withYear && startYear !== endYear) return `${dayMonth(weekStart)} ${startYear} – ${dayMonth(end)} ${endYear}`
+  const from = weekStart.slice(5, 7) === end.slice(5, 7) ? String(Number(weekStart.slice(8))) : dayMonth(weekStart)
+  return `${from} – ${dayMonth(end)}${withYear ? ` ${endYear}` : ''}`
+}

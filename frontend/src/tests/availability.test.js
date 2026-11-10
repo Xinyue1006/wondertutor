@@ -1,6 +1,6 @@
 import {
-  DAYS, HOURS, REF_MONDAY, addHours, cellKey, cellsToRanges, clearHours, eventToRange, hourEnd, keepsLocked, moveRange, rangeToEvent,
-  rangesToCells, removeRange, sameCells,
+  DAYS, HOURS, addDays, addHours, cellKey, cellsToRanges, clearHours, dateOfDay, eventToRange, hourEnd, isPastHour, keepPast, keepsLocked, momentIsPast,
+  moveRange, nowInMalaysia, pastCells, rangeToEvent, rangesToCells, removeRange, sameCells, shortDate, weekLabel, weekStartOf,
 } from '../lib/availability'
 
 const slot = (dayOfWeek, startTime, endTime) => ({ dayOfWeek, startTime, endTime })
@@ -72,28 +72,86 @@ describe('availability helpers', () => {
   })
 })
 
-describe('the reference week', () => {
+describe('a real week on the calendar', () => {
+  const MONDAY = '2026-11-16'
   // The calendar parses these strings in UTC, so the test does the same
   const roundTrip = (range) => {
-    const { start, end } = rangeToEvent(range)
+    const { start, end } = rangeToEvent(range, MONDAY)
     return eventToRange(new Date(`${start}Z`), new Date(`${end}Z`))
   }
-
-  test('starts on a Monday', () => {
-    expect(new Date(`${REF_MONDAY}T00:00:00Z`).getUTCDay()).toBe(1)
-  })
 
   test.each([0, 1, 2, 3, 4, 5, 6])('day %i survives the trip to the calendar and back', (dayOfWeek) => {
     const range = slot(dayOfWeek, '14:00', '17:00')
     expect(roundTrip(range)).toEqual(range)
   })
 
-  test('Sunday is the last day of the reference week', () => {
-    expect(rangeToEvent(slot(0, '09:00', '10:00'))).toEqual({ start: '2001-01-07T09:00:00', end: '2001-01-07T10:00:00' })
+  test('each day lands on its own date, with Sunday last', () => {
+    expect(rangeToEvent(slot(1, '09:00', '10:00'), MONDAY).start).toBe('2026-11-16T09:00:00')
+    expect(rangeToEvent(slot(6, '09:00', '10:00'), MONDAY).start).toBe('2026-11-21T09:00:00')
+    expect(rangeToEvent(slot(0, '09:00', '10:00'), MONDAY)).toEqual({ start: '2026-11-22T09:00:00', end: '2026-11-22T10:00:00' })
   })
 
   test('a block ending at 22:00 keeps its end', () => {
     expect(roundTrip(slot(5, '20:00', '22:00'))).toEqual(slot(5, '20:00', '22:00'))
+  })
+
+  test('dates cross months and years', () => {
+    expect(addDays('2026-12-28', 7)).toBe('2027-01-04')
+    expect(dateOfDay('2026-11-30', 0)).toBe('2026-12-06')
+  })
+
+  test('weekStartOf finds the Monday, and a Sunday belongs to the week before it', () => {
+    expect(weekStartOf('2026-11-16')).toBe('2026-11-16')
+    expect(weekStartOf('2026-11-19')).toBe('2026-11-16')
+    expect(weekStartOf('2026-11-22')).toBe('2026-11-16')
+  })
+
+  test('week labels', () => {
+    expect(weekLabel('2026-11-16')).toBe('16 – 22 Nov')
+    expect(weekLabel('2026-11-16', true)).toBe('16 – 22 Nov 2026')
+    expect(weekLabel('2026-11-30')).toBe('30 Nov – 6 Dec')
+    expect(weekLabel('2026-12-28', true)).toBe('28 Dec 2026 – 3 Jan 2027')
+    expect(shortDate('2026-12-07')).toBe('7 Dec')
+  })
+})
+
+describe('Malaysia time and past hours', () => {
+  const now = { date: '2026-11-18', time: '14:30' } // a Wednesday
+
+  test('nowInMalaysia reads Malaysia time whatever the computer uses', () => {
+    expect(nowInMalaysia(new Date('2026-11-18T06:30:00Z'))).toEqual(now)
+    expect(nowInMalaysia(new Date('2026-11-18T16:30:00Z'))).toEqual({ date: '2026-11-19', time: '00:30' })
+  })
+
+  test('an hour is over once it has started', () => {
+    expect(isPastHour('2026-11-17', '21:00', now)).toBe(true)
+    expect(isPastHour('2026-11-18', '14:00', now)).toBe(true)
+    expect(isPastHour('2026-11-18', '15:00', now)).toBe(false)
+    expect(isPastHour('2026-11-19', '07:00', now)).toBe(false)
+  })
+
+  test('momentIsPast reads the floating calendar time', () => {
+    expect(momentIsPast(new Date('2026-11-18T14:00:00Z'), now)).toBe(true)
+    expect(momentIsPast(new Date('2026-11-18T15:00:00Z'), now)).toBe(false)
+  })
+
+  test('pastCells covers earlier days and the hours already started today', () => {
+    const past = pastCells('2026-11-16', now)
+    expect(past.has('1-21:00')).toBe(true)
+    expect(past.has('3-14:00')).toBe(true)
+    expect(past.has('3-15:00')).toBe(false)
+    expect(past.has('4-07:00')).toBe(false)
+    expect(past.has('0-07:00')).toBe(false)
+  })
+
+  test('a later week has no past hours', () => {
+    expect(pastCells('2026-11-23', now).size).toBe(0)
+  })
+
+  test('keepPast undoes any change to a past hour and keeps the rest', () => {
+    const past = new Set(['1-09:00', '1-10:00'])
+    const kept = keepPast(new Set(['1-10:00', '2-09:00']), new Set(['1-09:00']), past)
+    expect([...kept].sort()).toEqual(['1-09:00', '2-09:00'])
   })
 })
 

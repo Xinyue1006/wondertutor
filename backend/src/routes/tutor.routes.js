@@ -26,5 +26,8 @@ router.post('/submit-for-verification', profile.submitForVerification)
 router.get('/dashboard', profile.dashboard)
 router.get('/availability', availability.getSchedule)
 router.put('/availability', availability.updateSchedule)
+router.post('/availability/weeks/copy', availability.copySchedule)
+router.put('/availability/weeks/:weekStart', availability.updateWeek)
+router.delete('/availability/weeks/:weekStart', availability.deleteWeek)
 
 export default router
