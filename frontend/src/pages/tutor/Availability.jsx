@@ -1,55 +1,44 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import FullCalendar from '@fullcalendar/react'
+import timeGridPlugin from '@fullcalendar/timegrid'
+import interactionPlugin from '@fullcalendar/interaction'
 import api, { errorMessage } from '../../api/client'
 import Icon from '../../components/ui/Icon'
 import { ErrorBox, LoadError, Spinner } from '../../components/ui/Common'
-import { DAYS, DAY_END, HOURS, PRESETS, addHours, cellKey, cellsOnLine, cellsToRanges, clearHours, hourEnd, rangesToCells, sameCells } from '../../lib/availability'
+import {
+  DAYS, DAY_END, DAY_START, HOURS, PRESETS, REF_MONDAY, addHours, cellKey, cellsToRanges, clearHours, eventToRange,
+  hourEnd, keepsLocked, moveRange, rangeToEvent, rangesToCells, removeRange, sameCells,
+} from '../../lib/availability'
+import { useUnsavedWarning } from '../../lib/useUnsavedWarning'
 
 const LOCKED_TIP = 'Booked lesson on this day. Cancel or reschedule it first.'
-const UNSAVED = 'You have unsaved changes to your availability. Leave without saving?'
-const HOLD_MS = 300 // on touch, how long a press lasts before a drag paints instead of scrolling
+const LOCK_REFUSED = 'That change would drop an hour with a booked lesson. Cancel or reschedule the lesson first.'
+const TIME_FORMAT = { hour: '2-digit', minute: '2-digit', hour12: false }
+const PLUGINS = [timeGridPlugin, interactionPlugin]
+
+const dayOf = (dayOfWeek) => DAYS.find((d) => d.value === dayOfWeek)
 
 // Booked hours always count as on, so saving can never drop one
 function fromServer(data) {
   const locked = new Set(data.locked.map((l) => cellKey(l.dayOfWeek, l.startTime)))
-  return { locked, cells: new Set([...rangesToCells(data.slots), ...locked]) }
-}
-
-// Asks before leaving with unsaved work: closing or reloading the tab, and links clicked inside the app
-function useUnsavedWarning(dirty) {
-  useEffect(() => {
-    if (!dirty) return
-    const beforeUnload = (e) => e.preventDefault()
-    const onLinkClick = (e) => {
-      const link = e.target.closest?.('a[href]')
-      if (!link || link.target === '_blank' || link.origin !== window.location.origin) return
-      if (!window.confirm(UNSAVED)) {
-        e.preventDefault()
-        e.stopPropagation()
-      }
-    }
-    window.addEventListener('beforeunload', beforeUnload)
-    document.addEventListener('click', onLinkClick, true) // capture: runs before the router handles the link
-    return () => {
-      window.removeEventListener('beforeunload', beforeUnload)
-      document.removeEventListener('click', onLinkClick, true)
-    }
-  }, [dirty])
+  return { locked, cells: new Set([...rangesToCells(data.slots), ...locked]), lockedHours: data.locked }
 }
 
 export default function Availability() {
   const [saved, setSaved] = useState(null) // the schedule as last loaded or saved
-  const [cells, setCells] = useState(new Set())
+  const [cells, setCells] = useState(new Set()) // the one source of truth: FullCalendar only draws and edits it
   const [locked, setLocked] = useState(new Set())
+  const [lockedHours, setLockedHours] = useState([])
+  const [mode, setMode] = useState('add')
   const [loadError, setLoadError] = useState('')
   const [saveError, setSaveError] = useState('')
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
-  const drag = useRef(null)
-  const gridBox = useRef(null)
 
   const apply = useCallback((data) => {
     const next = fromServer(data)
     setLocked(next.locked)
+    setLockedHours(next.lockedHours)
     setCells(next.cells)
     setSaved(next.cells)
   }, [])
@@ -67,16 +56,6 @@ export default function Availability() {
   const dirty = saved !== null && !sameCells(cells, saved)
   useUnsavedWarning(dirty)
 
-  // Once a held finger is painting, stop the browser scrolling. Must be a non-passive native listener to be allowed to.
-  const ready = saved !== null
-  useEffect(() => {
-    const box = gridBox.current
-    if (!box) return
-    const stopScroll = (e) => { if (drag.current?.painted) e.preventDefault() }
-    box.addEventListener('touchmove', stopScroll, { passive: false })
-    return () => box.removeEventListener('touchmove', stopScroll)
-  }, [ready])
-
   // Every edit goes through here, so a stale "saved" or error message never stays next to changed hours
   const edit = useCallback((change) => {
     setNotice('')
@@ -84,61 +63,68 @@ export default function Availability() {
     setCells(change)
   }, [])
 
-  const paint = useCallback((key, on) => {
-    if (locked.has(key)) return
-    edit((prev) => {
-      if (prev.has(key) === on) return prev
-      const next = new Set(prev)
-      if (on) next.add(key)
-      else next.delete(key)
-      return next
-    })
-  }, [edit, locked])
+  // Redrawn from the cell set after every change, so there is no separate event state to keep in sync
+  const events = useMemo(() => [
+    ...cellsToRanges(cells).map((range) => ({ ...rangeToEvent(range), title: `${range.startTime}–${range.endTime}`, extendedProps: { kind: 'block', range } })),
+    ...lockedHours.map((l) => ({
+      ...rangeToEvent({ dayOfWeek: l.dayOfWeek, startTime: l.startTime, endTime: hourEnd(l.startTime) }),
+      display: 'background',
+      classNames: ['fc-locked'],
+      editable: false,
+      extendedProps: { kind: 'locked' },
+    })),
+  ], [cells, lockedHours])
 
-  // Drag ends wherever the pointer is released, even outside the grid
-  useEffect(() => {
-    const finish = (e) => {
-      const d = drag.current
-      drag.current = null
-      clearTimeout(d?.timer)
-      if (d && !d.painted && e.type === 'pointerup') paint(d.key, d.on) // a tap
-    }
-    window.addEventListener('pointerup', finish)
-    window.addEventListener('pointercancel', finish)
-    return () => {
-      window.removeEventListener('pointerup', finish)
-      window.removeEventListener('pointercancel', finish)
-    }
-  }, [paint])
-
-  // The pressed cell decides paint-on or paint-off for the whole drag. A mouse paints at once. On touch a quick tap
-  // toggles when the finger lifts, a swipe is left to the browser to scroll (it sends pointercancel, so nothing
-  // changes), and only a press held for HOLD_MS starts painting.
-  function startDrag(e, key) {
-    if (e.button) return
-    const on = !cells.has(key)
-    const d = { key, last: key, on, painted: false }
-    drag.current = d
-    if (e.pointerType !== 'touch') {
-      d.painted = true
-      paint(key, on)
-      return
-    }
-    d.timer = setTimeout(() => {
-      if (drag.current !== d) return
-      d.painted = true
-      paint(key, on)
-    }, HOLD_MS)
+  function onSelect(info) {
+    const range = eventToRange(info.start, info.end)
+    edit((prev) => (mode === 'add' ? addHours(prev, [range.dayOfWeek], range.startTime, range.endTime) : removeRange(prev, range, locked)))
+    info.view?.calendar.unselect()
   }
 
-  function moveDrag(e) {
-    const d = drag.current
-    if (!d?.painted) return
-    // A touch stays attached to the cell it began on, so the cell under the finger has to be looked up
-    const key = document.elementFromPoint?.(e.clientX, e.clientY)?.closest?.('[data-cell]')?.dataset.cell
-    if (!key) return
-    for (const k of cellsOnLine(d.last, key)) paint(k, d.on)
-    d.last = key
+  // Model-level lock check: FullCalendar has already moved the block on screen, so a refused change is reverted
+  function onMoveOrResize(info) {
+    const next = moveRange(cells, eventToRange(info.oldEvent.start, info.oldEvent.end), eventToRange(info.event.start, info.event.end))
+    if (!keepsLocked(next, locked)) {
+      info.revert()
+      setNotice('')
+      setSaveError(LOCK_REFUSED)
+      return
+    }
+    edit(() => next)
+  }
+
+  function renderEvent(arg) {
+    const { kind, range } = arg.event.extendedProps
+    if (kind === 'locked') {
+      return (
+        <div title={LOCKED_TIP} className="flex h-full items-center justify-center text-slate-700">
+          <Icon name="lock" className="h-4 w-4" />
+          <span className="sr-only">Booked lesson, locked</span>
+        </div>
+      )
+    }
+    if (kind !== 'block') return undefined // the shaded preview while dragging a new selection
+    return (
+      <div className="flex h-full items-start justify-between gap-1 px-1 py-0.5 text-xs font-semibold">
+        <span className="min-w-0 leading-tight">{arg.timeText?.replace(' - ', '–') || arg.event.title}</span>
+        {!arg.isMirror && (
+          // A plain click on the block does nothing, so a tap while scrolling on a phone can never delete hours
+          <button type="button" onClick={() => edit((prev) => removeRange(prev, range, locked))} aria-label={`Remove ${dayOf(range.dayOfWeek).label} ${range.startTime} to ${range.endTime}`} className="flex h-7 w-7 shrink-0 items-center justify-center rounded hover:bg-white/25">
+            <Icon name="x" className="h-3.5 w-3.5" strokeWidth={3} />
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  function renderDayHeader(arg) {
+    const day = dayOf(arg.date.getUTCDay())
+    return (
+      <div className="py-0.5 text-center">
+        <div className="text-sm font-bold text-navy">{day.short}</div>
+        <button type="button" onClick={() => edit((prev) => clearHours(prev, locked, day.value))} aria-label={`Clear ${day.label}`} className="min-h-11 px-1 text-xs font-semibold text-brand-600 hover:underline">Clear this day</button>
+      </div>
+    )
   }
 
   async function save() {
@@ -169,34 +155,62 @@ export default function Availability() {
 
       <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <section className="card min-w-0 p-4 md:p-5" aria-label="Weekly hours">
-          <p className="mb-3 font-display text-lg font-bold text-navy">{total} {total === 1 ? 'hour' : 'hours'} a week</p>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <p className="font-display text-lg font-bold text-navy">{total} {total === 1 ? 'hour' : 'hours'} a week</p>
+            <ModeSwitch mode={mode} onChange={setMode} />
+          </div>
 
           <Legend />
 
-          {/* The grid scrolls inside this box on small screens, so the page itself never scrolls sideways */}
-          <div ref={gridBox} className="overflow-x-auto rounded-lg border border-brand-100" onPointerMove={moveDrag} onContextMenu={(e) => { if (drag.current) e.preventDefault() }}>
-            <div role="group" aria-label="Availability by day and hour" className="grid w-max min-w-full select-none grid-cols-[5.75rem_repeat(7,minmax(4.75rem,1fr))]">
-              <div className="sticky left-0 z-10 border-b border-r border-brand-100 bg-brand-25" />
-              {DAYS.map((day) => (
-                <div key={day.value} className="border-b border-brand-100 bg-brand-25 px-1 py-1.5 text-center">
-                  <div className="text-sm font-bold text-navy">{day.short}</div>
-                  <button type="button" onClick={() => edit((prev) => clearHours(prev, locked, day.value))} aria-label={`Clear ${day.label}`} className="min-h-11 px-1 text-xs font-semibold text-brand-600 hover:underline">Clear this day</button>
-                </div>
-              ))}
-
-              {HOURS.map((hour) => (
-                <Row key={hour} hour={hour} cells={cells} locked={locked} onPress={startDrag} onKeyToggle={(key) => paint(key, !cells.has(key))} />
-              ))}
+          {/* The calendar scrolls inside this box on small screens, so the page itself never scrolls sideways */}
+          <div className="overflow-x-auto rounded-lg">
+            <div className={`wt-calendar min-w-[640px] ${mode === 'remove' ? 'wt-calendar-remove' : ''}`}>
+              <FullCalendar
+                plugins={PLUGINS}
+                initialView="timeGridWeek"
+                initialDate={REF_MONDAY}
+                timeZone="UTC"
+                locale="en-gb"
+                firstDay={1}
+                headerToolbar={false}
+                allDaySlot={false}
+                nowIndicator={false}
+                height="auto"
+                slotMinTime={`${DAY_START}:00`}
+                slotMaxTime={`${DAY_END}:00`}
+                slotDuration="01:00:00"
+                snapDuration="01:00:00"
+                slotLabelFormat={TIME_FORMAT}
+                slotLabelContent={(arg) => `${arg.text}–${hourEnd(arg.text)}`}
+                eventTimeFormat={TIME_FORMAT}
+                displayEventEnd
+                dayHeaderFormat={{ weekday: 'short' }}
+                dayHeaderContent={renderDayHeader}
+                selectable
+                selectMirror
+                editable={mode === 'add'}
+                eventInteractive
+                longPressDelay={300}
+                selectLongPressDelay={300}
+                selectAllow={(s) => s.start.getUTCDate() === s.end.getUTCDate()}
+                eventOverlap
+                selectOverlap
+                events={events}
+                eventContent={renderEvent}
+                select={onSelect}
+                eventDrop={onMoveOrResize}
+                eventResize={onMoveOrResize}
+              />
             </div>
           </div>
-          <p className="mt-2 text-xs text-slate-600">Click or tap an hour to switch it on or off. To set several, drag with a mouse, or press and hold on a phone and then drag. Nothing changes for parents until you press Save availability.</p>
+          <p className="mt-2 text-xs text-slate-600">Drag over the hours to add them (or remove them in Remove mode). Drag a block to move it, or pull its edge to change its length. On a phone, press and hold, then drag. Nothing changes for parents until you press Save availability. Using a keyboard? Use Add many hours at once.</p>
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <button type="button" onClick={() => edit((prev) => clearHours(prev, locked))} className="btn-outline min-h-11 px-4">Clear all</button>
             <button type="button" onClick={save} disabled={!dirty || busy} className="btn-primary ml-auto min-h-11 px-5">{busy ? 'Saving…' : 'Save availability'}</button>
           </div>
 
-          {/* Below the buttons, so the result of Save is in view and a message appearing never moves the grid during a drag */}
+          {/* Below the buttons, so the result of Save is in view and a message appearing never moves the calendar during a drag */}
           <div className="mt-3">
             {saveError ? <ErrorBox>{saveError}</ErrorBox> : notice ? (
               <p role="status" className="flex items-center gap-2 rounded-lg bg-ok-50 px-3 py-2.5 text-sm text-green-800"><Icon name="check-circle" className="h-4 w-4 shrink-0" /> {notice}</p>
@@ -208,6 +222,19 @@ export default function Availability() {
 
         <AddHours onAdd={(days, from, to) => edit((prev) => addHours(prev, days, from, to))} />
       </div>
+    </div>
+  )
+}
+
+function ModeSwitch({ mode, onChange }) {
+  return (
+    <div role="radiogroup" aria-label="What dragging does" className="flex rounded-lg border border-brand-200 p-0.5 text-sm font-semibold">
+      {[['add', 'Add hours'], ['remove', 'Remove hours']].map(([value, label]) => (
+        <label key={value} className={`flex min-h-10 cursor-pointer items-center rounded-md px-3 ${mode === value ? 'bg-brand-500 text-white' : 'text-navy hover:bg-brand-50'}`}>
+          <input type="radio" name="availability-mode" className="sr-only" checked={mode === value} onChange={() => onChange(value)} />
+          {label}
+        </label>
+      ))}
     </div>
   )
 }
@@ -227,39 +254,6 @@ function Legend() {
         </li>
       ))}
     </ul>
-  )
-}
-
-function Row({ hour, cells, locked, onPress, onKeyToggle }) {
-  return (
-    <>
-      <div className="sticky left-0 z-10 flex items-center justify-center border-b border-r border-brand-100 bg-white whitespace-nowrap text-xs font-medium text-slate-600">{hour}–{hourEnd(hour)}</div>
-      {DAYS.map((day) => {
-        const key = cellKey(day.value, hour)
-        const isLocked = locked.has(key)
-        const on = cells.has(key)
-        const name = `${day.label} ${hour} to ${hourEnd(hour)}${isLocked ? ', booked lesson, locked' : ''}`
-        return (
-          <button
-            key={key}
-            type="button"
-            data-cell={key}
-            aria-pressed={on}
-            aria-label={name}
-            disabled={isLocked}
-            title={isLocked ? LOCKED_TIP : undefined}
-            onPointerDown={(e) => onPress(e, key)}
-            // Pointer presses are handled above; a click with detail 0 comes from Space or Enter
-            onClick={(e) => { if (e.detail === 0) onKeyToggle(key) }}
-            className={`flex h-11 touch-manipulation items-center justify-center border-b border-r border-brand-100 ${
-              isLocked ? 'cursor-not-allowed bg-slate-200 text-slate-700' : on ? 'bg-brand-500 text-white hover:bg-brand-600' : 'bg-white text-transparent hover:bg-brand-50'
-            }`}
-          >
-            {(on || isLocked) && <Icon name={isLocked ? 'lock' : 'check'} className="h-4 w-4" strokeWidth={isLocked ? 2 : 3} />}
-          </button>
-        )
-      })}
-    </>
   )
 }
 

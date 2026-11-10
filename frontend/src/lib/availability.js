@@ -67,20 +67,39 @@ export function clearHours(cells, locked, day = null) {
   return new Set([...cells].filter((key) => locked.has(key) || (day !== null && !key.startsWith(`${day}-`))))
 }
 
-// Every cell on the straight line between two cells. A fast drag reports only some positions along the way,
-// so the cells between two reports are filled in here.
-export function cellsOnLine(fromKey, toKey) {
-  const place = (key) => {
-    const [day, hour] = key.split('-')
-    return [DAYS.findIndex((d) => d.value === Number(day)), HOURS.indexOf(hour)]
-  }
-  const [x0, y0] = place(fromKey)
-  const [x1, y1] = place(toKey)
-  const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0))
-  return Array.from({ length: steps + 1 }, (_, i) => {
-    const t = steps ? i / steps : 0
-    return cellKey(DAYS[Math.round(x0 + (x1 - x0) * t)].value, HOURS[Math.round(y0 + (y1 - y0) * t)])
-  })
+// Takes a range's hours off, leaving booked hours on (the x button and Remove mode)
+export function removeRange(cells, range, locked) {
+  const next = new Set(cells)
+  for (const key of rangesToCells([range])) if (!locked.has(key)) next.delete(key)
+  return next
 }
+
+// A block was moved or resized: the old range's hours come off, the new range's go on
+export function moveRange(cells, oldRange, newRange) {
+  const next = new Set(cells)
+  for (const key of rangesToCells([oldRange])) next.delete(key)
+  for (const key of rangesToCells([newRange])) next.add(key)
+  return next
+}
+
+// The lock check run on every move or resize: no booked hour may leave the schedule
+export const keepsLocked = (cells, locked) => [...locked].every((key) => cells.has(key))
+
+// The schedule repeats every week, so the calendar shows one fixed reference week instead of real dates.
+// 2001-01-01 is a Monday: Monday to Saturday are the 1st to the 6th, Sunday (dayOfWeek 0) is the 7th.
+export const REF_MONDAY = '2001-01-01'
+const refDate = (dayOfWeek) => `2001-01-0${dayOfWeek === 0 ? 7 : dayOfWeek}`
+
+export const rangeToEvent = ({ dayOfWeek, startTime, endTime }) => ({
+  start: `${refDate(dayOfWeek)}T${startTime}:00`,
+  end: `${refDate(dayOfWeek)}T${endTime}:00`,
+})
+
+// The calendar runs in UTC, so the UTC getters read back exactly the hours that were drawn
+export const eventToRange = (start, end) => ({
+  dayOfWeek: start.getUTCDay(),
+  startTime: toHhmm(start.getUTCHours()),
+  endTime: toHhmm(end.getUTCHours()),
+})
 
 export const sameCells = (a, b) => a.size === b.size && [...a].every((key) => b.has(key))

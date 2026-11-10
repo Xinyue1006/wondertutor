@@ -163,3 +163,27 @@ html { scrollbar-gutter: stable; }
 @layer base {
   h1, h2 { font-family: var(--font-display); }
 }
+
+/* Tutor availability calendar: FullCalendar themed through its own variables */
+.wt-calendar {
+  --fc-border-color: var(--color-brand-100);
+  --fc-page-bg-color: #fff;
+  --fc-neutral-bg-color: var(--color-brand-25);
+  --fc-event-bg-color: var(--color-brand-500);
+  --fc-event-border-color: var(--color-brand-500);
+  --fc-event-text-color: #fff;
+  --fc-event-selected-overlay-color: rgb(0 0 0 / 0.15);
+  --fc-highlight-color: rgb(26 109 255 / 0.2);
+  --fc-bg-event-color: #e2e8f0;
+  --fc-bg-event-opacity: 1;
+}
+.wt-calendar .fc-timegrid-slot { height: 2.75rem; }
+.wt-calendar .fc-timegrid-event-harness-inset .fc-timegrid-event,
+.wt-calendar .fc-timegrid-event.fc-event-mirror { box-shadow: none; }
+.wt-calendar .fc-timegrid-slot-label-cushion { font-size: 0.75rem; white-space: nowrap; color: #475569; }
+/* A booked hour is always inside an available block, so it is lifted above the block to stay visible */
+.wt-calendar .fc-timegrid-col-bg .fc-timegrid-bg-harness:has(.fc-locked) { z-index: 4; }
+.wt-calendar .fc-timegrid-col-bg:has(.fc-locked) { z-index: 4; }
+/* FullCalendar never starts a selection on a block, so in Remove mode drags pass through blocks to the grid below */
+.wt-calendar-remove .fc-timegrid-event-harness { pointer-events: none; }
+.wt-calendar-remove .fc-timegrid-event button { pointer-events: auto; }

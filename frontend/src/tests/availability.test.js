@@ -1,4 +1,7 @@
-import { DAYS, HOURS, addHours, cellKey, cellsOnLine, cellsToRanges, clearHours, hourEnd, rangesToCells, sameCells } from '../lib/availability'
+import {
+  DAYS, HOURS, REF_MONDAY, addHours, cellKey, cellsToRanges, clearHours, eventToRange, hourEnd, keepsLocked, moveRange, rangeToEvent,
+  rangesToCells, removeRange, sameCells,
+} from '../lib/availability'
 
 const slot = (dayOfWeek, startTime, endTime) => ({ dayOfWeek, startTime, endTime })
 
@@ -63,18 +66,81 @@ describe('availability helpers', () => {
     expect([...clearHours(new Set(['0-09:00', '1-09:00']), new Set(), 0)]).toEqual(['1-09:00'])
   })
 
-  test('cellsOnLine fills in the hours skipped by a fast drag', () => {
-    expect(cellsOnLine('2-07:00', '2-10:00')).toEqual(['2-07:00', '2-08:00', '2-09:00', '2-10:00'])
-    expect(cellsOnLine('2-10:00', '2-08:00')).toEqual(['2-10:00', '2-09:00', '2-08:00'])
-  })
-
-  test('cellsOnLine crosses days in display order, Sunday after Saturday', () => {
-    expect(cellsOnLine('6-09:00', '0-09:00')).toEqual(['6-09:00', '0-09:00'])
-    expect(cellsOnLine('1-09:00', '1-09:00')).toEqual(['1-09:00'])
-  })
-
   test('sameCells ignores order', () => {
     expect(sameCells(new Set(['a', 'b']), new Set(['b', 'a']))).toBe(true)
     expect(sameCells(new Set(['a', 'b']), new Set(['a', 'c']))).toBe(false)
+  })
+})
+
+describe('the reference week', () => {
+  // The calendar parses these strings in UTC, so the test does the same
+  const roundTrip = (range) => {
+    const { start, end } = rangeToEvent(range)
+    return eventToRange(new Date(`${start}Z`), new Date(`${end}Z`))
+  }
+
+  test('starts on a Monday', () => {
+    expect(new Date(`${REF_MONDAY}T00:00:00Z`).getUTCDay()).toBe(1)
+  })
+
+  test.each([0, 1, 2, 3, 4, 5, 6])('day %i survives the trip to the calendar and back', (dayOfWeek) => {
+    const range = slot(dayOfWeek, '14:00', '17:00')
+    expect(roundTrip(range)).toEqual(range)
+  })
+
+  test('Sunday is the last day of the reference week', () => {
+    expect(rangeToEvent(slot(0, '09:00', '10:00'))).toEqual({ start: '2001-01-07T09:00:00', end: '2001-01-07T10:00:00' })
+  })
+
+  test('a block ending at 22:00 keeps its end', () => {
+    expect(roundTrip(slot(5, '20:00', '22:00'))).toEqual(slot(5, '20:00', '22:00'))
+  })
+})
+
+describe('moving, removing and the lock check', () => {
+  const block = slot(1, '14:00', '17:00')
+  const locked = new Set(['1-15:00'])
+
+  test('moveRange takes the old hours off and puts the new ones on', () => {
+    expect([...moveRange(rangesToCells([block]), block, slot(2, '09:00', '12:00'))].sort()).toEqual(['2-09:00', '2-10:00', '2-11:00'])
+  })
+
+  test('moveRange leaves other blocks alone', () => {
+    const cells = rangesToCells([block, slot(4, '09:00', '10:00')])
+    expect(moveRange(cells, block, slot(2, '09:00', '12:00')).has('4-09:00')).toBe(true)
+  })
+
+  test('a move that keeps the booked hour is accepted', () => {
+    const next = moveRange(rangesToCells([block]), block, slot(1, '15:00', '18:00'))
+    expect(keepsLocked(next, locked)).toBe(true)
+  })
+
+  test('a move to another day drops the booked hour and is refused', () => {
+    expect(keepsLocked(moveRange(rangesToCells([block]), block, slot(2, '14:00', '17:00')), locked)).toBe(false)
+  })
+
+  test('a resize that shrinks past the booked hour is refused', () => {
+    expect(keepsLocked(moveRange(rangesToCells([block]), block, slot(1, '14:00', '15:00')), locked)).toBe(false)
+  })
+
+  test('taking the hours off without the lock would be refused', () => {
+    const cells = rangesToCells([block])
+    cells.delete('1-15:00')
+    expect(keepsLocked(cells, locked)).toBe(false)
+  })
+
+  test('removeRange takes the free hours off and leaves the booked one on', () => {
+    expect([...removeRange(rangesToCells([block]), block, locked)]).toEqual(['1-15:00'])
+  })
+
+  test('removeRange can split a block', () => {
+    const next = removeRange(rangesToCells([block]), slot(1, '15:00', '16:00'), new Set())
+    expect(cellsToRanges(next)).toEqual([slot(1, '14:00', '15:00'), slot(1, '16:00', '17:00')])
+  })
+
+  test('removeRange does not change its input', () => {
+    const cells = rangesToCells([block])
+    removeRange(cells, block, new Set())
+    expect(cells.size).toBe(3)
   })
 })
