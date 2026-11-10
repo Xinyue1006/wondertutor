@@ -11,7 +11,7 @@
 import { env } from '../../config/env.js'
 
 export class ProviderError extends Error {
-  // kind: 'timeout' | 'rate_limit' | 'unavailable' | 'bad_response' | 'cancelled' | 'disabled'
+  // kind: 'timeout' | 'rate_limit' | 'unavailable' | 'blocked' | 'bad_response' | 'cancelled' | 'disabled'
   constructor(kind, message, { transient = false, httpStatus = null } = {}) {
     super(message)
     this.kind = kind
@@ -57,6 +57,9 @@ export function geminiProvider(cfg = env.ai) {
         throw new ProviderError('bad_response', 'AI service sent an unreadable reply')
       }
       const cand = data?.candidates?.[0]
+      if (['SAFETY', 'PROHIBITED_CONTENT', 'BLOCKLIST', 'SPII'].includes(cand?.finishReason) || data?.promptFeedback?.blockReason) {
+        throw new ProviderError('blocked', 'AI service blocked this response')
+      }
       const parts = cand?.content?.parts
       if (!Array.isArray(parts)) throw new ProviderError('bad_response', 'AI service sent no answer')
       return {

@@ -17,6 +17,7 @@ const renderAt = (path) =>
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/login" element={<LoginStub />} />
+        <Route path="/admin/login" element={<LoginStub />} />
         <Route path="/parent" element={<div>PARENT HOME</div>} />
         <Route path="/admin" element={<div>ADMIN HOME</div>} />
         <Route element={<ProtectedRoute roles={['ADMIN']} />}>
@@ -64,6 +65,8 @@ describe('role-based route protection', () => {
     expect(afterLogin({ role: 'PARENT' }, '/parentfake')).toBe('/parent')
     expect(afterLogin({ role: 'PARENT' }, '//evil.example.com')).toBe('/parent')
     expect(afterLogin({ role: 'ADMIN' }, undefined)).toBe('/admin')
+    expect(afterLogin({ role: 'ADMIN' }, '/admin/login')).toBe('/admin')
+    expect(afterLogin({ role: 'ADMIN' }, '/admin/login?from=test')).toBe('/admin')
   })
 
   test('homeFor maps each role to its portal', () => {

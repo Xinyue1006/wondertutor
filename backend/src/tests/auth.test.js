@@ -4,7 +4,7 @@ import express from 'express'
 import { prisma } from '../config/prisma.js'
 import { rateLimit } from '../middleware/rateLimit.js'
 import { errorHandler } from '../middleware/error.js'
-import { api, makeParent, resetDb, startServer, stopServer } from './helpers.js'
+import { api, makeAdmin, makeParent, makeTutor, resetDb, startServer, stopServer } from './helpers.js'
 
 beforeAll(async () => {
   await resetDb()
@@ -14,6 +14,25 @@ afterAll(stopServer)
 
 // The real code is emailed; tests replace it with a known one
 const setCode = (email, code) => bcrypt.hash(code, 4).then((codeHash) => prisma.emailOtp.updateMany({ where: { email }, data: { codeHash } }))
+
+describe('administrator login', () => {
+  test('only an active admin gets a session through the admin portal', async () => {
+    const admin = await makeAdmin()
+    const signedIn = await api().post('/auth/login', { email: admin.user.email, password: 'Test1234', portal: 'ADMIN' })
+    expect(signedIn.status).toBe(200)
+    expect(signedIn.user.role).toBe('ADMIN')
+    expect(signedIn.token).toBeTruthy()
+    for (const account of [await makeParent(), await makeTutor()]) {
+      const denied = await api().post('/auth/login', { email: account.user.email, password: 'Test1234', portal: 'ADMIN' })
+      expect(denied.status).toBe(403)
+      expect(denied.token).toBeUndefined()
+      expect(denied.message).toMatch(/administrator account/)
+      expect((await api().post('/auth/login', { email: account.user.email, password: 'Test1234' })).status).toBe(200)
+    }
+    await prisma.user.update({ where: { id: admin.user.id }, data: { status: 'DEACTIVATED' } })
+    expect((await api().post('/auth/login', { email: admin.user.email, password: 'Test1234', portal: 'ADMIN' })).status).toBe(403)
+  })
+})
 
 describe('forgot password', () => {
   test('gives the same answer whether or not the email has an account', async () => {

@@ -138,7 +138,7 @@ function UserMenu() {
             </Link>
           )}
           <button
-            onClick={() => { logout(); navigate('/login') }}
+            onClick={() => { logout(); navigate(user.role === 'ADMIN' ? '/admin/login' : '/login') }}
             className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50"
           >
             <Icon name="logout" className="h-4 w-4" /> Log out
@@ -261,7 +261,7 @@ function AppFooter({ items }) {
           <ul className="space-y-0.5">
             {account.map(([to, label]) => <li key={to}><Link to={to} className={link}>{label}</Link></li>)}
             <li>
-              <button type="button" onClick={() => { logout(); navigate('/login') }} className={`${link} text-red-700 hover:text-red-800`}>Log out</button>
+              <button type="button" onClick={() => { logout(); navigate(user.role === 'ADMIN' ? '/admin/login' : '/login') }} className={`${link} text-red-700 hover:text-red-800`}>Log out</button>
             </li>
           </ul>
         </nav>

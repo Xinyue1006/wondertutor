@@ -283,7 +283,7 @@ Rates describe this small synthetic set, one model and one prompt version only. 
 
 ## 10. Known limitations and open items
 
-- **No live run yet:** live model behaviour was **not** evaluated in development, because there was no API key in the build environment. Run the live evaluation before relying on the assistant.
+- **Live diagnostic runs:** free-tier models were compared on 10 November 2026 (see §11). These small repeated samples are diagnostic results, not a formal held-out accuracy claim. Run a separate evaluation before relying on the assistant.
 - **In-memory conversations:** these are lost on restart and are per-instance (see §6).
 - **Answer evidence, not proof of truth:** see §3a for exactly what is guaranteed (server-written facts) and what is not (vocabulary-filter screen for fact-free model wording, correctness of the model's tool choice, unreviewed Malay/Chinese templates). Do not describe the assistant as free of hallucination.
 - **Privacy is risk reduction:** see §6. Redaction is pattern and known-name based.
@@ -291,3 +291,39 @@ Rates describe this small synthetic set, one model and one prompt version only. 
   - Automatic full refunds when a **tutor** cancels or fails check-in are described in CLAUDE.md, but the tutor-side features are not in this codebase yet. The FAQ does not promise them.
   - The partial-refund percentage is undecided.
 - **English UI:** the interface is in English. Replies follow the parent's language where the model can.
+
+## 11. Free-tier model comparison — 10 November 2026
+
+Selected `gemini-3.5-flash-lite` in the local backend configuration and `.env.example`. The owner confirmed that the API project has no billing linked. Google lists standard input/output for the compared models as free of charge on its [pricing page](https://ai.google.dev/gemini-api/docs/pricing). Availability, quotas and provider latency can change; do not assume the same pricing applies to a project with billing enabled.
+
+The first run interleaved the same ten synthetic cases across three models, rotating their order. All used the same prompt, tools and 15-second turn deadline. Cases cover matching, missing criteria, lesson attendance, homework, payments, children, notifications, policies and an unsupported deletion request, in English, Malay, Chinese and Manglish. Only the `_test` database was used; no real user records were sent.
+
+| Model | Requests completed without provider fallback | Task success | Strict pass | Median turn time |
+| --- | --- | --- | --- | --- |
+| gemini-3.8-flash | 0/10 | 0/10 | 0/10 | 15.0 s |
+| gemini-3.5-flash-lite | 10/10 | 8/10 | 6/10 | 7.2 s |
+| gemini-3.1-flash-lite | 8/10 | 5/10 | 3/10 | 4.2 s |
+
+The current 3.8 model suffered timeouts/provider failures in that run; this does not establish its general quality. A completed request is not necessarily a correct answer. Strict grading also checks exact tool arguments; for example an explicit date range instead of the expected default period can fail a literal evidence check.
+
+We then fixed a real clarification bug: preliminary child-profile evidence could hide a later missing-criteria question. Missing subject/level now produces `clarification` status and takes precedence over preliminary evidence. The prompt/tool description now requests incomplete searches through `search_tutors`, preserves explicitly supplied grades and refuses unsupported action-only requests rather than substituting an account lookup.
+
+Both Flash-Lite models repeated the same ten cases with prompt `2026-11-10.1`:
+
+| Model | Requests completed without provider fallback | Task success | Strict pass | Median turn time |
+| --- | --- | --- | --- | --- |
+| gemini-3.5-flash-lite | 8/10 | 8/10 | 7/10 | 3.6 s |
+| gemini-3.1-flash-lite | 8/10 | 7/10 | 5/10 | 8.5 s |
+
+These results favour 3.5 Flash-Lite for the current app. Across both runs it completed 18/20 requests, versus 16/20 for 3.1. No writes or cross-family/privacy leaks were observed in the comparison checks. This is a small sample, not a reliability guarantee. Since the same cases informed prompt changes, these are **not independent held-out results** for Chapter 6.
+
+Final HTTP smoke checks with prompt `2026-11-10.2` verified a Primary 5 tutor search (including grade), a missing-criteria question and refusal of complaint deletion. The child-profile question was blocked by Gemini: HTTP 200 from the provider contained `finishReason: PROHIBITED_CONTENT` and no content. The app now identifies this separately as `blocked`, keeps the provider safety settings intact and offers the normal pages/guided search. Some complex requests still time out, and Chinese grade extraction was inconsistent in the comparisons; extra multilingual validation is still needed. The second model round after tool execution also contributes latency.
+
+To repeat the comparison in PowerShell (this resets and seeds the test database; do not run alongside backend tests):
+
+```powershell
+$env:EVAL_LIVE='1'
+node scripts/compare-assistant-models.js gemini-3.8-flash gemini-3.5-flash-lite gemini-3.1-flash-lite
+```
+
+Check pricing and project billing status before opting in. The script writes synthetic reports to the ignored `backend/eval/reports/` directory, including tool arguments and failures. Original run files: `comparison-2026-11-10T08-03-29-608Z.json` and `comparison-2026-11-10T08-08-20-272Z.json`.

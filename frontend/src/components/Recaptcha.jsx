@@ -10,7 +10,7 @@ export function resetRecaptcha() {
 }
 
 // Google reCAPTCHA v2 checkbox. Renders nothing when no site key is configured (the backend then skips the check too).
-export default function Recaptcha({ onToken }) {
+export default function Recaptcha({ onToken, compact = false }) {
   const box = useRef(null)
   const widget = useRef(null)
 
@@ -22,6 +22,7 @@ export default function Recaptcha({ onToken }) {
         if (cancelled || !box.current || widget.current !== null) return
         widget.current = window.grecaptcha.render(box.current, {
           sitekey: RECAPTCHA_SITE_KEY,
+          size: compact ? 'compact' : 'normal',
           callback: onToken,
           'expired-callback': () => onToken(''),
         })

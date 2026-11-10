@@ -238,6 +238,17 @@ describe('4. clarification for children', () => {
     const fr = calls[1].contents.at(-1).parts[0].functionResponse.response
     expect(fr.needsClarification).toBe('subject')
     expect(res.cards).toEqual([])
+    expect(res.status).toBe(200)
+    expect(res.text).toMatch(/\?/)
+  })
+
+  test('looking up children does not hide a later request for missing search criteria', async () => {
+    script(call('list_children'), call('search_tutors', {}), say('Which subject and grade?'))
+    const res = await send(A, { message: 'Find me a tutor' })
+    expect(res.status).toBe(200)
+    expect(res.text).toMatch(/Which subject/)
+    expect(res.matchResult).toBeNull()
+    expect(res.cards).toEqual([])
   })
 })
 

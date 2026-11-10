@@ -34,7 +34,7 @@ function LoginField({ label, icon, error, action, children }) {
   )
 }
 
-export default function Login() {
+export default function Login({ admin = false }) {
   const { login, googleLogin, notice } = useAuth()
   const navigate = useNavigate()
   const { state } = useLocation()
@@ -103,7 +103,7 @@ export default function Login() {
     if (RECAPTCHA_SITE_KEY && !captcha) return setError('Please tick “I’m not a robot” to continue.')
     setBusy(true)
     try {
-      const user = await login(form.email, form.password, form.remember, captcha)
+      const user = await login(form.email, form.password, form.remember, captcha, ...(admin ? ['ADMIN'] : []))
       navigate(afterLogin(user, state?.from))
     } catch (err) {
       setError(errorMessage(err))
@@ -120,20 +120,20 @@ export default function Login() {
   return (
     // Same pattern as the landing hero: a light-blue band with the photo anchored on one side and fading into it,
     // so the photo is never stretched or cropped hard on wide screens. The blank wall in the photo holds the headline.
-    <section className="relative left-1/2 -mt-4 flex w-screen flex-1 -translate-x-1/2 items-center overflow-x-clip bg-gradient-to-r from-brand-50 via-brand-50 to-brand-25">
-      <img
+    <section className={`${admin ? 'flex w-full flex-1' : 'relative left-1/2 -mt-4 flex w-screen flex-1 -translate-x-1/2'} items-center overflow-x-clip bg-gradient-to-r from-brand-50 via-brand-50 to-brand-25`}>
+      {!admin && <img
         src="/img/art/login-bg.jpg"
         alt=""
         aria-hidden="true"
         className="pointer-events-none absolute inset-y-0 left-0 hidden h-full w-[64%] object-cover object-[left_bottom] lg:block"
         style={{ maskImage: 'linear-gradient(to right, #000 55%, transparent)', WebkitMaskImage: 'linear-gradient(to right, #000 55%, transparent)' }}
-      />
+      />}
       {/* A soft wash over the upper part of the photo keeps the desk objects from competing with the text and benefits */}
-      <div className="pointer-events-none absolute inset-y-0 left-0 hidden w-[64%] bg-gradient-to-b from-brand-50/90 via-brand-50/55 to-transparent lg:block" aria-hidden="true" />
+      {!admin && <div className="pointer-events-none absolute inset-y-0 left-0 hidden w-[64%] bg-gradient-to-b from-brand-50/90 via-brand-50/55 to-transparent lg:block" aria-hidden="true" />}
 
-      <div className="relative mx-auto grid w-full max-w-[81.25rem] items-center gap-6 px-4 py-6 md:px-8 lg:grid-cols-[1.15fr_1fr] lg:gap-12">
+      <div className={`relative mx-auto grid w-full items-center gap-6 px-4 py-6 md:px-8 ${admin ? 'max-w-lg' : 'max-w-[81.25rem] lg:grid-cols-[1.15fr_1fr] lg:gap-12'}`}>
         {/* On phones this is a compact brand block under the form: no benefits row, no picture */}
-        <div className="order-2 lg:order-1 lg:self-start lg:pl-14 lg:pt-12">
+        {!admin && <div className="order-2 lg:order-1 lg:self-start lg:pl-14 lg:pt-12">
           <div className="eyebrow">Your learning journey starts here</div>
           <h1 className="mt-2 font-display text-3xl font-bold leading-[1.12] text-navy md:text-4xl lg:text-[2.75rem]">
             Learn Today,<br />
@@ -159,12 +159,13 @@ export default function Login() {
               </li>
             ))}
           </ul>
-        </div>
+        </div>}
 
-        <form onSubmit={onSubmit} noValidate aria-label="Log in" className="order-1 mx-auto w-full max-w-[28rem] space-y-3 rounded-2xl border border-brand-100 bg-white p-6 shadow-card md:p-8 lg:order-2 lg:ml-auto">
+        <form onSubmit={onSubmit} noValidate aria-label={admin ? 'Admin login' : 'Log in'} className="order-1 mx-auto w-full max-w-[28rem] space-y-3 rounded-2xl border border-brand-100 bg-white p-6 shadow-card md:p-8 lg:order-2 lg:ml-auto">
           <div>
-            <h2 className="font-display text-2xl font-bold text-navy">Welcome back</h2>
-            <p className="mt-1 text-sm text-slate-600">Log in to continue to your account</p>
+            {admin && <div className="eyebrow mb-2">WonderTutor administration</div>}
+            <h2 className="font-display text-2xl font-bold text-navy">{admin ? 'Admin login' : 'Welcome back'}</h2>
+            <p className="mt-1 text-sm text-slate-600">{admin ? 'Sign in with your administrator account.' : 'Log in to continue to your account'}</p>
           </div>
           {state?.deleted && <p role="status" className="flex gap-2 rounded-lg bg-brand-50 px-3 py-2.5 text-sm text-slate-700"><Icon name="check-circle" className="mt-0.5 h-4 w-4 shrink-0 text-ok" /> Your account has been deleted. We have emailed you a confirmation.</p>}
           {/* Why the user is here again (expired session, deactivated account) */}
@@ -179,7 +180,7 @@ export default function Login() {
           </LoginField>
           <LoginField
             label="Password" icon="lock" error={fieldErrors.password}
-            action={<Link to="/forgot-password" state={{ email: form.email }} className="text-xs font-semibold text-brand-600 hover:underline">Forgot password?</Link>}
+            action={<Link to="/forgot-password" state={{ email: form.email, ...(admin && { adminLogin: true }) }} className="text-xs font-semibold text-brand-600 hover:underline">Forgot password?</Link>}
           >
             {(id, err) => (
               <>
@@ -201,11 +202,11 @@ export default function Login() {
             Remember me on this device
           </label>
 
-          <Recaptcha onToken={setCaptcha} />
+          <Recaptcha onToken={setCaptcha} compact={admin} />
 
           {/* Server answers (wrong password, deactivated account...) sit right above the button that caused them */}
           <ErrorBox>{error}</ErrorBox>
-          {error === NEEDS_VERIFICATION && form.email.trim() && (
+          {!admin && error === NEEDS_VERIFICATION && form.email.trim() && (
             <div>
               <button type="button" disabled={resending} onClick={sendNewCode} className="btn-outline min-h-11 w-full">{resending ? 'Sending…' : 'Send me a new code'}</button>
               {resendError && <p role="alert" className="mt-1 text-sm font-medium text-red-700">{resendError}</p>}
@@ -213,7 +214,7 @@ export default function Login() {
           )}
           <button disabled={busy} className="btn-primary h-11 w-full text-base">{busy ? 'Logging in…' : 'Log in'}</button>
 
-          <div className="flex items-center gap-3 text-sm text-slate-500">
+          {!admin && <><div className="flex items-center gap-3 text-sm text-slate-500">
             <span className="h-px flex-1 bg-slate-200" /> or <span className="h-px flex-1 bg-slate-200" />
           </div>
           {newGoogle ? (
@@ -232,7 +233,7 @@ export default function Login() {
           )}
           <p className="text-center text-sm text-slate-600">
             New to WonderTutor? <Link to="/signup" className="inline-flex min-h-11 items-center font-semibold text-brand-600 hover:underline">Create an account</Link>
-          </p>
+          </p></>}
         </form>
       </div>
     </section>

@@ -59,6 +59,16 @@ test('a disabled or unconfigured provider refuses without a network call', async
   expect(seen).toBeNull()
 })
 
+test.each([
+  { candidates: [{ finishReason: 'PROHIBITED_CONTENT', content: {} }] },
+  { promptFeedback: { blockReason: 'SAFETY' } },
+])('provider safety blocks are identified without weakening settings or exposing content', async (body) => {
+  reply = () => [200, body]
+  await expect(geminiProvider(cfg()).generate({ system: 's', contents: [] }))
+    .rejects.toMatchObject({ kind: 'blocked', transient: false })
+  expect(seen.body).not.toHaveProperty('safetySettings')
+})
+
 test('a deadline abort is classified as timeout rather than user cancellation', async () => {
   await expect(geminiProvider(cfg()).generate({ system: 's', contents: [], signal: AbortSignal.abort(new DOMException('Deadline', 'TimeoutError')) }))
     .rejects.toMatchObject({ kind: 'timeout' })
