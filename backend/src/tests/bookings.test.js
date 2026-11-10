@@ -20,6 +20,14 @@ const request = (over = {}) => ({
 })
 
 describe('creating a booking request', () => {
+  test('simultaneous requests cannot overlap for the same child, even with different tutors', async () => {
+    const child = await makeChild(parentA.parent.id, { name: 'Concurrent Child' })
+    const t1 = await makeTutor()
+    const t2 = await makeTutor()
+    const replies = await Promise.all([t1, t2].map((t) => api(parentA.token).post('/parent/bookings', request({ childId: child.id, tutorId: t.tutor.id, startTime: '18:00' }))))
+    expect(replies.map((r) => r.status).sort()).toEqual([201, 409])
+    expect(await prisma.booking.count({ where: { childId: child.id } })).toBe(1)
+  })
   test('a valid request is saved as PENDING with the proposed price', async () => {
     const res = await api(parentA.token).post('/parent/bookings', request())
     expect(res.status).toBe(201)

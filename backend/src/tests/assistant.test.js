@@ -321,6 +321,19 @@ describe('9. "paid this month" matches the Payments page at Malaysian month boun
 })
 
 describe('10. provider failures fall back clearly; normal pages keep working', () => {
+  test('explicit overload and quota errors do not trigger an immediate second request', async () => {
+    for (const httpStatus of [429, 503]) {
+      let calls = 0
+      setProvider({ name: 'mock', generate: async () => {
+        calls++
+        throw new ProviderError(httpStatus === 429 ? 'rate_limit' : 'unavailable', 'busy', { transient: true, httpStatus })
+      } })
+      const response = await send(A, { message: 'hello' })
+      expect(response.status).toBe(httpStatus)
+      expect(calls).toBe(1)
+    }
+  })
+
   test('timeout, rate limit, malformed output and endless tool loops', async () => {
     const saved = env.ai.timeoutMs
     env.ai.timeoutMs = 1200

@@ -50,9 +50,11 @@ export default function FindTutor() {
     if (initialised.current || !catalog || !kidsLoaded) return
     initialised.current = true
     const kid = kids[0]
+    const grade = kid ? `${kid.educationLevel}:${kid.grade}` : 'PRIMARY:5'
+    const allowed = subjectsForLevel(catalog.subjects, catalog.subjectLevels, parseGrade(grade).level)
     const initial = {
-      subject: kid?.subject || 'Mathematics',
-      grade: kid ? `${kid.educationLevel}:${kid.grade}` : 'PRIMARY:5',
+      subject: allowed.includes(kid?.subject) ? kid.subject : allowed.includes('Mathematics') ? 'Mathematics' : allowed[0] || '',
+      grade,
       location: catalog.homeLocation || '',
       date: '',
       time: '',
@@ -93,7 +95,25 @@ export default function FindTutor() {
 
   if (!bar || !catalog) return loadError ? <LoadError message={loadError} onRetry={reloadShared} /> : <Spinner />
 
-  const set = (k) => (e) => setBar({ ...bar, [k]: e.target.value })
+  const set = (k) => (e) => {
+    const value = e.target.value
+    setBar((previous) => {
+      const next = { ...previous, [k]: value }
+      if (k === 'grade' && !subjectsForLevel(catalog.subjects, catalog.subjectLevels, parseGrade(value).level).includes(previous.subject)) next.subject = ''
+      return next
+    })
+  }
+
+  function clearFilters() {
+    const cleared = { ...bar, location: '', date: '', time: '' }
+    setBar(cleared)
+    // Keep the last valid search if the new level still needs a subject.
+    setApplied({ ...(bar.subject ? cleared : applied), location: '', date: '', time: '' })
+    setExtra(NO_EXTRA)
+    setSort('recommended')
+    setPage(1)
+    setError('')
+  }
   // Save / unsave straight from the results; the heart updates at once
   async function toggleSave(t) {
     if (saving.has(t.id)) return
@@ -133,7 +153,8 @@ export default function FindTutor() {
           <label className="block">
             <span className="mb-1.5 block text-sm font-semibold text-navy">Subject <span className="text-red-500">*</span></span>
             <SelectBox icon="book" value={bar.subject} onChange={set('subject')}>
-              {[...new Set([...subjectsForLevel(catalog.subjects, catalog.subjectLevels, parseGrade(bar.grade).level), bar.subject])].map((s) => <option key={s}>{s}</option>)}
+              <option value="">Select subject</option>
+              {subjectsForLevel(catalog.subjects, catalog.subjectLevels, parseGrade(bar.grade).level).map((s) => <option key={s}>{s}</option>)}
             </SelectBox>
           </label>
           <label className="block">
@@ -188,7 +209,7 @@ export default function FindTutor() {
       </div>
 
       <div className="mt-3">
-        <FilterChips extra={extra} setExtra={setExtra} locationName={applied.location} />
+        <FilterChips extra={extra} setExtra={setExtra} locationName={applied.location} onClear={clearFilters} />
       </div>
 
       <div className="mt-4">

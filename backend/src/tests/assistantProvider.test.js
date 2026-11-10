@@ -58,3 +58,8 @@ test('a disabled or unconfigured provider refuses without a network call', async
   await expect(geminiProvider({ ...cfg(), enabled: false }).generate({ system: 's', contents: [] })).rejects.toMatchObject({ kind: 'disabled' })
   expect(seen).toBeNull()
 })
+
+test('a deadline abort is classified as timeout rather than user cancellation', async () => {
+  await expect(geminiProvider(cfg()).generate({ system: 's', contents: [], signal: AbortSignal.abort(new DOMException('Deadline', 'TimeoutError')) }))
+    .rejects.toMatchObject({ kind: 'timeout' })
+})

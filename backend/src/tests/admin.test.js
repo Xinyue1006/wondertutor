@@ -13,6 +13,19 @@ beforeAll(async () => {
 })
 afterAll(stopServer)
 
+test('two admins cannot overwrite each other when closing the same complaint', async () => {
+  const second = await makeAdmin()
+  const complaint = await prisma.complaint.create({ data: { filedById: parent.user.id, category: 'Other', description: 'Concurrent resolution regression case' } })
+  const replies = await Promise.all([
+    api(admin.token).patch(`/admin/complaints/${complaint.id}`, { status: 'RESOLVED', adminResponse: 'Resolved by first reviewer' }),
+    api(second.token).patch(`/admin/complaints/${complaint.id}`, { status: 'DISMISSED', adminResponse: 'Dismissed by second reviewer' }),
+  ])
+  expect(replies.filter((r) => r.status === 200)).toHaveLength(1)
+  expect(replies.filter((r) => [400, 409].includes(r.status))).toHaveLength(1)
+  await prisma.complaint.delete({ where: { id: complaint.id } })
+  await prisma.notification.deleteMany({ where: { userId: parent.user.id, type: 'COMPLAINT_UPDATE' } })
+})
+
 describe('access control', () => {
   test('parents and tutors cannot open Admin APIs', async () => {
     expect((await api(parent.token).get('/admin/users')).status).toBe(403)
@@ -132,6 +145,7 @@ describe('account security', () => {
     expect((await api(p.token).post('/parent/profile/password', { currentPassword: 'wrong', newPassword: 'Newpass123' })).status).toBe(400)
     expect((await api(p.token).post('/parent/profile/password', { currentPassword: 'Test1234', newPassword: 'weak' })).status).toBe(400)
     expect((await api(p.token).post('/parent/profile/password', { currentPassword: 'Test1234', newPassword: 'Newpass123' })).status).toBe(200)
+    expect((await api(p.token).get('/auth/me')).status).toBe(401)
     expect((await api().post('/auth/login', { email: p.user.email, password: 'Newpass123' })).status).toBe(200)
     expect((await api().post('/auth/login', { email: p.user.email, password: 'Test1234' })).status).toBe(401)
   })

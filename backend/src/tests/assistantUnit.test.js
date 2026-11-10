@@ -8,6 +8,13 @@ import { executeTool, toolDeclarations, TOOLS } from '../services/assistant/tool
 import { toolArgs } from '../services/assistant/schemas.js'
 import { rateLimit } from '../middleware/rateLimit.js'
 
+test('assistant tools reject impossible calendar dates before querying records', () => {
+  for (const tool of ['list_bookings', 'get_learning_progress', 'get_payment_summary']) {
+    expect(toolArgs[tool].safeParse({ from: '2026-02-31' }).success).toBe(false)
+    expect(toolArgs[tool].safeParse({ from: '2026-02-28' }).success).toBe(true)
+  }
+})
+
 describe('redaction', () => {
   test('names become references; contact details and street addresses are masked; text is bounded', () => {
     const names = expandNames([['Sarah', '[[child_1]]'], ['Daniel Tan', '[[tutor_1]]']])

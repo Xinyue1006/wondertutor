@@ -39,7 +39,7 @@ function validCards(cards) {
   return out.slice(0, 6)
 }
 
-async function callModel(provider, req, deadline, signal) {
+async function callModel(provider, req, deadline, signal, timings) {
   // At most one retry for a transient failure, and only while there is time left
   for (let attempt = 0; ; attempt++) {
     if (signal?.aborted) throw new ProviderError('cancelled', 'Cancelled') // never start a provider call for a dead turn
@@ -49,15 +49,19 @@ async function callModel(provider, req, deadline, signal) {
     const timer = setTimeout(() => ac.abort('timeout'), remaining)
     const onAbort = () => ac.abort('cancelled')
     signal?.addEventListener('abort', onAbort, { once: true })
+    const attemptStarted = Date.now()
     try {
       return await provider.generate({ ...req, signal: ac.signal })
     } catch (err) {
       if (signal?.aborted) throw new ProviderError('cancelled', 'Cancelled')
       if (ac.signal.aborted && ac.signal.reason === 'timeout') throw new ProviderError('timeout', 'Took too long')
       const pe = err instanceof ProviderError ? err : new ProviderError('bad_response', 'Unexpected AI error')
-      if (pe.transient && attempt === 0 && deadline - Date.now() > 1000) continue
+      // Repeating an explicit overload/quota response immediately adds latency
+      // while the service is still busy. Keep the bounded retry for transport errors.
+      if (pe.transient && ![429, 503].includes(pe.httpStatus) && attempt === 0 && deadline - Date.now() > 1000) continue
       throw pe
     } finally {
+      timings.push(Date.now() - attemptStarted)
       clearTimeout(timer)
       signal?.removeEventListener('abort', onAbort)
     }
@@ -110,7 +114,7 @@ export async function handleMessage({ user, parent, body, signal, now = new Date
 async function runTurn({ user, parent, data, session, turn, now, db }) {
   const started = Date.now()
   const requestId = opaque()
-  const log = { requestId, tools: [], outcome: 'ok', usage: { inputTokens: 0, outputTokens: 0 }, prompt: PROMPT_VERSION, faq: FAQ_VERSION }
+  const log = { requestId, tools: [], providerMs: [], outcome: 'ok', usage: { inputTokens: 0, outputTokens: 0 }, prompt: PROMPT_VERSION, faq: FAQ_VERSION }
   const finish = (outcome) => {
     log.outcome = outcome
     log.latencyMs = Date.now() - started
@@ -158,7 +162,7 @@ async function runTurn({ user, parent, data, session, turn, now, db }) {
 
     for (let round = 0; round <= cfg.maxToolRounds; round++) {
       // The one boundary to the provider: history, the new message and tool results are all filtered here, every round
-      const res = await callModel(provider, { system, contents: sanitizeContents(contents, namesNow()), tools: toolDeclarations(), maxOutputTokens: cfg.maxOutputTokens }, deadline, turn.signal)
+      const res = await callModel(provider, { system, contents: sanitizeContents(contents, namesNow()), tools: toolDeclarations(), maxOutputTokens: cfg.maxOutputTokens }, deadline, turn.signal, log.providerMs)
       log.usage.inputTokens += res.usage?.inputTokens || 0
       log.usage.outputTokens += res.usage?.outputTokens || 0
       stopIfCancelled(turn)

@@ -1,3 +1,4 @@
+import { mediaLink } from './privateMedia.js'
 // Shapes a Booking (with relations) for the Parent Portal.
 import { toTutorCard } from './tutor.service.js'
 
@@ -48,7 +49,7 @@ export function toBookingDto(b) {
     review: b.review && { rating: b.review.rating, comment: b.review.comment, photoUrl: b.review.photoUrl },
     // Attendance + summary are written by the Tutor Portal; parents only read them
     attendance: b.attendance && {
-      checkInAt: b.attendance.checkInAt, checkOutAt: b.attendance.checkOutAt, checkInPhotoUrl: b.attendance.checkInPhotoUrl,
+      checkInAt: b.attendance.checkInAt, checkOutAt: b.attendance.checkOutAt, checkInPhotoUrl: mediaLink(b.attendance.checkInPhotoUrl, 'wondertutor/attendance/' + b.id),
     },
     summary: b.summary && { content: b.summary.content, progressNote: b.summary.progressNote },
     // Latest reschedule request (if any) and which side asked, so the page knows whether to show Accept/Decline or Withdraw

@@ -5,7 +5,7 @@ import { assertChildFree, assertSlotBookable } from '../../services/booking.serv
 import { bookingInclude, toBookingDto } from '../../services/booking.dto.js'
 import { notify } from '../../services/notification.service.js'
 import { requestReschedule as askReschedule, respondReschedule, withdrawReschedule } from '../../services/reschedule.service.js'
-import { fromMinutes, mytToDate, toMinutes } from '../../utils/time.js'
+import { mytToDate, toMinutes } from '../../utils/time.js'
 import { hhmm, id, ringgit, ymd } from '../../utils/validators.js'
 import { SUBJECTS } from '../../data/catalog.js'
 import { subjectsOf } from '../../utils/childSubjects.js'
@@ -13,13 +13,14 @@ import { subjectsOf } from '../../utils/childSubjects.js'
 const createSchema = z.object({
   tutorId: id('Tutor'),
   childId: id('Child'),
-  date: ymd('Choose a date'),
-  startTime: hhmm('Choose a time'),
+  date: ymd('Choose a date').optional(),
+  startTime: hhmm('Choose a time').optional(),
+  slots: z.array(z.object({ date: ymd('Choose a date'), startTime: hhmm('Choose a time') })).min(1).max(12).optional(),
   teachingMode: z.enum(['ONLINE', 'PHYSICAL'], { message: 'Choose online or physical' }),
   proposedPrice: ringgit('Proposed price'),
   subject: z.enum(SUBJECTS, { message: 'Choose a subject from the list' }).optional(),
   messageToTutor: z.string().trim().max(200, 'Message must be 200 characters or fewer').optional(),
-  isTrial: z.boolean().optional(),
+  isTrial: z.literal(false).optional(),
 })
 
 // Loads a booking only if it belongs to the logged-in parent
@@ -52,6 +53,13 @@ async function lockPaymentAndCountOpenRefunds(tx, paymentId) {
 // POST /parent/bookings: send a booking request (PENDING)
 export async function createBooking(req, res) {
   const data = createSchema.parse(req.body)
+  if (data.slots && (data.date || data.startTime)) throw new AppError(400, 'Send slots or a single date and time')
+  const slots = data.slots || (data.date && data.startTime ? [{ date: data.date, startTime: data.startTime }] : [])
+  if (!slots.length) throw new AppError(400, 'Select at least one slot')
+  if (new Set(slots.map(s => s.date + s.startTime)).size !== slots.length) throw new AppError(400, 'Duplicate slots are not allowed')
+  if (slots.some(s => toMinutes(s.startTime) > 23 * 60)) throw new AppError(400, 'Lessons must finish on the selected date')
+  slots.sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime))
+
 
   const child = await prisma.child.findFirst({ where: { id: data.childId, parentId: req.parent.id } })
   if (!child) throw new AppError(404, 'Child not found')
@@ -75,40 +83,45 @@ export async function createBooking(req, res) {
   if (!teachesIt) throw new AppError(400, `This tutor does not teach ${subject ?? 'that subject'} at your child's level`)
 
   // Lessons are 1 hour long (one cell of the availability grid)
-  const startAt = mytToDate(data.date, data.startTime)
-  const endAt = mytToDate(data.date, fromMinutes(toMinutes(data.startTime) + 60))
-  await assertSlotBookable({ tutorId: tutor.id, startAt, endAt })
-  await assertChildFree({ childId: child.id, startAt, endAt })
+  const bookings = await prisma.$transaction(async (tx) => {
+    // Serialise requests for this child. Checking and inserting separately allowed
+    // simultaneous browser requests to both pass the overlap/trial checks.
+    await tx.$queryRaw`SELECT id FROM TutorProfile WHERE id = ${tutor.id} FOR UPDATE`
+    await tx.$queryRaw`SELECT id FROM Child WHERE id = ${child.id} FOR UPDATE`
 
-  // A trial is the child's first lesson with this tutor (paid like any lesson, only marked so both sides know)
-  if (data.isTrial) {
-    const before = await prisma.booking.count({ where: { childId: child.id, tutorId: tutor.id, status: { notIn: ['REJECTED', 'CANCELLED'] } } })
-    if (before) throw new AppError(400, `${child.name} has already had a lesson booked with this tutor, so this cannot be a trial lesson`)
-  }
 
-  const booking = await prisma.booking.create({
-    data: {
-      parentId: req.parent.id,
-      childId: child.id,
-      tutorId: tutor.id,
-      subject,
-      startAt,
-      endAt,
-      teachingMode: data.teachingMode,
-      location: data.teachingMode === 'PHYSICAL' ? req.parent.address || tutor.location : null,
-      latitude: data.teachingMode === 'PHYSICAL' ? req.parent.latitude : null,
-      longitude: data.teachingMode === 'PHYSICAL' ? req.parent.longitude : null,
-      isTrial: data.isTrial ?? false,
-      messageToTutor: data.messageToTutor || null,
-      proposedPrice: data.proposedPrice,
-    },
-    include: bookingInclude,
+    const created = []
+    for (const slot of slots) {
+      const startAt = mytToDate(slot.date, slot.startTime)
+      const endAt = new Date(startAt.getTime() + 3600000)
+      await assertSlotBookable({ tutorId: tutor.id, startAt, endAt }, tx)
+      await assertChildFree({ childId: child.id, startAt, endAt }, tx)
+      created.push(await tx.booking.create({
+        data: {
+          parentId: req.parent.id,
+          childId: child.id,
+          tutorId: tutor.id,
+          subject,
+          startAt,
+          endAt,
+          teachingMode: data.teachingMode,
+          location: data.teachingMode === 'PHYSICAL' ? req.parent.address || tutor.location : null,
+          latitude: data.teachingMode === 'PHYSICAL' ? req.parent.latitude : null,
+          longitude: data.teachingMode === 'PHYSICAL' ? req.parent.longitude : null,
+          isTrial: false,
+          messageToTutor: data.messageToTutor || null,
+          proposedPrice: data.proposedPrice,
+        },
+        include: bookingInclude,
+      }))
+    }
+    return created
   })
 
   await notify(tutor.userId, {
     type: 'BOOKING_REQUEST',
     title: 'New booking request',
-    message: `${req.user.fullName} requested a ${subject} lesson for ${child.name}.`,
+    message: `${req.user.fullName} requested ${bookings.length} ${subject} lesson(s) for ${child.name}.`,
     link: '/tutor/bookings',
   })
   await notify(req.user.id, {
@@ -118,7 +131,7 @@ export async function createBooking(req, res) {
     link: '/parent/bookings',
   })
 
-  res.status(201).json({ booking: toBookingDto(booking) })
+  res.status(201).json({ booking: toBookingDto(bookings[0]), bookings: bookings.map(toBookingDto) })
 }
 
 // GET /parent/bookings

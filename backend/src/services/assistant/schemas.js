@@ -2,9 +2,10 @@
 // browser. Anything that does not match is rejected (tools) or dropped (cards): the assistant fails closed.
 import { z } from 'zod'
 import { CHARACTERISTICS, LANGUAGES, SUBJECTS } from '../../data/catalog.js'
+import { ymd } from '../../utils/validators.js'
 
 const REF = (kind) => z.string().regex(new RegExp(`^${kind}_\\d{1,6}$`), `Invalid ${kind} reference`)
-const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD')
+const day = ymd('Use a real date in YYYY-MM-DD format')
 const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:mm')
 
 // ───────────── HTTP request ─────────────

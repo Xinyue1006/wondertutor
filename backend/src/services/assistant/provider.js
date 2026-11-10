@@ -12,10 +12,11 @@ import { env } from '../../config/env.js'
 
 export class ProviderError extends Error {
   // kind: 'timeout' | 'rate_limit' | 'unavailable' | 'bad_response' | 'cancelled' | 'disabled'
-  constructor(kind, message, { transient = false } = {}) {
+  constructor(kind, message, { transient = false, httpStatus = null } = {}) {
     super(message)
     this.kind = kind
     this.transient = transient
+    this.httpStatus = httpStatus
   }
 }
 
@@ -42,12 +43,12 @@ export function geminiProvider(cfg = env.ai) {
           signal,
         })
       } catch (err) {
-        if (signal?.aborted) throw new ProviderError(signal.reason === 'timeout' ? 'timeout' : 'cancelled', 'Request stopped')
+        if (signal?.aborted) throw new ProviderError(signal.reason === 'timeout' || signal.reason?.name === 'TimeoutError' ? 'timeout' : 'cancelled', 'Request stopped')
         throw new ProviderError('unavailable', 'Could not reach the AI service', { transient: true })
       }
       // Provider error bodies are never passed on (they can echo the request); only the category is reported
-      if (res.status === 429) throw new ProviderError('rate_limit', 'AI service is busy', { transient: true })
-      if (res.status >= 500) throw new ProviderError('unavailable', 'AI service error', { transient: true })
+      if (res.status === 429) throw new ProviderError('rate_limit', 'AI service is busy', { transient: true, httpStatus: res.status })
+      if (res.status >= 500) throw new ProviderError('unavailable', 'AI service error', { transient: true, httpStatus: res.status })
       if (!res.ok) throw new ProviderError('bad_response', `AI service rejected the request (${res.status})`)
       let data
       try {

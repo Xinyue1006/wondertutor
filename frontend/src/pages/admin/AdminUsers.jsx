@@ -11,7 +11,9 @@ import WarnUser from '../../components/WarnUser'
 // Admin user management: search, deactivate / reactivate, approve tutor qualifications
 export default function AdminUsers() {
   const [params, setParams] = useSearchParams()
-  const [q, setQ] = useState('')
+  const q = params.get('q') || ''
+  const page = params.get('page') || '1'
+  const [revision, setRevision] = useState(0)
   const [data, setData] = useState(null)
   const [selected, setSelected] = useState(null)
   const role = params.get('role') || ''
@@ -21,17 +23,27 @@ export default function AdminUsers() {
   const pending = params.get('pending') || ''
 
   const [loadError, setLoadError] = useState('')
-  const load = useCallback(() => {
-    setLoadError('')
-    api.get('/admin/users', { params: { role, status, flagged, review, q } }).then((r) => setData(r.data)).catch((e) => setLoadError(errorMessage(e)))
-  }, [role, status, flagged, review, q])
+  const load = () => setRevision(n => n + 1)
   useEffect(() => {
-    const t = setTimeout(load, 250) // wait for the admin to stop typing
-    return () => clearTimeout(t)
-  }, [load])
+    const controller = new AbortController()
+    setLoadError('')
+    setData(null)
+    const timer = setTimeout(() => {
+      api.get('/admin/users', { params: { role, status, flagged, review, pending, q, page }, signal: controller.signal })
+        .then(r => { if (!controller.signal.aborted) setData(r.data) })
+        .catch(e => { if (!controller.signal.aborted) setLoadError(errorMessage(e)) })
+    }, 250)
+    return () => { clearTimeout(timer); controller.abort() }
+  }, [role, status, flagged, review, pending, q, page, revision])
 
-  const set = (k, v) => { const p = Object.fromEntries(params); if (v) p[k] = v; else delete p[k]; setParams(p) }
-  const users = (data?.users || []).filter((u) => !pending || u.tutor?.pendingQualifications > 0)
+  const set = (key, value) => {
+    const next = new URLSearchParams(params)
+    if (key !== 'page') next.delete('page')
+    if (value) next.set(key, value)
+    else next.delete(key)
+    setParams(next, { replace: key === 'q' })
+  }
+  const users = data?.users || []
 
   return (
     <div>
@@ -40,7 +52,7 @@ export default function AdminUsers() {
       <div className="card mb-4 flex flex-wrap items-center gap-3 p-3">
         <div className="relative min-w-[220px] flex-1">
           <Icon name="search" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input className="input h-10 pl-9" placeholder="Search by name or email" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input className="input h-10 pl-9" placeholder="Search by name or email" value={q} onChange={(e) => set('q', e.target.value)} />
         </div>
         <select className="input h-10 w-40" value={role} onChange={(e) => set('role', e.target.value)}>
           <option value="">All roles</option><option value="PARENT">Parents</option><option value="TUTOR">Tutors</option><option value="ADMIN">Admins</option>
@@ -96,6 +108,13 @@ export default function AdminUsers() {
         </div>
       )}
 
+      {data && data.pages > 1 && (
+        <nav aria-label="User list pages" className="mt-4 flex flex-wrap items-center justify-end gap-3">
+          <button className="btn-outline" disabled={data.page <= 1} onClick={() => set('page', String(data.page - 1))}>Previous</button>
+          <span>Page {data.page} of {data.pages}</span>
+          <button className="btn-outline" disabled={data.page >= data.pages} onClick={() => set('page', String(data.page + 1))}>Next</button>
+        </nav>
+      )}
       <UserModal id={selected} onClose={() => setSelected(null)} onChanged={load} />
     </div>
   )

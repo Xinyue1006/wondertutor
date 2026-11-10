@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import PublicLayout from './layouts/PublicLayout'
 import AppLayout from './layouts/AppLayout'
@@ -11,28 +12,29 @@ import Login from './pages/auth/Login'
 import Signup from './pages/auth/Signup'
 import ForgotPassword from './pages/auth/ForgotPassword'
 import NotFound from './pages/NotFound'
-import ParentDashboard from './pages/parent/Dashboard'
-import FindTutor from './pages/parent/FindTutor'
-import MatchingWizard from './pages/parent/MatchingWizard'
-import MatchResults from './pages/parent/MatchResults'
-import TutorProfile from './pages/parent/TutorProfile'
-import BookLesson from './pages/parent/BookLesson'
-import MyBookings from './pages/parent/MyBookings'
-import MyChildren from './pages/parent/MyChildren'
-import Payments from './pages/parent/Payments'
-import PaymentReturn from './pages/parent/PaymentReturn'
-import Receipt from './pages/parent/Receipt'
-import Complaints from './pages/parent/Complaints'
-import Profile from './pages/parent/Profile'
-import SavedTutors from './pages/parent/SavedTutors'
-import ChildProgress from './pages/parent/ChildProgress'
-import ProgressReport from './pages/parent/ProgressReport'
+const Availability = lazy(() => import('./pages/tutor/Availability'))
+const ParentDashboard = lazy(() => import('./pages/parent/Dashboard'))
+const FindTutor = lazy(() => import('./pages/parent/FindTutor'))
+const MatchingWizard = lazy(() => import('./pages/parent/MatchingWizard'))
+const MatchResults = lazy(() => import('./pages/parent/MatchResults'))
+const TutorProfile = lazy(() => import('./pages/parent/TutorProfile'))
+const BookLesson = lazy(() => import('./pages/parent/BookLesson'))
+const MyBookings = lazy(() => import('./pages/parent/MyBookings'))
+const MyChildren = lazy(() => import('./pages/parent/MyChildren'))
+const Payments = lazy(() => import('./pages/parent/Payments'))
+const PaymentReturn = lazy(() => import('./pages/parent/PaymentReturn'))
+const Receipt = lazy(() => import('./pages/parent/Receipt'))
+const Complaints = lazy(() => import('./pages/parent/Complaints'))
+const Profile = lazy(() => import('./pages/parent/Profile'))
+const SavedTutors = lazy(() => import('./pages/parent/SavedTutors'))
+const ChildProgress = lazy(() => import('./pages/parent/ChildProgress'))
+const ProgressReport = lazy(() => import('./pages/parent/ProgressReport'))
 import ProfileSetup from './pages/tutor/ProfileSetup'
 import VerificationStatus from './pages/tutor/VerificationStatus'
 import ProfilePreview from './pages/tutor/ProfilePreview'
-import AdminDashboard from './pages/admin/AdminDashboard'
-import AdminUsers from './pages/admin/AdminUsers'
-import AdminComplaints from './pages/admin/AdminComplaints'
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'))
+const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'))
+const AdminComplaints = lazy(() => import('./pages/admin/AdminComplaints'))
 
 // Redirect logged-in users away from login/signup
 function GuestOnly({ children }) {
@@ -44,6 +46,7 @@ function GuestOnly({ children }) {
 
 export default function App() {
   return (
+    <Suspense fallback={<div role="status" className="p-6 text-center text-slate-600">Loading page…</div>}>
     <Routes>
       {/* Public */}
       <Route element={<PublicLayout />}>
@@ -81,7 +84,7 @@ export default function App() {
         <Route path="/tutor" element={<AppLayout />}>
           {/* Every page is open to every tutor; verification only adds the badge and search priority */}
           <Route index element={<Placeholder title="Tutor Dashboard" />} />
-          <Route path="availability" element={<Placeholder title="My Availability" />} />
+          <Route path="availability" element={<Availability />} />
           <Route path="bookings" element={<Placeholder title="Booking Requests" />} />
           <Route path="students" element={<Placeholder title="My Students" />} />
           <Route path="earnings" element={<Placeholder title="Earnings & Withdrawals" />} />
@@ -105,5 +108,6 @@ export default function App() {
 
       <Route path="*" element={<NotFound />} />
     </Routes>
+    </Suspense>
   )
 }

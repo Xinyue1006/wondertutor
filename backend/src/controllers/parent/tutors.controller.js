@@ -68,9 +68,12 @@ async function freeAt(tutors, date, time) {
   const end = new Date(start.getTime() + 3600000)
   if (start <= new Date()) return new Set()
   const { dow } = mytParts(start)
-  const covering = tutors.filter((t) =>
-    t.availability.some((a) => a.dayOfWeek === dow && toMinutes(a.startTime) <= toMinutes(time) && toMinutes(a.endTime) >= toMinutes(time) + 60),
-  )
+  const overrides = await prisma.availabilityException.findMany({ where: { tutorId: { in: tutors.map(t => t.id) }, date } })
+  const covering = tutors.filter(t => {
+    const override = overrides.find(e => e.tutorId === t.id)
+    const hours = override ? override.ranges : t.availability.filter(a => a.dayOfWeek === dow)
+    return hours.some(a => toMinutes(a.startTime) <= toMinutes(time) && toMinutes(a.endTime) >= toMinutes(time) + 60)
+  })
   const busy = await prisma.booking.findMany({
     where: { tutorId: { in: covering.map((t) => t.id) }, status: { in: SLOT_BLOCKING }, startAt: { lt: end }, endAt: { gt: start } },
     select: { tutorId: true },

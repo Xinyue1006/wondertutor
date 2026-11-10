@@ -21,24 +21,34 @@ const when = (d) =>
 const otherParty = (booking, userId) => (userId === booking.parent.userId ? booking.tutor.userId : booking.parent.userId)
 const linkFor = (booking, userId) => (userId === booking.parent.userId ? `/parent/bookings?booking=${booking.id}` : '/tutor/bookings')
 
-async function assertNewTimeOk(booking, startAt, endAt) {
-  await assertSlotBookable({ tutorId: booking.tutorId, startAt, endAt, ignoreBookingId: booking.id })
-  await assertChildFree({ childId: booking.childId, startAt, endAt, ignoreBookingId: booking.id })
+async function assertNewTimeOk(booking, startAt, endAt, db = prisma) {
+  await assertSlotBookable({ tutorId: booking.tutorId, startAt, endAt, ignoreBookingId: booking.id }, db)
+  await assertChildFree({ childId: booking.childId, startAt, endAt, ignoreBookingId: booking.id }, db)
+}
+
+const stale = () => new AppError(409, 'This lesson or request has just changed. Please refresh and try again.')
+async function answerPending(db, requestId, status) {
+  const { count } = await db.rescheduleRequest.updateMany({ where: { id: requestId, status: 'PENDING' }, data: { status } })
+  if (!count) throw stale()
 }
 
 export async function requestReschedule({ booking, byUserId, date, startTime, reason }) {
   if (!RESCHEDULABLE.includes(booking.status)) throw new AppError(400, 'Only upcoming lessons can be rescheduled')
   if (booking.startAt <= new Date()) throw new AppError(400, 'This lesson has already started')
-  const pending = await prisma.rescheduleRequest.findFirst({ where: { bookingId: booking.id, status: 'PENDING' } })
-  if (pending) throw new AppError(409, 'There is already a reschedule request waiting for an answer')
 
   const startAt = mytToDate(date, startTime)
   const endAt = new Date(startAt.getTime() + (booking.endAt - booking.startAt)) // same lesson length
   if (startAt.getTime() === booking.startAt.getTime()) throw new AppError(400, 'Choose a different time from the current one')
-  await assertNewTimeOk(booking, startAt, endAt)
-
-  const request = await prisma.rescheduleRequest.create({
-    data: { bookingId: booking.id, requestedById: byUserId, newStartAt: startAt, newEndAt: endAt, reason: reason || null },
+  const request = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM Booking WHERE id = ${booking.id} FOR UPDATE`
+    const current = await tx.booking.findUnique({ where: { id: booking.id } })
+    if (!current || current.status !== booking.status || current.startAt.getTime() !== booking.startAt.getTime() || current.startAt <= new Date()) throw stale()
+    const pending = await tx.rescheduleRequest.findFirst({ where: { bookingId: booking.id, status: 'PENDING' } })
+    if (pending) throw new AppError(409, 'There is already a reschedule request waiting for an answer')
+    await assertNewTimeOk(booking, startAt, endAt, tx)
+    return tx.rescheduleRequest.create({
+      data: { bookingId: booking.id, requestedById: byUserId, newStartAt: startAt, newEndAt: endAt, reason: reason || null },
+    })
   })
   const who = byUserId === booking.parent.userId ? 'The parent' : 'The tutor'
   const to = otherParty(booking, byUserId)
@@ -60,11 +70,15 @@ export async function respondReschedule({ booking, requestId, byUserId, accept }
   if (accept) {
     if (!RESCHEDULABLE.includes(booking.status)) throw new AppError(400, 'This lesson can no longer be rescheduled')
     // The new time was free when asked; check again in case something was booked since
-    await assertNewTimeOk(booking, request.newStartAt, request.newEndAt)
-    await prisma.$transaction([
-      prisma.booking.update({ where: { id: booking.id }, data: { startAt: request.newStartAt, endAt: request.newEndAt } }),
-      prisma.rescheduleRequest.update({ where: { id: request.id }, data: { status: 'APPROVED' } }),
-    ])
+    await prisma.$transaction(async (tx) => {
+      await answerPending(tx, request.id, 'APPROVED')
+      await assertNewTimeOk(booking, request.newStartAt, request.newEndAt, tx)
+      const { count } = await tx.booking.updateMany({
+        where: { id: booking.id, status: booking.status, startAt: booking.startAt, endAt: booking.endAt },
+        data: { startAt: request.newStartAt, endAt: request.newEndAt },
+      })
+      if (!count) throw stale()
+    })
     await notify(request.requestedById, {
       type: 'RESCHEDULE_APPROVED',
       title: 'Reschedule accepted',
@@ -75,7 +89,7 @@ export async function respondReschedule({ booking, requestId, byUserId, accept }
   }
 
   // No mutual agreement: Admin decides. The lesson keeps its current time until then.
-  await prisma.rescheduleRequest.update({ where: { id: request.id }, data: { status: 'ESCALATED' } })
+  await answerPending(prisma, request.id, 'ESCALATED')
   await notify(request.requestedById, {
     type: 'RESCHEDULE_ESCALATED',
     title: 'Reschedule declined',
@@ -97,7 +111,7 @@ export async function withdrawReschedule({ booking, requestId, byUserId }) {
   if (!request) throw new AppError(404, 'Reschedule request not found')
   if (request.requestedById !== byUserId) throw new AppError(403, 'Only the person who asked can withdraw it')
   if (request.status !== 'PENDING') throw new AppError(400, 'This request has already been answered')
-  await prisma.rescheduleRequest.update({ where: { id: request.id }, data: { status: 'REJECTED' } })
+  await answerPending(prisma, request.id, 'REJECTED')
   await notify(otherParty(booking, byUserId), {
     type: 'RESCHEDULE_WITHDRAWN',
     title: 'Reschedule withdrawn',

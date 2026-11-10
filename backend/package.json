@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
+    "jobs:run": "node scripts/run-housekeeping.js",
     "db:migrate": "prisma migrate dev",
     "db:seed": "node prisma/seed.js",
     "db:deploy": "prisma migrate deploy",
@@ -21,6 +22,7 @@
   "dependencies": {
     "@prisma/client": "^6.19.3",
     "bcrypt": "^6.0.0",
+    "cloudinary": "^2.11.0",
     "cors": "^2.8.6",
     "dotenv": "^18.0.7",
     "express": "^5.3.0",

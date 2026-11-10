@@ -63,7 +63,7 @@ export default function PlaceSearch({
     setActive(-1)
     onChange(place)
   }
-  const useTyped = () => {
+  const chooseTypedPlace = () => {
     const typed = text.trim()
     picked.current = typed
     trusted.current = null
@@ -105,7 +105,10 @@ export default function PlaceSearch({
     else if (e.key === 'Enter' && open) {
       e.preventDefault() // never submit the form while a list is open
       const row = rows[active]
-      if (row) row.custom ? useTyped() : choose(row.label)
+      if (row) {
+        if (row.custom) chooseTypedPlace()
+        else choose(row.label)
+      }
     }
   }
 
@@ -140,7 +143,7 @@ export default function PlaceSearch({
             {rows.map((r, i) => (
               <li
                 key={r.key} id={`${id}-opt-${i}`} role="option" aria-selected={i === active}
-                onMouseDown={(e) => e.preventDefault()} onClick={() => (r.custom ? useTyped() : choose(r.label))} onMouseEnter={() => setActive(i)}
+                onMouseDown={(e) => e.preventDefault()} onClick={() => (r.custom ? chooseTypedPlace() : choose(r.label))} onMouseEnter={() => setActive(i)}
                 className={`flex min-h-11 cursor-pointer items-center justify-between gap-3 px-3 text-sm ${i === active ? 'bg-brand-50' : ''} ${r.custom ? 'border-t border-slate-100 font-semibold text-brand-700' : 'text-navy'}`}
               >
                 {r.custom

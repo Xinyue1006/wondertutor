@@ -11,8 +11,8 @@ export const FAQ = [
     id: 'faq.trial-lesson',
     topic: 'Trial lessons',
     keywords: ['trial', 'first lesson', 'free', 'percuma', 'cubaan', '试课', '试听', 'trial class'],
-    answer: 'A trial lesson is the child\'s first lesson with a tutor. It is paid like any other lesson; the booking is only marked as a trial so both sides know. A lesson cannot be marked as a trial if the child already has a booking with that tutor.',
-    source: 'backend/src/controllers/parent/bookings.controller.js#createBooking (isTrial check)',
+    answer: 'WonderTutor does not offer trial lessons. All bookings are regular paid lessons at the agreed price.',
+    source: 'backend/src/controllers/parent/bookings.controller.js#createBooking',
     reviewed: REVIEWED,
   },
   {

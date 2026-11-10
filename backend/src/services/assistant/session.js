@@ -87,6 +87,16 @@ export function deleteSession(id, user, parent) {
   return true
 }
 
+// Account deletion must also discard temporary personal data and cancel in-flight turns.
+export function deleteUserSessions(userId) {
+  for (const s of store.values()) {
+    if (s.userId !== userId) continue
+    s.deleted = true
+    store.delete(s.id)
+    s.active?.ac.abort('deleted')
+  }
+}
+
 // ───────────── one turn at a time, staged state ─────────────
 // Policy for overlapping requests on ONE conversation: the second one is rejected as a retryable conflict ("busy"),
 // except when the first was already cancelled by the browser: then the new turn takes over at once and the old turn can

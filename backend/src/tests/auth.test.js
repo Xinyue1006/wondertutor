@@ -30,13 +30,14 @@ describe('forgot password', () => {
   })
 
   test('resets the password with the code; the old password stops working and the code cannot be reused', async () => {
-    const { user } = await makeParent()
+    const { user, token } = await makeParent()
     await api().post('/auth/forgot-password', { email: user.email })
     await setCode(user.email, '123456')
 
     expect((await api().post('/auth/reset-password', { email: user.email, code: '000000', newPassword: 'NewPass123' })).status).toBe(400)
     const ok = await api().post('/auth/reset-password', { email: user.email, code: '123456', newPassword: 'NewPass123' })
     expect(ok.status).toBe(200)
+    expect((await api(token).get('/auth/me')).status).toBe(401)
 
     expect((await api().post('/auth/login', { email: user.email, password: 'Test1234' })).status).toBe(401)
     expect((await api().post('/auth/login', { email: user.email, password: 'NewPass123' })).status).toBe(200)

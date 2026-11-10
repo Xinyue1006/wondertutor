@@ -1,3 +1,4 @@
+import { mediaLink } from '../../services/privateMedia.js'
 import { z } from 'zod'
 import { prisma } from '../../config/prisma.js'
 import { AppError } from '../../utils/AppError.js'
@@ -134,7 +135,7 @@ export async function childProgress(req, res) {
       endAt: b.endAt,
       teachingMode: b.teachingMode,
       tutor: { id: b.tutorId, name: b.tutor.user.fullName, photoUrl: b.tutor.user.profilePhotoUrl },
-      attendance: b.attendance && { checkInAt: b.attendance.checkInAt, checkOutAt: b.attendance.checkOutAt, checkInPhotoUrl: b.attendance.checkInPhotoUrl },
+      attendance: b.attendance && { checkInAt: b.attendance.checkInAt, checkOutAt: b.attendance.checkOutAt, checkInPhotoUrl: mediaLink(b.attendance.checkInPhotoUrl, 'wondertutor/attendance/' + b.id) },
       summary: b.summary && toSummaryDto(b.summary),
       rating: b.review?.rating ?? null,
     })),

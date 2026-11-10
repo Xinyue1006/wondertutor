@@ -48,7 +48,7 @@ const Saved = ({ children }) => (
 )
 
 export default function Profile() {
-  const { user, setUser } = useAuth()
+  const { user, setUser, logout } = useAuth()
   const { catalog, kids, loadError: listsError, reloadShared } = useMatching()
   const [params, setParams] = useSearchParams()
   const tab = TABS.some(([id]) => id === params.get('tab')) ? params.get('tab') : 'details'
@@ -162,7 +162,7 @@ export default function Profile() {
     try {
       await api.post('/parent/profile/password', { currentPassword: pw.currentPassword, newPassword: pw.newPassword })
       setPw({ currentPassword: '', newPassword: '', confirm: '' })
-      setPwMsg('Your password was changed.')
+      logout('Your password was changed. Please log in with your new password.')
     } catch (err) {
       setPwError(errorMessage(err))
     } finally {

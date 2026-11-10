@@ -146,6 +146,7 @@ function PayModal({ booking, banks, defaultBank, live, onClose, onDone }) {
     setError('')
     try {
       const checkout = await api.post('/parent/payments/checkout', { bookingId: booking.id })
+      if (checkout.data.reconciled) return onDone()
       window.location.assign(checkout.data.redirectUrl)
     } catch (err) {
       setError(errorMessage(err))
