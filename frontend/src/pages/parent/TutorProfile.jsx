@@ -65,16 +65,16 @@ export default function TutorProfile() {
         <Icon name="arrow-left" className="h-4 w-4" /> Back to Find Tutors
       </button>
 
-      <div className="grid items-start gap-6 xl:grid-cols-[1fr_390px]">
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
         <div className="min-w-0 space-y-4">
           {/* header */}
           <section className="card flex flex-wrap gap-5 p-5">
             <Avatar src={tutor.photoUrl} name={tutor.name} className="h-[170px] w-[150px]" rounded="rounded-2xl" text="text-5xl" />
-            <div className="min-w-[260px] flex-1">
-              <div className="flex items-start justify-between gap-3">
-                <h1 className="flex items-center gap-2 text-3xl font-extrabold text-navy">{tutor.name} {tutor.verified && <VerifiedTick className="h-6 w-6" />}</h1>
-                <div className="flex items-center gap-3">
-                  <span className="text-xl font-extrabold text-navy">RM {tutor.hourlyRate} / hour</span>
+            <div className="min-w-0 basis-full sm:flex-1 sm:basis-64">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <h1 className="min-w-0 break-words text-2xl font-extrabold text-navy sm:text-3xl">{tutor.name} {tutor.verified && <VerifiedTick className="inline-block h-6 w-6" />}</h1>
+                <div className="flex shrink-0 items-center gap-3">
+                  <span className="whitespace-nowrap text-xl font-extrabold text-navy">RM {tutor.hourlyRate} / hour</span>
                   <button onClick={toggleFav} disabled={favBusy} aria-pressed={tutor.isFavourite} aria-label={tutor.isFavourite ? `Remove ${tutor.name} from saved tutors` : `Save ${tutor.name}`} className={`flex h-11 w-11 items-center justify-center rounded-lg border ${tutor.isFavourite ? 'border-red-300 bg-red-50 text-red-500' : 'border-slate-200 text-brand-500'} hover:bg-brand-50`}>
                     <Icon name="heart" fill={tutor.isFavourite} className="h-5 w-5" />
                   </button>
@@ -84,7 +84,7 @@ export default function TutorProfile() {
               <div className="mt-1 flex items-center gap-1.5 text-sm">
                 <Icon name="star" fill className="h-4 w-4 text-accent" /> <b className="text-navy">{tutor.rating.toFixed(1)}</b> <span className="text-slate-500">({tutor.reviewCount} reviews)</span>
               </div>
-              <div className="mt-2 flex items-center gap-2 text-sm text-slate-600"><Icon name="book" className="h-4 w-4 text-brand-500" /> {tutor.subjects.join(', ')} <span className="text-slate-300">|</span> {tutor.levels}</div>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-600"><Icon name="book" className="h-4 w-4 shrink-0 text-brand-500" /> <span>{tutor.subjects.join(', ')}</span> <span className="text-slate-300">|</span> <span>{tutor.levels}</span></div>
               <div className="mt-1 flex items-center gap-2 text-sm text-slate-600"><Icon name="pin" className="h-4 w-4 text-brand-500" /> {tutor.location}</div>
               <div className="mt-3"><ModePills online={tutor.offersOnline} physical={tutor.offersPhysical} /></div>
               <p className="mt-4 rounded-xl bg-brand-50 p-4 text-sm leading-relaxed text-slate-600">
@@ -152,37 +152,37 @@ export default function TutorProfile() {
             </div>
           </section>
 
-          <div ref={refs.teaching} className="grid scroll-mt-40 gap-4 md:grid-cols-[1.25fr_1fr]">
+          <div ref={refs.teaching} className="min-w-0 scroll-mt-40 space-y-4">
             <section className="card p-5">
               <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-navy"><Icon name="book" className="h-5 w-5 text-brand-500" /> Subjects &amp; Levels</h2>
-              <div className="grid gap-4 sm:grid-cols-[auto_1fr_auto] sm:divide-x sm:divide-slate-100">
-                <div className="sm:pr-4">
+              <div className="grid gap-5 sm:grid-cols-2">
+                <div className="min-w-0">
                   <div className="mb-2 text-sm font-bold text-navy">Subjects Taught</div>
                   <div className="flex flex-wrap gap-2">{tutor.subjects.map((s) => <span key={s} className="pill bg-brand-50 text-brand-600">{s}</span>)}</div>
                 </div>
-                <div className="sm:px-4">
+                <div className="min-w-0">
                   <div className="mb-2 text-sm font-bold text-navy">Education Levels</div>
-                  <div className="flex flex-wrap gap-2">{tutor.grades.map((g) => <span key={g} className="rounded-md border border-slate-200 px-2.5 py-1 text-xs text-slate-600">{g}</span>)}</div>
+                  <div className="flex flex-wrap gap-2">{tutor.grades.map((g) => <span key={g} className="whitespace-nowrap rounded-md border border-slate-200 px-2.5 py-1 text-xs text-slate-600">{g}</span>)}</div>
                 </div>
-                <div className="sm:pl-4">
+                <div className="min-w-0 border-t border-slate-100 pt-4 sm:col-span-2">
                   <div className="mb-2 flex items-center gap-1.5 text-sm font-bold text-navy"><Icon name="monitor" className="h-4 w-4 text-brand-500" /> Teaching Mode</div>
                   <ModePills online={tutor.offersOnline} physical={tutor.offersPhysical} />
                 </div>
               </div>
             </section>
             <section ref={refs.availability} className="card scroll-mt-40 p-5">
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="flex items-center gap-2 text-lg font-bold text-navy"><Icon name="calendar" className="h-5 w-5 text-brand-500" /> Availability <span className="text-xs font-normal text-slate-500">(Upcoming 1 Week)</span></h2>
-                <Link to={`/parent/tutors/${tutor.id}/book`} className="flex items-center gap-1 text-xs font-semibold text-brand-500 hover:underline">View Full Availability <Icon name="arrow-right" className="h-3.5 w-3.5" /></Link>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div><h2 className="flex items-center gap-2 text-lg font-bold text-navy"><Icon name="calendar" className="h-5 w-5 shrink-0 text-brand-500" /> Availability</h2><p className="mt-1 text-xs text-slate-500">Upcoming week · Malaysia time (MYT)</p></div>
+                <Link to={`/parent/tutors/${tutor.id}/book`} className="inline-flex min-h-10 items-center gap-1 whitespace-nowrap text-sm font-semibold text-brand-500 hover:underline">View Full Availability <Icon name="arrow-right" className="h-3.5 w-3.5 shrink-0" /></Link>
               </div>
-              <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 md:grid-cols-7">
                 {tutor.upcomingAvailability.map((d) => {
                   const ranges = mergeSlots(d.slots.filter((s) => s.status === 'available'))
                   return (
-                    <div key={d.date} className="rounded-lg border border-slate-100 bg-brand-25 p-1.5 text-center text-[10px] leading-tight">
+                    <div key={d.date} className="min-w-0 rounded-lg border border-slate-100 bg-brand-25 px-2 py-3 text-center text-xs leading-relaxed">
                       <div className="font-bold text-navy">{weekdayName(d.date)}</div>
                       <div className="mb-1 text-slate-500">{dayMonth(d.date)}</div>
-                      {ranges.length ? ranges.slice(0, 2).map((r) => <div key={r.start} className="text-slate-600">{hhmmLabel(r.start).replace(':00', '')}<br />-{hhmmLabel(r.end).replace(':00', '')}</div>) : <div className="py-2 text-slate-400">-</div>}
+                      {ranges.length ? ranges.map((r) => <div key={r.start} className="mt-1 text-slate-600"><span className="whitespace-nowrap">{hhmmLabel(r.start).replace(':00', '')}</span><span className="block whitespace-nowrap">– {hhmmLabel(r.end).replace(':00', '')}</span></div>) : <div className="py-2 text-slate-400">—</div>}
                     </div>
                   )
                 })}
@@ -218,7 +218,7 @@ function Reviews({ tutor, reference }) {
 
   return (
     <section ref={reference} className="card scroll-mt-40 p-5">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 text-lg font-bold text-navy"><Icon name="star" className="h-5 w-5 text-brand-500" /> Reviews from Parents</h2>
         <label className="flex items-center gap-2 text-sm font-semibold text-navy">Sort by:
           <select className="input h-9 w-36 py-1 font-medium" value={sort} onChange={(e) => { setPage(1); setSort(e.target.value) }}>
@@ -232,7 +232,7 @@ function Reviews({ tutor, reference }) {
           <Stars value={tutor.rating} size="h-5 w-5" />
           <div className="mt-1 text-sm text-slate-500">{tutor.reviewCount} reviews</div>
         </div>
-        <div className="min-w-[260px] flex-1 space-y-1.5">
+        <div className="min-w-0 basis-full flex-1 space-y-1.5 sm:basis-64">
           {tutor.ratingDistribution.map((d) => (
             <div key={d.stars} className="flex items-center gap-3 text-xs text-slate-500">
               <span className="w-12">{d.stars} star{d.stars > 1 ? 's' : ''}</span>
@@ -279,6 +279,7 @@ function BookingPanel({ tutor, kids }) {
   const [date, setDate] = useState(availableDays[0]?.date || '')
   const slots = availableDays.find((d) => d.date === date)?.slots.filter((s) => s.status === 'available') || []
   const [time, setTime] = useState(slots[0]?.start || '')
+  const [selectedSlots, setSelectedSlots] = useState([])
   const [childId, setChildId] = useState(kids[0]?.id || '')
   const [mode, setMode] = useState(tutor.offersPhysical ? 'PHYSICAL' : 'ONLINE')
   const [price, setPrice] = useState(String(tutor.hourlyRate))
@@ -295,20 +296,21 @@ function BookingPanel({ tutor, kids }) {
 
   function onContinue() {
     if (!childId) return setError('Add a child first so we can match the lesson to their level.')
-    if (!date || !time) return setError('Please choose an available date and time.')
+    if (!selectedSlots.length && (!date || !time)) return setError('Please choose an available date and time.')
     const badPrice = checkRinggit(price, 'Proposed price')
     if (badPrice) return setError(badPrice)
-    navigate(`/parent/tutors/${tutor.id}/book`, { state: { date, time, childId: Number(childId), mode, price, msg } })
+    const lessons = selectedSlots.length ? selectedSlots : [{ date, start: time }]
+    navigate(`/parent/tutors/${tutor.id}/book`, { state: { date: lessons[0].date, time: lessons[0].start, slots: lessons, childId: Number(childId), mode, price, msg } })
   }
 
   return (
-    <aside className="space-y-4 xl:sticky xl:top-[84px]">
+    <aside className="min-w-0 space-y-4">
       <section className="card p-5">
         <div className="mb-4 flex items-center gap-3">
           <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent-100 text-accent-600"><Icon name="calendar" className="h-6 w-6" /></span>
           <div>
             <h2 className="text-xl font-extrabold text-navy">Book a Lesson</h2>
-            <p className="text-xs text-slate-500">Send a booking request to this tutor.</p>
+            <p className="text-xs text-slate-500">Select lessons here or choose later dates on the full calendar.</p>
           </div>
         </div>
         <div className="space-y-3.5">
@@ -322,6 +324,15 @@ function BookingPanel({ tutor, kids }) {
             <SelectBox icon="clock" value={time} onChange={(e) => setTime(e.target.value)} className="[&_select]:h-10">
               {slots.map((s) => <option key={s.start} value={s.start}>{hhmmLabel(s.start)} - {hhmmLabel(s.end)}</option>)}
             </SelectBox></label>
+          <button type="button" className="btn-outline min-h-11 w-full" disabled={!date || !time || selectedSlots.length >= 12 || selectedSlots.some(s => s.date === date && s.start === time)} onClick={() => setSelectedSlots(current => [...current, { date, start: time }])}>Add selected lesson</button>
+          {selectedSlots.length > 0 && <div className="space-y-2" aria-label="Selected lessons">
+            <p className="text-sm font-bold text-navy">Selected lessons ({selectedSlots.length}/12)</p>
+            {selectedSlots.map(s => <div key={s.date + s.start} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-brand-50 p-2 text-sm">
+              <span>{dateLabel(s.date)} · {hhmmLabel(s.start)}</span>
+              <button type="button" className="btn-outline min-h-10 px-2" aria-label={'Remove ' + s.date + ' ' + s.start} onClick={() => setSelectedSlots(current => current.filter(x => x.date !== s.date || x.start !== s.start))}>Remove</button>
+            </div>)}
+          </div>}
+          <Link to={`/parent/tutors/${tutor.id}/book`} state={{ slots: selectedSlots, date: selectedSlots[0]?.date || date, time: selectedSlots[0]?.start || time, childId: Number(childId), mode, price, msg }} className="inline-flex min-h-10 items-center text-sm font-semibold text-brand-500 hover:underline">Choose other dates on the full calendar →</Link>
           <label className="block"><span className="mb-1 block text-sm font-bold text-navy">Child <span className="text-red-500">*</span></span>
             {kids.length === 0 ? (
               <Link to="/parent/children?add=1" className="btn-outline w-full"><Icon name="plus" className="h-4 w-4" /> Add a child first</Link>

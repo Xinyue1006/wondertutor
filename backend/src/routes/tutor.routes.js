@@ -3,6 +3,7 @@ import { Router } from 'express'
 import { validateIdParams } from '../middleware/params.js'
 import { requireAuth, requireRole } from '../middleware/auth.js'
 import { loadTutorProfile } from '../middleware/tutor.js'
+import * as exceptions from '../controllers/tutor/availability.controller.js'
 import * as profile from '../controllers/tutor/profile.controller.js'
 
 const router = validateIdParams(Router()) // every :id in these URLs must be a positive whole number
@@ -24,4 +25,7 @@ router.post('/submit-for-verification', profile.submitForVerification)
 // Teaching features: availability, requests, sessions and earnings go below this line
 router.get('/dashboard', profile.dashboard)
 
+router.get('/availability/exceptions', exceptions.list)
+router.put('/availability/exceptions', exceptions.save)
+router.delete('/availability/exceptions/:date', exceptions.remove)
 export default router

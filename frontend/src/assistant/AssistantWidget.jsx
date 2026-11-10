@@ -1,6 +1,10 @@
 // "Book Robot": floating bottom-right button + right-side chat panel (Parent Portal only).
-// The chat is a GUIDED requirement-collection flow (quick-reply buttons + some free text).
-// It is not an ML model: it fills the same criteria as the wizard and calls the same matching service.
+// Two clearly separated modes:
+//   - "AI Assistant" (AiChat.jsx): read-only questions answered by a language model through server-side tools. Only
+//     offered when the backend says it is enabled; anything it shows is marked as AI output.
+//   - "Guided Tutor Search" (below): the original GUIDED requirement-collection flow (quick-reply buttons + some free
+//     text, deterministic keyword parsing). It is not an ML model: it fills the same criteria as the wizard and calls
+//     the same matching service. It always works, including when the AI is switched off or unavailable.
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Robot from '../components/ui/Robot'
@@ -12,6 +16,9 @@ import { DAY_SHORT, hhmmLabel } from '../lib/format'
 import { gradeLabel, LEVELS, levelLabel } from '../lib/education'
 import { childSubjects, subjectsForLevel } from '../lib/subjects'
 import { TIME_PRESETS, defaultRange, rangeKey, rangeLabel } from '../lib/times'
+import AiChat from './AiChat'
+import { useAuth } from '../context/AuthContext'
+import { useAssistantCapabilities } from './aiApi'
 
 let nextId = 1
 const uid = () => nextId++
@@ -27,34 +34,23 @@ const budgetText = (c) =>
   c.budgetMax == null ? 'Any budget' : (c.budgetMin ?? 20) <= 20 ? `Up to RM${c.budgetMax}/hour` : `RM${c.budgetMin} – RM${c.budgetMax}/hour`
 
 // The launcher can be dragged anywhere (mouse, touch or pen) so it never hides content the parent needs.
-// A short tap still opens the chat; the arrow keys move it for keyboard users; the spot is remembered in this browser.
-const POS_KEY = 'wt-assistant-pos'
+// A short tap still opens the chat; the arrow keys move it for keyboard users; refreshing restores the default corner.
 const SIZE = 76
 const MARGIN = 8
 const DRAG_THRESHOLD = 6 // px of movement before a press counts as a drag rather than a tap
 
 const clampPos = ({ right, bottom }) => ({
-  right: Math.min(Math.max(right, MARGIN), window.innerWidth - SIZE - MARGIN),
-  bottom: Math.min(Math.max(bottom, MARGIN), window.innerHeight - SIZE - MARGIN),
+  right: Math.min(Math.max(right, MARGIN), Math.max(MARGIN, document.body.clientWidth - SIZE - MARGIN)),
+  bottom: Math.min(Math.max(bottom, MARGIN), Math.max(MARGIN, window.innerHeight - SIZE - MARGIN)),
 })
-
-function loadPos() {
-  try {
-    const p = JSON.parse(localStorage.getItem(POS_KEY) || 'null')
-    if (p && Number.isFinite(p.right) && Number.isFinite(p.bottom)) return clampPos(p)
-  } catch { /* storage blocked or bad value: use the default corner */ }
-  return { right: 16, bottom: 16 }
-}
 
 export default function AssistantWidget() {
   const { chatOpen, setChatOpen } = useMatching()
   const [bubble, setBubble] = useState(true)
-  const [pos, setPos] = useState(loadPos)
+  const [pos, setPos] = useState({ right: 16, bottom: 16 })
   const [dragging, setDragging] = useState(false)
   const drag = useRef(null) // { x, y, start, moved }
   const suppressClick = useRef(false)
-
-  const save = (p) => { try { localStorage.setItem(POS_KEY, JSON.stringify(p)) } catch { /* not remembered */ } }
 
   // Keep it on screen when the window gets smaller
   useEffect(() => {
@@ -83,7 +79,6 @@ export default function AssistantWidget() {
     if (d?.moved) {
       suppressClick.current = true // the click that follows a drag must not open the chat
       setDragging(false)
-      setPos((p) => { save(p); return p })
     }
   }
   function onClick() {
@@ -95,7 +90,7 @@ export default function AssistantWidget() {
     const move = { ArrowLeft: [step, 0], ArrowRight: [-step, 0], ArrowUp: [0, step], ArrowDown: [0, -step] }[e.key]
     if (!move) return
     e.preventDefault()
-    setPos((p) => { const next = clampPos({ right: p.right + move[0], bottom: p.bottom + move[1] }); save(next); return next })
+    setPos(p => clampPos({ right: p.right + move[0], bottom: p.bottom + move[1] }))
   }
 
   // When the button sits on the left half of the screen, the greeting opens towards the right so it stays visible
@@ -104,7 +99,7 @@ export default function AssistantWidget() {
   return (
     <>
       {chatOpen && <ChatPanel />}
-      <div className={`fixed z-40 flex flex-col ${onLeft ? 'items-start' : 'items-end'}`} style={{ right: pos.right, bottom: pos.bottom }}>
+      <div className={`fixed z-40 flex w-[76px] flex-col ${onLeft ? 'items-start' : 'items-end'}`} style={{ right: pos.right, bottom: pos.bottom }}>
         {bubble && !chatOpen && !dragging && (
           <div className={`pop-in relative mb-1 w-48 rounded-xl bg-white px-3 py-2 text-left shadow-lg ring-1 ring-brand-100 ${onLeft ? 'ml-2' : 'mr-2'}`}>
             <button onClick={() => setBubble(false)} className="absolute right-1.5 top-1.5 text-slate-400 hover:text-slate-600" aria-label="Dismiss">
@@ -124,7 +119,7 @@ export default function AssistantWidget() {
           onKeyDown={onKeyDown}
           title="Drag to move. Click to chat."
           className={`flex h-[76px] w-[76px] touch-none select-none items-center justify-center rounded-full bg-white shadow-xl ring-2 ring-brand-100 transition-transform ${
-            dragging ? 'scale-105 cursor-grabbing' : 'float-y cursor-grab hover:scale-105'
+            dragging ? 'scale-105 cursor-grabbing' : 'cursor-grab'
           }`}
           aria-label={chatOpen ? 'Close AI Tutor Assistant' : 'Open AI Tutor Assistant (use the arrow keys to move this button)'}
         >
@@ -135,9 +130,146 @@ export default function AssistantWidget() {
   )
 }
 
-// ───────────── chat panel ─────────────
+// ───────────── chat panel (mode switch) ─────────────
 
 function ChatPanel() {
+  const { setChatOpen } = useMatching()
+  const { user } = useAuth()
+  const caps = useAssistantCapabilities()
+  const aiOn = Boolean(caps?.enabled)
+  const [mode, setMode] = useState(null) // null until capabilities are known: AI first when it is available
+  const active = mode || (aiOn ? 'ai' : 'guided')
+  const panel = useRef(null)
+  const panelDrag = useRef(null)
+  const [panelPosition, setPanelPosition] = useState(null)
+  const [panelSize, setPanelSize] = useState(null)
+  const resizeStart = useRef(null)
+
+  function resizePanel(width, height, bounds) {
+    const maxWidth = Math.min(390, document.body.clientWidth - bounds.left - 8)
+    const maxHeight = Math.min(640, window.innerHeight - bounds.top - 8)
+    setPanelSize({
+      width: Math.max(Math.min(300, maxWidth), Math.min(width, maxWidth)),
+      height: Math.max(Math.min(360, maxHeight), Math.min(height, maxHeight)),
+    })
+  }
+
+  function startResize(event) {
+    if (event.button !== 0) return
+    const bounds = panel.current.getBoundingClientRect()
+    setPanelPosition({ left: bounds.left, top: bounds.top })
+    resizeStart.current = { x: event.clientX, y: event.clientY, bounds }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  function dragResize(event) {
+    const start = resizeStart.current
+    if (!start) return
+    resizePanel(start.bounds.width + event.clientX - start.x, start.bounds.height + event.clientY - start.y, start.bounds)
+  }
+
+  function keyboardResize(event) {
+    const change = { ArrowLeft: [-16, 0], ArrowRight: [16, 0], ArrowUp: [0, -16], ArrowDown: [0, 16] }[event.key]
+    if (!change) return
+    event.preventDefault()
+    const bounds = panel.current.getBoundingClientRect()
+    setPanelPosition({ left: bounds.left, top: bounds.top })
+    resizePanel(bounds.width + change[0], bounds.height + change[1], bounds)
+  }
+
+  function keepPanelOnScreen(position) {
+    const width = panel.current?.offsetWidth || Math.min(390, window.innerWidth - 32)
+    const height = panel.current?.offsetHeight || Math.min(640, window.innerHeight - 32)
+    return {
+      left: Math.max(8, Math.min(position.left, document.body.clientWidth - width - 8)),
+      top: Math.max(8, Math.min(position.top, window.innerHeight - height - 8)),
+    }
+  }
+
+  useEffect(() => {
+    const resize = () => setPanelPosition(current => current ? keepPanelOnScreen(current) : null)
+    window.addEventListener('resize', resize)
+    return () => window.removeEventListener('resize', resize)
+  }, [])
+
+  function startPanelDrag(event) {
+    if (event.button !== 0) return
+    const bounds = panel.current.getBoundingClientRect()
+    panelDrag.current = { x: event.clientX, y: event.clientY, left: bounds.left, top: bounds.top }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  function movePanel(event) {
+    const start = panelDrag.current
+    if (!start) return
+    setPanelPosition(keepPanelOnScreen({ left: start.left + event.clientX - start.x, top: start.top + event.clientY - start.y }))
+  }
+
+  function movePanelWithKeyboard(event) {
+    const direction = { ArrowLeft: [-16, 0], ArrowRight: [16, 0], ArrowUp: [0, -16], ArrowDown: [0, 16] }[event.key]
+    if (!direction) return
+    event.preventDefault()
+    const bounds = panel.current.getBoundingClientRect()
+    setPanelPosition(keepPanelOnScreen({ left: bounds.left + direction[0], top: bounds.top + direction[1] }))
+  }
+
+  // Escape closes the panel (a dialog open on top, e.g. lesson details, gets the Escape key first)
+  useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && !document.querySelector('[role=dialog]') && setChatOpen(false)
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [setChatOpen])
+
+  const tab = (id, label) => (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active === id}
+      onClick={() => setMode(id)}
+      className={`min-h-9 flex-1 rounded-lg px-2 text-[13px] font-bold ${active === id ? 'bg-white text-navy shadow-sm' : 'text-slate-500 hover:text-navy'}`}
+    >
+      {label}
+    </button>
+  )
+
+  return (
+    <aside ref={panel} aria-label="AI Tutor Assistant" style={{ width: panelSize?.width, height: panelSize?.height || 'min(640px, calc(100dvh - 32px))', maxWidth: 'calc(100vw - 16px)', maxHeight: 'calc(100dvh - 16px)', ...(panelPosition ? { left: panelPosition.left, top: panelPosition.top } : { right: 16, top: 'min(96px, 4dvh)' }) }} className="fixed z-40 flex w-[min(390px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-brand-100">
+      <header className="bg-gradient-to-r from-brand-50 to-white px-4 pb-2 pt-3">
+        <div className="flex items-center gap-3">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow ring-1 ring-brand-100">
+            <Robot className="h-10 w-10" sparkles={false} />
+          </span>
+          <div role="button" tabIndex={0} aria-label="Move chat window using drag or arrow keys" title="Drag to move the chat window" onPointerDown={startPanelDrag} onPointerMove={movePanel} onPointerUp={() => { panelDrag.current = null }} onPointerCancel={() => { panelDrag.current = null }} onKeyDown={movePanelWithKeyboard} className="min-w-0 flex-1 touch-none select-none cursor-move rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500">
+            <div className="text-lg font-extrabold text-navy">AI Tutor Assistant</div>
+            <div className="text-xs text-slate-500">{active === 'ai' ? 'Ask about your lessons, payments and tutors' : 'Your learning matchmaker'}</div>
+          </div>
+          <button onClick={() => setChatOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Minimise">
+            <Icon name="minus" className="h-[18px] w-[18px]" />
+          </button>
+          <button onClick={() => setChatOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Close">
+            <Icon name="x" className="h-[18px] w-[18px]" />
+          </button>
+        </div>
+        <div role="tablist" aria-label="Assistant mode" className="mt-2 flex gap-1 rounded-xl bg-brand-50 p-1">
+          {tab('ai', 'AI Assistant')}
+          {tab('guided', 'Guided Tutor Search')}
+        </div>
+      </header>
+      {/* Both stay mounted so switching tabs never loses a conversation */}
+      <div className={active === 'ai' ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}>
+        <AiChat key={user?.id ?? 'none'} capabilities={caps} onUseGuided={() => setMode('guided')} />
+      </div>
+      <div className={active === 'guided' ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}>
+        <GuidedChat />
+      </div>
+      <button type="button" aria-label="Resize chat window using drag or arrow keys" title="Drag to resize" onPointerDown={startResize} onPointerMove={dragResize} onPointerUp={() => { resizeStart.current = null }} onPointerCancel={() => { resizeStart.current = null }} onKeyDown={keyboardResize} className="absolute bottom-0 right-0 z-10 flex h-6 w-6 touch-none select-none items-center justify-center rounded-tl-lg bg-white text-slate-400 cursor-se-resize focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500">◢</button>
+    </aside>
+  )
+}
+
+// ───────────── guided tutor search (deterministic, no AI) ─────────────
+
+function GuidedChat() {
   const m = useMatching()
   const navigate = useNavigate()
   const { catalog, kids, kidsLoaded, criteria, setCriteria, setChatOpen, loadError, reloadShared } = m
@@ -149,14 +281,6 @@ function ChatPanel() {
   const input = useRef(null)
   const started = useRef(false)
 
-  // Opening the panel puts the cursor in the message box; Escape closes it again
-  useEffect(() => {
-    input.current?.focus()
-    // A dialog open on top (e.g. lesson details) gets the Escape key first
-    const onKey = (e) => e.key === 'Escape' && !document.querySelector('[role=dialog]') && setChatOpen(false)
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [setChatOpen])
 
   // The conversation lives for as long as the portal is open; closing the panel just hides it
   useEffect(() => {
@@ -246,26 +370,13 @@ function ChatPanel() {
   }
 
   return (
-    <aside aria-label="AI Tutor Assistant" className="pop-in fixed bottom-28 right-4 top-24 z-40 flex w-[min(390px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-brand-100">
-      <header className="flex items-center gap-3 bg-gradient-to-r from-brand-50 to-white px-4 py-3">
-        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow ring-1 ring-brand-100">
-          <Robot className="h-10 w-10" sparkles={false} />
-        </span>
-        <div className="flex-1">
-          <div className="text-lg font-extrabold text-navy">AI Tutor Assistant</div>
-          <div className="text-xs text-slate-500">Your learning matchmaker</div>
-        </div>
-        <button onClick={restart} title="Start over" className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Start over">
-          <Icon name="refresh" className="h-[18px] w-[18px]" />
+    <>
+      <div className="flex items-center justify-between border-b border-slate-100 bg-white px-4 py-1.5 text-xs text-slate-500">
+        <span>Step-by-step search (no AI)</span>
+        <button onClick={restart} className="flex min-h-9 items-center gap-1 rounded-lg px-2 font-semibold text-brand-600 hover:bg-brand-50" aria-label="Start over">
+          <Icon name="refresh" className="h-3.5 w-3.5" /> Start over
         </button>
-        <button onClick={() => setChatOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Minimise">
-          <Icon name="minus" className="h-[18px] w-[18px]" />
-        </button>
-        <button onClick={() => setChatOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Close">
-          <Icon name="x" className="h-[18px] w-[18px]" />
-        </button>
-      </header>
-
+      </div>
       {/* aria-live: each new message from the assistant is read out by screen readers */}
       <div ref={scroller} aria-live="polite" className="flex-1 space-y-3 overflow-y-auto bg-brand-25 px-4 py-4">
         {!catalog && loadError && (
@@ -293,7 +404,7 @@ function ChatPanel() {
           <Icon name="send" className="h-[18px] w-[18px]" />
         </button>
       </form>
-    </aside>
+    </>
   )
 }
 

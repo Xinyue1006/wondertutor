@@ -1,5 +1,6 @@
 // Payments (sandbox), commission snapshot, refund requests and reviews.
 import { prisma } from '../config/prisma.js'
+import { env } from '../config/env.js'
 import { MONDAY, api, makeBooking, makeParent, makeTutor, nextDate, resetDb, startServer, stopServer } from './helpers.js'
 
 let parent, other, monday
@@ -21,6 +22,17 @@ async function checkout(tutor, { price = 60, start = '17:00' } = {}) {
 }
 
 describe('checkout', () => {
+  test('production refuses the built-in simulated gateway without changing payment records', async () => {
+    const t = await makeTutor()
+    const b = await makeBooking({ parent: parent.parent, child: parent.child, tutor: t.tutor, date: monday, start: '16:00', status: 'AWAITING_PAYMENT' })
+    const original = env.nodeEnv
+    try {
+      env.nodeEnv = 'production'
+      expect((await api(parent.token).post('/parent/payments/checkout', { bookingId: b.id })).status).toBe(503)
+      expect((await api(parent.token).post('/parent/payments/1/confirm', { bank: 'Maybank2u', outcome: 'SUCCESS' })).status).toBe(404)
+      expect(await prisma.payment.count({ where: { bookingId: b.id } })).toBe(0)
+    } finally { env.nodeEnv = original }
+  })
   test('amount = agreed hourly price x lesson hours (decimal maths)', async () => {
     const t = await makeTutor()
     const b = await makeBooking({ parent: parent.parent, child: parent.child, tutor: t.tutor, date: monday, start: '16:00', status: 'AWAITING_PAYMENT', price: 33.33 })

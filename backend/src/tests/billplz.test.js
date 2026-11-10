@@ -29,7 +29,7 @@ beforeAll(async () => {
       const form = Object.fromEntries(new URLSearchParams(options.body))
       created.push(form)
       const id = `bill${++billCount}`
-      bills[id] = { id, amount: Number(form.amount), paid: false, state: 'due', url: `https://billplz.test/bills/${id}` }
+      bills[id] = { ...form, id, paid_amount: 0, amount: Number(form.amount), paid: false, state: 'due', url: `https://billplz.test/bills/${id}` }
       return json(200, bills[id])
     }
     const found = bills[u.split('/').pop()]
@@ -55,7 +55,7 @@ const redirectBody = (id, paid, key = KEY) => {
   const fields = { 'billplz[id]': id, 'billplz[paid]': String(paid), 'billplz[paid_at]': '2026-10-22 10:00:00 +0800' }
   return { id, paid: String(paid), paid_at: fields['billplz[paid_at]'], x_signature: signatureFor(fields, key) }
 }
-const markPaid = (id) => { bills[id].paid = true; bills[id].state = 'paid' }
+const markPaid = (id) => { bills[id].paid = true; bills[id].state = 'paid'; bills[id].paid_amount = bills[id].amount }
 
 async function callback(fields) {
   const res = await realFetch(`${apiBase()}/payments/billplz/callback`, { method: 'POST', body: new URLSearchParams(fields) })
@@ -76,6 +76,8 @@ describe('the signature', () => {
   })
 
   test('a wrong, missing or different-key signature is refused', () => {
+    expect(signatureIsValid({ id: 'b1', x_signature: '界'.repeat(64) })).toBe(false)
+    expect(signatureIsValid({ id: 'b1', x_signature: 'z'.repeat(64) })).toBe(false)
     const good = redirectBody('b1', true)
     expect(signatureIsValid({ 'billplz[id]': 'b1', 'billplz[paid]': 'true', 'billplz[paid_at]': good.paid_at, 'billplz[x_signature]': good.x_signature })).toBe(true)
     expect(signatureIsValid({ 'billplz[id]': 'b1', 'billplz[paid]': 'false', 'billplz[paid_at]': good.paid_at, 'billplz[x_signature]': good.x_signature })).toBe(false)
@@ -86,6 +88,43 @@ describe('the signature', () => {
 })
 
 describe('checkout with Billplz', () => {
+  test('a bank payment arriving after API cancellation is retained and refunded exactly once', async () => {
+    const { booking, checkout: c } = await startPayment()
+    expect((await api(parent.token).post(`/parent/bookings/${booking.id}/cancel`)).status).toBe(200)
+    expect((await prisma.payment.findUnique({ where: { id: c.paymentId } })).status).toBe('FAILED')
+    markPaid(c.gatewayRef)
+    const first = await api(parent.token).post('/parent/payments/return', redirectBody(c.gatewayRef, true))
+    expect(first.outcome).toBe('LATE')
+    const second = await api(parent.token).post('/parent/payments/return', redirectBody(c.gatewayRef, true))
+    expect(second.outcome).toBe('LATE')
+    expect((await prisma.payment.findUnique({ where: { id: c.paymentId } })).status).toBe('PAID')
+    expect((await prisma.booking.findUnique({ where: { id: booking.id } })).status).toBe('CANCELLED')
+    expect(await prisma.refund.count({ where: { paymentId: c.paymentId, type: 'AUTO' } })).toBe(1)
+  })
+  test('recovers the original bill after the provider creates it but the response is lost', async () => {
+    const original = global.fetch
+    let checkout
+    try {
+      global.fetch = async (url, options) => {
+        const response = await original(url, options)
+        if (String(url) === BASE + '/v3/bills' && options?.method === 'POST') throw new Error('timeout')
+        return response
+      }
+      checkout = await startPayment()
+    } finally { global.fetch = original }
+    expect(checkout.checkout.status).toBe(502)
+    const id = 'bill' + billCount
+    const before = await prisma.payment.findUnique({ where: { bookingId: checkout.booking.id } })
+    expect(before.gatewayRef).toBeNull()
+    markPaid(id)
+    bills[id].paid_amount--
+    expect(await callback(signedCallback(id))).toBe(500)
+    expect((await prisma.payment.findUnique({ where: { id: before.id } })).gatewayRef).toBeNull()
+    markPaid(id)
+    expect(await callback(signedCallback(id))).toBe(200)
+    expect(await callback(signedCallback(id))).toBe(200)
+    expect(await prisma.payment.findUnique({ where: { id: before.id } })).toMatchObject({ gatewayRef: id, status: 'PAID' })
+  })
   test('creates a bill for the exact amount in cents and returns the Billplz page to open', async () => {
     const t = await makeTutor()
     const b = await makeBooking({ parent: parent.parent, child: parent.child, tutor: t.tutor, date: monday, start: '16:00', status: 'AWAITING_PAYMENT', price: 33.33 })
@@ -102,6 +141,10 @@ describe('checkout with Billplz', () => {
     const payment = await prisma.payment.findUnique({ where: { id: res.paymentId } })
     expect(payment.status).toBe('PENDING')
     expect(payment.gatewayRef).toBe(res.gatewayRef)
+    const count = created.length
+    const retry = await api(parent.token).post('/parent/payments/checkout', { bookingId: b.id })
+    expect(retry.redirectUrl).toBe(res.redirectUrl)
+    expect(created.length).toBe(count)
   })
 
   test('says so when the gateway is down, and nothing is charged', async () => {
@@ -112,7 +155,8 @@ describe('checkout with Billplz', () => {
     const res = await api(parent.token).post('/parent/payments/checkout', { bookingId: b.id })
     global.fetch = saved
     expect(res.status).toBe(502)
-    expect(res.message).toContain('not been charged')
+    expect(res.message).toContain('original bill')
+    expect((await api(parent.token).post('/parent/payments/checkout', { bookingId: b.id })).status).toBe(409)
     expect((await prisma.booking.findUnique({ where: { id: b.id } })).status).toBe('AWAITING_PAYMENT')
   })
 

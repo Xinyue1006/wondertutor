@@ -107,18 +107,29 @@ export async function sendPaymentReminders(now = new Date()) {
   return { sent }
 }
 
+// One finite pass, shared by the local timer and the Hostinger cron entry point.
+export async function runHousekeeping(now = new Date()) {
+  const { expired } = await expireStaleBookings(now)
+  const { sent } = await sendLessonReminders(now)
+  const { sent: paymentReminders } = await sendPaymentReminders(now)
+  const { moved } = await promoteChildren(now)
+  return { expired, sent, paymentReminders, moved }
+}
+
 // Runs once at start-up and then every few minutes. Errors are logged, never thrown, so the API keeps running.
 export function startScheduler(intervalMs = 5 * 60_000) {
+  let running = false
   const run = async () => {
+    if (running) return
+    running = true
     try {
-      const { expired } = await expireStaleBookings()
-      const { sent } = await sendLessonReminders()
-      const { sent: paymentReminders } = await sendPaymentReminders()
-      const { moved } = await promoteChildren() // 1 January: every child moves up a grade (does nothing the rest of the year)
+      const { expired, sent, paymentReminders, moved } = await runHousekeeping()
       if (moved) console.log(`[scheduler] moved ${moved} child(ren) up a grade for the new school year`)
       if (expired || sent || paymentReminders) console.log(`[scheduler] expired ${expired} booking(s), sent ${sent} lesson and ${paymentReminders} payment reminder(s)`)
     } catch (err) {
       console.error('[scheduler]', err.message)
+    } finally {
+      running = false
     }
   }
   run()

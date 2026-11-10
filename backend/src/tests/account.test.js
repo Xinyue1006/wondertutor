@@ -1,6 +1,7 @@
 // Privacy and account controls (PDPA): consent at sign-up, reminder emails on/off, "download my data" and
 // "delete my account" (personal details go, lesson and payment records stay without a name).
 import { prisma } from '../config/prisma.js'
+import { signToken } from '../services/token.service.js'
 import { outbox } from '../services/email.service.js'
 import { MONDAY, api, apiBase, makeAdmin, makeBooking, makeParent, makeTutor, nextDate, resetDb, startServer, stopServer } from './helpers.js'
 
@@ -49,6 +50,7 @@ describe('download my data', () => {
   test('contains my own data, not the password and not anyone else’s', async () => {
     const p = await makeParent()
     const other = await makeParent()
+    await prisma.child.update({ where: { id: p.child.id }, data: { preferredLanguage: 'Mandarin', goals: 'Improve fractions' } })
     await makeBooking({ parent: p.parent, child: p.child, tutor: tutor.tutor, date: monday, start: '16:00', status: 'COMPLETED' })
     await makeBooking({ parent: other.parent, child: other.child, tutor: tutor.tutor, date: monday, start: '17:00', status: 'COMPLETED' })
     const res = await fetch(`${apiBase()}/parent/account/export`, { headers: { Authorization: `Bearer ${p.token}` } })
@@ -58,6 +60,7 @@ describe('download my data', () => {
     const data = JSON.parse(text)
     expect(data.account.email).toBe(p.user.email)
     expect(data.children.map((c) => c.name)).toEqual(['Sarah'])
+    expect(data.children[0]).toMatchObject({ preferredLanguage: 'Mandarin', goals: 'Improve fractions' })
     expect(data.bookings).toHaveLength(1)
     expect(text).not.toContain('passwordHash')
     expect(text).not.toContain(other.user.email)
@@ -98,7 +101,7 @@ describe('delete my account', () => {
   test('removes the personal details but keeps the lesson and payment records, now without a name', async () => {
     const p = await makeParent()
     await prisma.parentProfile.update({ where: { id: p.parent.id }, data: { latitude: 3.2, longitude: 101.6, preferences: { mode: 'ONLINE' } } })
-    await prisma.child.update({ where: { id: p.child.id }, data: { notes: 'Struggles with fractions', photoUrl: 'https://res.cloudinary.com/demo/x.jpg' } })
+    await prisma.child.update({ where: { id: p.child.id }, data: { notes: 'Struggles with fractions', goals: 'Sensitive family learning goal', preferredLanguage: 'Mandarin', photoUrl: 'https://res.cloudinary.com/demo/x.jpg' } })
     const b = await makeBooking({ parent: p.parent, child: p.child, tutor: tutor.tutor, date: monday, start: '17:00', status: 'COMPLETED', extra: { location: 'Kepong, Kuala Lumpur', latitude: 3.2, longitude: 101.6, messageToTutor: 'Please call me' } })
     await prisma.payment.create({ data: { bookingId: b.id, amount: 50, commissionRate: 10, commissionAmount: 5, status: 'PAID', paidAt: new Date() } })
     await prisma.notification.create({ data: { userId: p.user.id, type: 'X', title: 'x', message: 'x' } })
@@ -117,7 +120,7 @@ describe('delete my account', () => {
     const parent = await prisma.parentProfile.findUnique({ where: { id: p.parent.id } })
     expect(parent).toMatchObject({ address: null, latitude: null, longitude: null })
     expect(parent.preferences).toBeNull()
-    expect(await prisma.child.findUnique({ where: { id: p.child.id } })).toMatchObject({ name: 'Child', notes: null, photoUrl: null })
+    expect(await prisma.child.findUnique({ where: { id: p.child.id } })).toMatchObject({ name: 'Child', notes: null, goals: null, preferredLanguage: null, photoUrl: null })
 
     // records the centre needs stay
     expect(await prisma.booking.findUnique({ where: { id: b.id } })).toMatchObject({ status: 'COMPLETED', location: null, latitude: null, messageToTutor: null })
@@ -144,9 +147,20 @@ describe('delete my account', () => {
 
   test('a Google-only account (no password) confirms with the email alone', async () => {
     const p = await makeParent()
-    await prisma.user.update({ where: { id: p.user.id }, data: { passwordHash: null, googleId: 'g-123' } })
+    const googleUser = await prisma.user.update({ where: { id: p.user.id }, data: { passwordHash: null, googleId: 'g-123' } })
+    p.token = signToken(googleUser)
     const res = await api(p.token).post('/parent/account/delete', { confirmEmail: p.user.email })
     expect(res.status).toBe(200)
+  })
+
+  test('an approved refund still awaiting processing blocks account deletion', async () => {
+    const p = await makeParent()
+    const b = await makeBooking({ parent: p.parent, child: p.child, tutor: tutor.tutor, date: monday, start: '17:00', status: 'CANCELLED' })
+    const payment = await prisma.payment.create({ data: { bookingId: b.id, amount: 50, commissionRate: 10, commissionAmount: 5, status: 'PAID' } })
+    await prisma.refund.create({ data: { paymentId: payment.id, amount: 50, type: 'ADMIN_REVIEW', status: 'APPROVED', reason: 'Approved; transfer pending' } })
+    expect((await api(p.token).get('/parent/account/deletion-check')).blockers.refunds).toBe(1)
+    expect((await del(p)).status).toBe(409)
+    expect((await prisma.user.findUnique({ where: { id: p.user.id } })).deletedAt).toBeNull()
   })
 
   test('Admin sees it as deleted and cannot reactivate it', async () => {

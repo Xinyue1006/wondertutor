@@ -28,6 +28,8 @@ describe('form validation rules (same as the server)', () => {
     expect(checkPassword('short1')).toContain('at least 8')
     expect(checkPassword('onlyletters')).toContain('letter and a number')
     expect(checkPassword(`${'a'.repeat(72)}1`)).toContain('72 characters')
+    expect(checkPassword(`A1${'界'.repeat(23)}`)).toBe('')
+    expect(checkPassword(`A1${'界'.repeat(24)}`)).toContain('UTF-8 bytes')
   })
 
   test('ringgit amounts and text length', () => {

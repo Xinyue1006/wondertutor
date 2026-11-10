@@ -57,6 +57,7 @@ export const password = z.string()
   .max(72, 'Password must be 72 characters or fewer')
   .regex(/[A-Za-z]/, 'Password must contain a letter')
   .regex(/\d/, 'Password must contain a number')
+  .refine((v) => Buffer.byteLength(v, 'utf8') <= 72, 'Password must be 72 UTF-8 bytes or fewer; use fewer non-English characters')
 
 export const otpCode = z.string().trim().regex(/^\d{6}$/, 'Code must be 6 digits')
 
@@ -98,7 +99,15 @@ export const yearsExperience = z.number({ message: 'Enter your years of experien
 // a link into one of those could show a stranger's file inside our pages. (Without a cloud name configured, which only
 // happens in development, any Cloudinary address passes so the forms can still be tried.)
 export const ownUploadPrefix = () => (env.cloudinary.cloudName ? `https://res.cloudinary.com/${env.cloudinary.cloudName}/` : 'https://res.cloudinary.com/')
-export const isOwnUpload = (url) => typeof url === 'string' && url.startsWith(ownUploadPrefix())
+export function isOwnUpload(url) {
+  if (typeof url !== 'string') return false
+  try {
+    const parsed = new URL(url)
+    // Compare the URL browsers actually request, after resolving /../ and encoded
+    // dot segments; a raw startsWith check could escape into another cloud account.
+    return !parsed.username && !parsed.password && parsed.href.startsWith(ownUploadPrefix())
+  } catch { return false }
+}
 
 export const cloudinaryUrl = (label = 'File') =>
   z.string().trim().max(500, `${label} link is too long`).url(`${label} link is invalid`)

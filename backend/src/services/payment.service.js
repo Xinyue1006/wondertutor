@@ -13,7 +13,10 @@ export async function settlePayment(paymentId, { paid, method = 'FPX', real = fa
   const payment = await prisma.payment.findUnique({ where: { id: paymentId }, include: settleInclude })
   if (!payment) throw new AppError(404, 'Payment not found')
   // Gateways retry callbacks and people refresh pages, so a payment that is already settled is not an error
-  if (payment.status !== 'PENDING') return { result: 'ALREADY', payment }
+  // Cancellation/expiry closes local checkout as FAILED, but cannot stop a bank
+  // transfer already underway. A verified paid gateway result must still be recorded.
+  const payableStatuses = real && paid ? ['PENDING', 'FAILED'] : ['PENDING']
+  if (!payableStatuses.includes(payment.status)) return { result: 'ALREADY', payment }
 
   if (!paid) {
     const { count } = await prisma.payment.updateMany({ where: { id: payment.id, status: 'PENDING' }, data: { status: 'FAILED' } })
@@ -32,7 +35,7 @@ export async function settlePayment(paymentId, { paid, method = 'FPX', real = fa
   // cannot confirm twice or confirm a booking that was released.
   await prisma.$transaction(async (tx) => {
     const done = await tx.payment.updateMany({
-      where: { id: payment.id, status: 'PENDING' },
+      where: { id: payment.id, status: { in: payableStatuses } },
       data: { status: 'PAID', paidAt: new Date(), method, commissionRate: rate, commissionAmount },
     })
     if (!done.count) throw new AppError(409, 'This payment has already been processed')

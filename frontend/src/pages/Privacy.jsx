@@ -84,6 +84,7 @@ export default function Privacy() {
           'Parents see a tutor’s public profile: name, photo, subjects, qualifications (once approved), rating and reviews. Reviews show the parent’s name.',
           'The centre’s admin team can see accounts, bookings, payments and complaints in order to run the service and help you.',
           'Companies that help us run the service see only what they need: Google (sign-in and the “I’m not a robot” check), Cloudinary (photos and documents), our email provider, our hosting provider, and the payment gateway once payments are switched on.',
+          'If you choose to use the optional AI Assistant (read-only), your question and short, relevant parts of your own records (for example lesson dates, amounts or what a tutor recorded) are sent to Google’s Gemini service to produce an answer. We replace names with references and hide emails, phone numbers and street addresses first, but this does not make the information anonymous. Guided Tutor Search works without it.',
           'We share data with authorities only when the law requires it.',
         ]} />
       </Section>

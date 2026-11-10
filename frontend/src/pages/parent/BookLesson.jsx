@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import api, { errorMessage } from '../../api/client'
 import { useMatching } from '../../assistant/MatchingContext'
@@ -11,11 +11,7 @@ import { gradeLabel } from '../../lib/education'
 import { childSubjects } from '../../lib/subjects'
 import { checkRinggit, checkText } from '../../lib/validation'
 
-const hourOf = (hhmm) => Number(hhmm.split(':')[0])
-const shortLabel = (s, e) => `${hhmmLabel(s).replace(' AM', '').replace(' PM', '')} - ${hhmmLabel(e).replace(' AM', '').replace(' PM', '')}`
-
-// "Book a Lesson": pick a free hour on the tutor's weekly calendar, then send a booking REQUEST.
-// Nothing is confirmed until the tutor agrees a price and the parent pays.
+// Parents select dated one-hour lessons; the server rechecks every selection.
 export default function BookLesson() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -23,15 +19,16 @@ export default function BookLesson() {
   const { kids, kidsLoaded, loadError, reloadShared } = useMatching()
 
   const [tutor, setTutor] = useState(null)
+  const [calendarVersion, setCalendarVersion] = useState(0)
   const [week, setWeek] = useState(mondayOfYmd(prefill.date || todayYmd()))
   const [grid, setGrid] = useState(null)
-  const [sel, setSel] = useState(prefill.date ? { date: prefill.date, start: prefill.time } : null)
+  const [calendarError, setCalendarError] = useState('')
+  const [selectedSlots, setSelectedSlots] = useState(prefill.slots?.length ? prefill.slots : prefill.date && prefill.time ? [{ date: prefill.date, start: prefill.time }] : [])
   const [childId, setChildId] = useState(prefill.childId || '')
   const [mode, setMode] = useState(prefill.mode || '')
   const [subject, setSubject] = useState('')
   const [price, setPrice] = useState(prefill.price || '')
   const [msg, setMsg] = useState(prefill.msg || '')
-  const [trial, setTrial] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(false)
@@ -49,9 +46,14 @@ export default function BookLesson() {
   useEffect(() => { if (kidsLoaded && !childId && kids[0]) setChildId(kids[0].id) }, [kidsLoaded, kids, childId])
 
   useEffect(() => {
+    const controller = new AbortController()
     setGrid(null)
-    api.get(`/parent/tutors/${id}/slots`, { params: { from: week } }).then((r) => setGrid(r.data.days)).catch((e) => setError(errorMessage(e)))
-  }, [id, week])
+    setCalendarError('')
+    api.get(`/parent/tutors/${id}/slots`, { params: { from: week }, signal: controller.signal })
+      .then(r => { if (!controller.signal.aborted) setGrid(r.data.days) })
+      .catch(e => { if (!controller.signal.aborted) setCalendarError(errorMessage(e)) })
+    return () => controller.abort()
+  }, [id, week, calendarVersion])
 
   const child = kids.find((k) => k.id === Number(childId))
 
@@ -62,38 +64,34 @@ export default function BookLesson() {
     if (tutor && match) setSubject(match)
   }, [tutor, child])
 
-  const hours = useMemo(() => {
-    const all = (grid || []).flatMap((d) => d.slots)
-    const lo = Math.min(8, ...all.map((s) => hourOf(s.start)))
-    const hi = Math.max(20, ...all.map((s) => hourOf(s.end)))
-    return Array.from({ length: hi - lo }, (_, i) => lo + i)
-  }, [grid])
-
   if (error && !tutor) return <div className="card p-8 text-center text-red-600">{error}</div>
   if (!kidsLoaded && loadError) return <LoadError message={loadError} onRetry={reloadShared} />
   if (!tutor || !kidsLoaded) return <Spinner />
 
-  const isThisWeek = week <= mondayOfYmd(todayYmd())
-  const selSlot = sel && grid?.find((d) => d.date === sel.date)?.slots.find((s) => s.start === sel.start)
+  const toggleSlot = slot => {
+    setSelectedSlots(current => current.some(s => s.date === slot.date && s.start === slot.start)
+      ? current.filter(s => s.date !== slot.date || s.start !== slot.start)
+      : current.length < 12 ? [...current, slot] : current)
+  }
   const teachesChild = !child || tutor.grades.includes(gradeLabel(child.educationLevel, child.grade))
 
   async function send() {
     setError('')
     if (!child) return setError('Please choose a child (add one under My Children first).')
-    if (!sel) return setError('Please select an available time on the calendar.')
+    if (!selectedSlots.length) return setError('Please select an available time on the calendar.')
     const problem = checkRinggit(price, 'Proposed price') || checkText(msg, { label: 'Message', max: 200 })
     if (problem) return setError(problem)
     setBusy(true)
     try {
       await api.post('/parent/bookings', {
-        tutorId: tutor.id, childId: child.id, date: sel.date, startTime: sel.start, teachingMode: mode,
-        proposedPrice: Number(price), subject, messageToTutor: msg || undefined, isTrial: trial,
+        tutorId: tutor.id, childId: child.id, slots: selectedSlots.map(s => ({ date: s.date, startTime: s.start })), teachingMode: mode,
+        proposedPrice: Number(price), subject, messageToTutor: msg || undefined,
       })
       setDone(true)
     } catch (err) {
       setError(errorMessage(err))
       // The slot may have just been taken: refresh the calendar
-      api.get(`/parent/tutors/${id}/slots`, { params: { from: week } }).then((r) => setGrid(r.data.days))
+      setCalendarVersion(v => v + 1)
     } finally {
       setBusy(false)
     }
@@ -101,7 +99,7 @@ export default function BookLesson() {
 
   return (
     <div>
-      <PageTitle icon="calendar" title="Book a Lesson" subtitle="Select an available time and send a booking request to the tutor." />
+      <PageTitle icon="calendar" title="Book a Lesson" subtitle="Select up to 12 dated one-hour lessons and send them together to the tutor." />
 
       <div className="grid items-start gap-6 xl:grid-cols-[1fr_400px]">
         <div className="min-w-0 space-y-4">
@@ -115,67 +113,39 @@ export default function BookLesson() {
             <Link to={`/parent/tutors/${tutor.id}`} className="btn-outline px-6">View Profile</Link>
           </section>
 
-          <section className="card p-4">
-            <div className="mb-3 flex flex-wrap items-center gap-3">
-              <button disabled={isThisWeek} onClick={() => setWeek(addDaysYmd(week, -7))} className="btn-outline px-4 py-2"><Icon name="left" className="h-4 w-4" /> Previous Week</button>
-              <label className="relative flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-brand-200 bg-white px-3 text-sm font-semibold text-navy">
-                <Icon name="calendar" className="h-4 w-4 text-brand-500" />
-                {dayMonth(week)} – {dayMonth(addDaysYmd(week, 6))} {addDaysYmd(week, 6).slice(0, 4)}
-                <Icon name="down" className="h-4 w-4" />
-                <input type="date" min={todayYmd()} value={sel?.date || week} onChange={(e) => e.target.value && setWeek(mondayOfYmd(e.target.value))} className="absolute inset-0 cursor-pointer opacity-0" aria-label="Jump to week" />
+          <section className="card p-3 sm:p-4">
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <button type="button" disabled={week <= mondayOfYmd(todayYmd())} onClick={() => setWeek(addDaysYmd(week, -7))} className="btn-outline min-h-11 px-3"><Icon name="left" className="h-4 w-4" /> Previous Week</button>
+              <span className="font-semibold text-navy">{dayMonth(week)} – {dayMonth(addDaysYmd(week, 6))}</span>
+              <button type="button" onClick={() => setWeek(addDaysYmd(week, 7))} className="btn-outline min-h-11 px-3">Next Week <Icon name="right" className="h-4 w-4" /></button>
+              <button type="button" onClick={() => setWeek(mondayOfYmd(todayYmd()))} className="btn-outline min-h-11 px-3">This Week</button>
+              <label className="flex flex-wrap items-center gap-2 text-sm font-semibold">Jump to date
+                <input type="date" aria-label="Jump to week" min={todayYmd()} value={week} onChange={e => { if (e.target.value) setWeek(mondayOfYmd(e.target.value)) }} className="input min-h-11 w-auto max-w-full" />
               </label>
-              <button onClick={() => setWeek(addDaysYmd(week, 7))} className="btn-outline px-4 py-2">Next Week <Icon name="right" className="h-4 w-4" /></button>
-              <button onClick={() => setWeek(mondayOfYmd(todayYmd()))} className="btn-outline bg-brand-50 px-4 py-2">This Week</button>
-              <div className="ml-auto flex items-center gap-4 text-xs text-slate-600">
-                <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-brand-500" /> Available</span>
-                <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-navy" /> Selected</span>
-                <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-slate-300" /> Unavailable</span>
-              </div>
             </div>
-
-            {!grid ? <Spinner /> : (
-              <div className="overflow-x-auto">
+            <p className="mb-3 text-xs text-slate-500">Malaysia time (MYT) · Blue: available · Dark: selected · Grey: unavailable</p>
+            {calendarError ? <LoadError message={calendarError} onRetry={() => setCalendarVersion(v => v + 1)} /> : !grid ? <Spinner /> : (
+              <div className="overflow-x-auto" role="region" aria-label="Weekly lesson calendar" tabIndex={0}>
                 <table className="w-full min-w-[720px] table-fixed border-separate border-spacing-1 text-center text-xs">
-                  <thead>
-                    <tr>
-                      <th className="w-20 text-left text-slate-500">Time</th>
-                      {grid.map((d) => (
-                        <th key={d.date} className={`rounded-lg py-1.5 ${d.date === todayYmd() ? 'bg-brand-50' : ''}`}>
-                          <div className="font-bold text-navy">{weekdayName(d.date)}</div>
-                          <div className="font-normal text-slate-500">{dayMonth(d.date)}</div>
-                        </th>
-                      ))}
+                  <thead><tr><th className="w-20 text-left text-slate-500">Time</th>{grid.map(d => <th key={d.date} className="rounded-lg py-2"><div className="font-bold text-navy">{weekdayName(d.date)}</div><div className="font-normal text-slate-500">{dayMonth(d.date)}</div></th>)}</tr></thead>
+                  <tbody>{Array.from({ length: 15 }, (_, i) => i + 7).map(hour => {
+                    const start = String(hour).padStart(2, '0') + ':00'
+                    const end = String(hour + 1).padStart(2, '0') + ':00'
+                    return <tr key={hour}>
+                      <td className="whitespace-nowrap pr-2 text-left text-slate-500">{hhmmLabel(start)}</td>
+                      {grid.map(d => {
+                        const slot = d.slots.find(s => s.start === start)
+                        const selected = selectedSlots.some(s => s.date === d.date && s.start === start)
+                        return <td key={d.date} className="rounded bg-slate-50 p-0">
+                          {slot && <button type="button" aria-label={d.date + ' ' + start} aria-pressed={selected} disabled={slot.status !== 'available' || (!selected && selectedSlots.length >= 12)}
+                            onClick={() => toggleSlot({ date: d.date, start })}
+                            className={'h-8 w-full rounded px-1 font-semibold transition disabled:cursor-not-allowed ' + (selected ? 'bg-navy text-white' : slot.status === 'available' ? 'bg-brand-500 text-white hover:bg-brand-600' : 'bg-slate-300 text-white')}>
+                            {hhmmLabel(start).replace(' AM', '').replace(' PM', '')} - {hhmmLabel(end).replace(' AM', '').replace(' PM', '')}
+                          </button>}
+                        </td>
+                      })}
                     </tr>
-                  </thead>
-                  <tbody>
-                    {hours.map((h) => (
-                      <tr key={h}>
-                        <td className="whitespace-nowrap pr-2 text-left text-slate-500">{hhmmLabel(`${h}:00`)}</td>
-                        {grid.map((d) => {
-                          const slot = d.slots.find((s) => hourOf(s.start) === h)
-                          const selected = sel?.date === d.date && sel?.start === slot?.start
-                          return (
-                            <td key={d.date} className="h-8 rounded bg-slate-50/80 p-0">
-                              {slot && (
-                                <button
-                                  type="button"
-                                  disabled={slot.status !== 'available'}
-                                  onClick={() => setSel({ date: d.date, start: slot.start })}
-                                  className={`h-8 w-full rounded font-semibold transition ${
-                                    selected ? 'bg-navy text-white ring-2 ring-navy/30'
-                                      : slot.status === 'available' ? 'bg-brand-500 text-white hover:bg-brand-600'
-                                        : 'cursor-not-allowed bg-slate-300 text-white'
-                                  }`}
-                                >
-                                  {shortLabel(slot.start, slot.end)}
-                                </button>
-                              )}
-                            </td>
-                          )
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
+                  })}</tbody>
                 </table>
               </div>
             )}
@@ -190,11 +160,14 @@ export default function BookLesson() {
             </div>
             <div className="space-y-3.5">
               <ErrorBox>{error}</ErrorBox>
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                <label className="block"><span className="mb-1 block text-sm font-bold text-navy">Selected Date</span>
-                  <div className="input flex h-10 items-center gap-2 text-navy"><Icon name="calendar" className="h-4 w-4 text-brand-500" /> {sel ? dateLabel(sel.date) : <span className="text-slate-400">Pick a slot</span>}</div></label>
-                <label className="block"><span className="mb-1 block text-sm font-bold text-navy">Selected Time</span>
-                  <div className="input flex h-10 items-center gap-2 text-navy"><Icon name="clock" className="h-4 w-4 text-brand-500" /> {selSlot ? `${hhmmLabel(selSlot.start)} - ${hhmmLabel(selSlot.end)}` : <span className="text-slate-400">Pick a slot</span>}</div></label>
+              <div className="space-y-2">
+                <p className="font-bold">Selected lessons ({selectedSlots.length}/12)</p>
+                {selectedSlots.length === 0 && <p>Select available hours. You can move between weeks.</p>}
+                {selectedSlots.map(slot => <div key={slot.date + slot.start} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-brand-50 p-2">
+                  <span>{dateLabel(slot.date)} · {hhmmLabel(slot.start)} (1 hour)</span>
+                  <button type="button" className="btn-outline" onClick={() => toggleSlot(slot)} aria-label={'Remove ' + slot.date + ' ' + slot.start}>Remove</button>
+                </div>)}
+                <p className="text-sm">Proposed total: RM{(Number(price || 0) * selectedSlots.length).toFixed(2)}. Each lesson is confirmed and paid separately.</p>
               </div>
               <label className="block"><span className="mb-1 block text-sm font-bold text-navy">Child <span className="text-red-500">*</span></span>
                 {kids.length === 0 ? <Link to="/parent/children?add=1" className="btn-outline w-full"><Icon name="plus" className="h-4 w-4" /> Add a child first</Link> : (
@@ -222,11 +195,6 @@ export default function BookLesson() {
               <label className="block"><span className="mb-1 block text-sm font-bold text-navy">Message to Tutor <span className="font-normal text-slate-500">(Optional)</span></span>
                 <textarea rows={3} maxLength={200} className="input resize-none" placeholder="E.g. My child would like to focus on exam preparation. Thank you!" value={msg} onChange={(e) => setMsg(e.target.value)} />
                 <span className="block text-right text-xs text-slate-400">{msg.length}/200</span></label>
-              {/* Trial lessons are paid like any lesson; the flag only tells the tutor it is the child's first lesson with them */}
-              <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-slate-200 p-3 text-sm">
-                <input type="checkbox" className="mt-0.5 h-4 w-4 accent-brand-500" checked={trial} onChange={(e) => setTrial(e.target.checked)} />
-                <span><b className="text-navy">This is a trial lesson</b><span className="block text-xs text-slate-600">A first lesson to see if the tutor is a good fit. It is paid like a normal lesson.</span></span>
-              </label>
               <button onClick={send} disabled={busy || !teachesChild} className="btn-primary h-12 w-full text-base">{busy ? 'Sending…' : 'Send Booking Request'} {!busy && <Icon name="arrow-right" className="h-4 w-4" />}</button>
             </div>
           </section>

@@ -25,6 +25,8 @@ describe('uploads must be in our own Cloudinary account', () => {
     expect(isOwnUpload('https://res.cloudinary.com.evil.example/our-cloud/x.jpg')).toBe(false) // look-alike host
     expect(isOwnUpload('https://evil.example/res.cloudinary.com/our-cloud/x.jpg')).toBe(false)
     expect(isOwnUpload('javascript:alert(1)')).toBe(false)
+    expect(isOwnUpload('https://res.cloudinary.com/our-cloud/../someone-elses-cloud/image/upload/x.jpg')).toBe(false)
+    expect(isOwnUpload('https://res.cloudinary.com/our-cloud/%2e%2e/someone-elses-cloud/image/upload/x.jpg')).toBe(false)
     expect(isOwnUpload(null)).toBe(false)
   })
 

@@ -10,7 +10,7 @@ export const billplzConfigured = () => Boolean(env.billplz.apiKey && env.billplz
 const authHeader = () => `Basic ${Buffer.from(`${env.billplz.apiKey}:`).toString('base64')}`
 
 async function call(path, options = {}) {
-  const res = await fetch(`${env.billplz.baseUrl}${path}`, { ...options, headers: { Authorization: authHeader(), ...options.headers } })
+  const res = await fetch(`${env.billplz.baseUrl}${path}`, { ...options, signal: AbortSignal.timeout(10_000), headers: { Authorization: authHeader(), ...options.headers } })
   const body = await res.json().catch(() => ({}))
   if (!res.ok) {
     const detail = body?.error?.message
@@ -52,8 +52,8 @@ export function signatureFor(params, key = env.billplz.xSignature) {
 
 export function signatureIsValid(params) {
   const given = String(params.x_signature ?? params['billplz[x_signature]'] ?? '')
-  if (!env.billplz.xSignature || !given) return false
+  if (!env.billplz.xSignature || !/^[a-f0-9]{64}$/i.test(given)) return false
   const expected = signatureFor(params)
   // timingSafeEqual needs equal lengths, and avoids leaking how many characters matched
-  return given.length === expected.length && timingSafeEqual(Buffer.from(given), Buffer.from(expected))
+  return timingSafeEqual(Buffer.from(given, 'hex'), Buffer.from(expected, 'hex'))
 }

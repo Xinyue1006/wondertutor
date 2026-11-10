@@ -25,7 +25,7 @@ const overlaps = (aStart, aEnd, bStart, bEnd) => aStart < bEnd && bStart < aEnd
 
 // 7 days starting at `fromDate` (YYYY-MM-DD) with every lesson cell and whether it can still be booked
 export async function getTutorSlots(tutorId, fromDate, days = 7) {
-  const [availability, blocking] = await Promise.all([
+  const [availability, blocking, exceptions] = await Promise.all([
     prisma.availabilitySlot.findMany({ where: { tutorId } }),
     prisma.booking.findMany({
       where: {
@@ -35,12 +35,15 @@ export async function getTutorSlots(tutorId, fromDate, days = 7) {
       },
       select: { startAt: true, endAt: true },
     }),
+    prisma.availabilityException.findMany({ where: { tutorId, date: { gte: fromDate, lt: addDays(fromDate, days) } } }),
   ])
   const now = new Date()
   return Array.from({ length: days }, (_, i) => {
     const date = addDays(fromDate, i)
     const dow = mytParts(mytToDate(date, '12:00')).dow
-    const slots = cellsForDay(availability, dow).map((c) => {
+    const override = exceptions.find(e => e.date === date)
+    const hours = override ? override.ranges.map(r => ({ ...r, dayOfWeek: dow })) : availability
+    const slots = cellsForDay(hours, dow).map((c) => {
       const s = mytToDate(date, c.start)
       const e = mytToDate(date, c.end)
       const taken = s <= now || blocking.some((b) => overlaps(s, e, b.startAt, b.endAt))
@@ -52,24 +55,25 @@ export async function getTutorSlots(tutorId, fromDate, days = 7) {
 
 // Throws unless the requested hour is inside the tutor's availability and not taken
 // ignoreBookingId: when an existing booking is being moved, it must not clash with itself
-export async function assertSlotBookable({ tutorId, startAt, endAt, ignoreBookingId }) {
+export async function assertSlotBookable({ tutorId, startAt, endAt, ignoreBookingId }, db = prisma) {
   if (startAt <= new Date()) throw new AppError(400, 'Please choose a time in the future')
   const { date, time, dow } = mytParts(startAt)
-  const availability = await prisma.availabilitySlot.findMany({ where: { tutorId, dayOfWeek: dow } })
+  const override = await db.availabilityException.findUnique({ where: { tutorId_date: { tutorId, date } } })
+  const availability = override ? override.ranges : await db.availabilitySlot.findMany({ where: { tutorId, dayOfWeek: dow } })
   const end = mytParts(endAt)
   const inside = availability.some(
     (a) => toMinutes(a.startTime) <= toMinutes(time) && toMinutes(a.endTime) >= toMinutes(end.time) && end.date === date,
   )
   if (!inside) throw new AppError(400, 'The tutor is not available at that time')
-  const clash = await prisma.booking.findFirst({
+  const clash = await db.booking.findFirst({
     where: { tutorId, status: { in: SLOT_BLOCKING }, startAt: { lt: endAt }, endAt: { gt: startAt }, ...(ignoreBookingId && { id: { not: ignoreBookingId } }) },
   })
   if (clash) throw new AppError(409, 'That time slot has just been taken. Please pick another slot.')
 }
 
 // Conflict check is per CHILD (siblings may have overlapping lessons)
-export async function assertChildFree({ childId, startAt, endAt, ignoreBookingId }) {
-  const clash = await prisma.booking.findFirst({
+export async function assertChildFree({ childId, startAt, endAt, ignoreBookingId }, db = prisma) {
+  const clash = await db.booking.findFirst({
     where: {
       childId,
       status: { in: CHILD_BLOCKING },

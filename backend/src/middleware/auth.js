@@ -1,5 +1,5 @@
 import { prisma } from '../config/prisma.js'
-import { verifyToken } from '../services/token.service.js'
+import { verifyToken, credentialTag } from '../services/token.service.js'
 import { AppError } from '../utils/AppError.js'
 
 // Requires a valid JWT. Attaches req.user (fresh from DB).
@@ -18,7 +18,9 @@ export async function requireAuth(req, res, next) {
   const user = await prisma.user.findUnique({ where: { id: payload.sub } })
   if (!user) throw new AppError(401, 'Account not found')
   if (user.status === 'DEACTIVATED') throw new AppError(403, 'Your account has been deactivated. Please contact Admin.')
+  if (payload.credential !== credentialTag(user)) throw new AppError(401, 'Session expired, please log in again')
 
+  res.set('Cache-Control', 'private, no-store')
   req.user = user
   next()
 }
