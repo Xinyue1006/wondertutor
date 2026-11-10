@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { vi } from 'vitest'
@@ -7,6 +7,7 @@ import { vi } from 'vitest'
 // reports a token the same way (onToken).
 vi.mock('../components/Recaptcha', () => ({
   RECAPTCHA_SITE_KEY: 'test-site-key',
+  resetRecaptcha: vi.fn(),
   default: ({ onToken }) => (
     <label>
       <input type="checkbox" onChange={(e) => onToken(e.target.checked ? 'captcha-token' : '')} /> I'm not a robot
@@ -19,7 +20,16 @@ const loginCalls = []
 const login = (...args) => { loginCalls.push(args); return loginImpl(...args) }
 vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ login, googleLogin: () => {}, user: null, loading: false }) }))
 
+vi.mock('../api/client', () => ({
+  default: { get: vi.fn(), post: vi.fn() },
+  errorMessage: (e) => e?.response?.data?.message || e.message,
+}))
+vi.mock('../lib/loadScript', () => ({ loadScript: () => Promise.resolve() }))
+
+import api from '../api/client'
+import { resetRecaptcha } from '../components/Recaptcha'
 import Login from '../pages/auth/Login'
+import Signup from '../pages/auth/Signup'
 
 const renderLogin = () =>
   render(
@@ -27,7 +37,7 @@ const renderLogin = () =>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/parent" element={<div>PARENT HOME</div>} />
-        <Route path="/tutor/setup" element={<div>TUTOR SETUP</div>} />
+        <Route path="/tutor" element={<div>TUTOR HOME</div>} />
       </Routes>
     </MemoryRouter>,
   )
@@ -59,12 +69,58 @@ describe('Login with reCAPTCHA', () => {
     expect(await screen.findByText('PARENT HOME')).toBeInTheDocument()
   })
 
-  test('a tutor who has not finished the setup is taken to it after logging in', async () => {
+  test('a tutor who is not verified yet still goes to the tutor portal after logging in', async () => {
     loginImpl = async () => ({ role: 'TUTOR', tutorStatus: 'NOT_SUBMITTED' })
     renderLogin()
     await fill()
     await userEvent.click(screen.getByRole('checkbox', { name: /I'm not a robot/ }))
     await userEvent.click(screen.getByRole('button', { name: 'Log in' }))
-    expect(await screen.findByText('TUTOR SETUP')).toBeInTheDocument()
+    expect(await screen.findByText('TUTOR HOME')).toBeInTheDocument()
+  })
+})
+
+describe('Sign up with reCAPTCHA', () => {
+  const create = () => userEvent.click(screen.getByRole('button', { name: 'Create account and send code' }))
+
+  test('a failed Create Account clears the token and asks for a new tick', async () => {
+    sessionStorage.clear()
+    vi.clearAllMocks()
+    api.get.mockResolvedValue({ data: { subjects: [], locations: [], tutors: [] } })
+    api.post.mockRejectedValueOnce(Object.assign(new Error('x'), { response: { data: { message: 'An account with this email already exists' } } }))
+    render(<MemoryRouter><Signup /></MemoryRouter>)
+
+    await userEvent.click(screen.getByRole('radio', { name: /I'm a Tutor/ }))
+    await userEvent.click(screen.getByRole('button', { name: /^Continue as Tutor/ }))
+    await userEvent.type(screen.getByLabelText(/Full name/), 'Daniel Tan')
+    await userEvent.type(screen.getByLabelText(/Email address/), 'daniel@example.com')
+    await userEvent.type(screen.getByLabelText(/Phone number/), '0123456789')
+    await userEvent.type(screen.getByLabelText(/^Password/), 'Tutor1234')
+    await userEvent.type(screen.getByLabelText(/Confirm password/), 'Tutor1234')
+    await userEvent.click(screen.getByRole('checkbox', { name: /Terms of Use/ }))
+    await userEvent.click(screen.getByRole('checkbox', { name: /I'm not a robot/ }))
+
+    await create()
+    expect(await screen.findByRole('alert')).toHaveTextContent(/already exists/)
+    expect(api.post.mock.calls[0][1].recaptchaToken).toBe('captcha-token')
+    expect(resetRecaptcha).toHaveBeenCalledTimes(1)
+
+    await create()
+    expect(await screen.findByRole('alert')).toHaveTextContent(/not a robot/)
+    expect(api.post).toHaveBeenCalledTimes(1) // the used token was not sent again
+  })
+})
+
+describe('Recaptcha widget', () => {
+  test('a new widget clears any old token, and reset goes to the current widget', async () => {
+    vi.stubEnv('VITE_RECAPTCHA_SITE_KEY', 'test-site-key')
+    window.grecaptcha = { ready: (fn) => fn(), render: vi.fn(() => 7), reset: vi.fn() }
+    const { default: RealRecaptcha, resetRecaptcha: realReset } = await vi.importActual('../components/Recaptcha')
+    const onToken = vi.fn()
+    render(<RealRecaptcha onToken={onToken} />)
+    await waitFor(() => expect(onToken).toHaveBeenCalledWith(''))
+    realReset()
+    expect(window.grecaptcha.reset).toHaveBeenCalledWith(7)
+    vi.unstubAllEnvs()
+    delete window.grecaptcha
   })
 })

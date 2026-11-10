@@ -168,8 +168,9 @@ Matches `WonderTutor_Mockups_All.pdf` pages 1 to 7:
   document (PDF/JPG/PNG to Cloudinary), profile photo and portfolio, review and submit. Each step saves a draft.
 - **Verification status** (`/tutor/verification`): not submitted, under review, changes requested (with Admin's reason),
   or verified. A tutor is verified once Admin approves **an identity document and a qualification**.
-  Until then only setup, status and the profile preview open; every other tutor page redirects to the status page
-  (`VerifiedTutorRoute` in the frontend, `requireVerifiedTutor` on the API).
+  **Every tutor can use every tutor feature straight after sign-up.** Verification only adds the verified badge and lists
+  the tutor before unverified ones in Find a Tutor and matching. Until then a banner on the tutor pages says what to do next.
+  A tutor appears to parents once they have added at least one subject.
 
 - **Google sign-in**: an existing verified account is linked (role unchanged); an email signup that was never verified is
   replaced by a clean Google account, so a password chosen by someone else cannot be used; deactivated accounts are refused
@@ -193,7 +194,7 @@ backend/
   src/
     app.js, server.js
     config/              # env, prisma client
-    middleware/          # requireAuth, requireRole, loadParentProfile / loadTutorProfile, requireVerifiedTutor, error handler
+    middleware/          # requireAuth, requireRole, loadParentProfile / loadTutorProfile, error handler
     routes/              # one file per module (auth, parent, tutor, admin), registered in routes/index.js
     controllers/         # request handlers: Zod validation + ownership, then a service (parent/, tutor/, admin/)
     services/            # email, OTP, JWT, reCAPTCHA, matching, booking (slots + conflicts), notifications,
@@ -230,8 +231,8 @@ frontend/src/
 | What | Command | Notes |
 |---|---|---|
 | Backend (Jest): matching scoring, booking rules, payments + commission snapshot, refunds, reviews, admin, complaints, security, parent signup and saved preferences, input validation, double-submit and stale-page races | `cd backend && npm test` | Uses a **separate** database `wondertutor_test`, created and migrated automatically (`pretest`). Your dev data is never touched. MySQL must be running. |
-| Backend tutor onboarding (`tutorSetup.test.js`): reCAPTCHA on login, tutor sign-up without profile details, setup drafts and bad input, submit rules, identity + qualification approval, changes requested, the verification gate | `cd backend && npm test` | Same test database. |
-| Frontend (Vitest + React Testing Library): login (with reCAPTCHA), sign-up (parent sections, tutor form, code boxes), route protection, the tutor verification gate, profile setup steps, matching wizard, tutor card, chatbot text reader, date helpers, form validation rules | `cd frontend && npm test` | Runs in a simulated browser, no servers needed. |
+| Backend tutor onboarding (`tutorSetup.test.js`): reCAPTCHA on login, tutor sign-up without profile details, setup drafts and bad input, submit rules, identity + qualification approval, changes requested, tutors using the portal before verification | `cd backend && npm test` | Same test database. |
+| Frontend (Vitest + React Testing Library): login (with reCAPTCHA), sign-up (parent sections, tutor form, code boxes), route protection, tutor pages open before verification and the status banner, profile setup steps, matching wizard, tutor card, chatbot text reader, date helpers, form validation rules | `cd frontend && npm test` | Runs in a simulated browser, no servers needed. |
 | API demo (Postman) | Import `docs/WonderTutor.postman_collection.json` | Run *Login (parent)* and *Login (admin)* first; they store the tokens. |
 
 Vitest is used instead of Jest on the frontend because it reads the Vite config directly (Jest needs extra setup for `import.meta.env`). The test syntax is the same.

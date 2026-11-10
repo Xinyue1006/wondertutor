@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { vi } from 'vitest'
 
 // A plain function (not vi.fn): Vitest's spy wrapper reports rejected promises from spies as unhandled errors
@@ -9,7 +9,17 @@ const loginCalls = []
 const login = (...args) => { loginCalls.push(args); return loginImpl(...args) }
 vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ login, googleLogin: () => {}, user: null, loading: false }) }))
 
+vi.mock('../api/client', () => ({
+  default: { post: vi.fn() },
+  errorMessage: (e) => e?.response?.data?.message || e.message,
+}))
+
+import api from '../api/client'
 import Login from '../pages/auth/Login'
+
+function SignupStub() {
+  return <div>SIGNUP PAGE {useLocation().state?.verifyEmail}</div>
+}
 
 const renderLogin = () =>
   render(
@@ -18,6 +28,7 @@ const renderLogin = () =>
         <Route path="/login" element={<Login />} />
         <Route path="/parent" element={<div>PARENT HOME</div>} />
         <Route path="/admin" element={<div>ADMIN HOME</div>} />
+        <Route path="/signup" element={<SignupStub />} />
       </Routes>
     </MemoryRouter>,
   )
@@ -105,5 +116,43 @@ describe('Login page', () => {
     expect(await screen.findByText(/Enter a valid email/)).toBeInTheDocument()
     await userEvent.type(screen.getByPlaceholderText('you@example.com'), 'x')
     expect(screen.queryByText(/Enter a valid email/)).not.toBeInTheDocument()
+  })
+})
+
+describe('Login with an unverified email', () => {
+  const failWith = (message) => { loginImpl = async () => { throw Object.assign(new Error('x'), { response: { data: { message } } }) } }
+  const attempt = async () => {
+    renderLogin()
+    await userEvent.type(screen.getByPlaceholderText('you@example.com'), 'miki@example.com')
+    await userEvent.type(screen.getByPlaceholderText('Enter your password'), 'Parent1234')
+    await userEvent.click(screen.getByRole('button', { name: 'Log in' }))
+  }
+  const newCode = () => screen.findByRole('button', { name: 'Send me a new code' })
+
+  beforeEach(() => { api.post.mockReset() })
+
+  test('the new code button does not appear for other errors', async () => {
+    failWith('Incorrect email or password')
+    await attempt()
+    await screen.findByText('Incorrect email or password')
+    expect(screen.queryByRole('button', { name: 'Send me a new code' })).not.toBeInTheDocument()
+  })
+
+  test('the button sends a new code and opens the code screen for that email', async () => {
+    failWith('Please verify your email before logging in')
+    api.post.mockResolvedValueOnce({ data: { message: 'A new code has been sent' } })
+    await attempt()
+    await userEvent.click(await newCode())
+    expect(api.post).toHaveBeenCalledWith('/auth/resend-otp', { email: 'miki@example.com' })
+    expect(await screen.findByText('SIGNUP PAGE miki@example.com')).toBeInTheDocument()
+  })
+
+  test('if the code cannot be sent the reason is shown and the page stays', async () => {
+    failWith('Please verify your email before logging in')
+    api.post.mockRejectedValueOnce(Object.assign(new Error('x'), { response: { data: { message: 'Please wait 60 seconds before requesting another code' } } }))
+    await attempt()
+    await userEvent.click(await newCode())
+    expect(await screen.findByText(/Please wait 60 seconds/)).toBeInTheDocument()
+    expect(screen.queryByText(/SIGNUP PAGE/)).not.toBeInTheDocument()
   })
 })

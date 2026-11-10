@@ -9,10 +9,10 @@ import { fmtDateLong } from '../../lib/format'
 // Verification status (mockup 07): where an unverified tutor lands, and what every locked tutor page points to.
 // The status comes from GET /tutor/profile (derived on the server from the submit date and the document reviews).
 const HEADLINE = {
-  NOT_SUBMITTED: ['Profile not submitted', 'bg-accent-100 text-amber-900', 'Finish setting up your profile', 'Complete the setup and submit it. Admin then checks your documents before parents can find you.'],
-  UNDER_REVIEW: ['Under review', 'bg-accent-100 text-amber-900', "We're reviewing your documents", "Admin checks your identity document and qualifications. You'll get a notification when there's a decision. Until then your profile isn't open for bookings."],
+  NOT_SUBMITTED: ['Profile not submitted', 'bg-accent-100 text-amber-900', 'Finish setting up your profile', 'You can already use every tutor feature. Complete the setup so parents can find you, and submit your documents to get the verified badge.'],
+  UNDER_REVIEW: ['Under review', 'bg-accent-100 text-amber-900', "We're reviewing your documents", "Admin checks your identity document and qualifications. You'll get a notification when there's a decision. Meanwhile you can use every tutor feature as usual."],
   CHANGES_REQUESTED: ['Changes requested', 'bg-red-50 text-red-700', 'A document is needed', 'One of your documents was not accepted or has been removed. Upload a new one and the review carries on.'],
-  VERIFIED: ['Verified', 'bg-ok-50 text-green-800', "You're verified", 'Your profile shows the verified badge. Teaching features are now open.'],
+  VERIFIED: ['Verified', 'bg-ok-50 text-green-800', "You're verified", 'Your profile shows the verified badge, and you appear before unverified tutors when parents search.'],
 }
 
 export default function VerificationStatus() {
@@ -50,7 +50,7 @@ export default function VerificationStatus() {
     ['Email verified', p.email, p.isEmailVerified ? 'done' : 'current'],
     ['Profile submitted', p.submittedAt ? `Submitted ${fmtDateLong(p.submittedAt)}` : `${p.missing.length} item${p.missing.length === 1 ? '' : 's'} still to complete`, p.submittedAt ? 'done' : 'current'],
     ['Admin document review', p.status === 'CHANGES_REQUESTED' ? 'Waiting for a new document from you' : 'Identity document and qualification', p.status === 'VERIFIED' ? 'done' : p.submittedAt ? 'current' : 'todo'],
-    ['Approved: verified badge and go live', 'Platform base commission rate applied', p.status === 'VERIFIED' ? 'done' : 'todo'],
+    ['Approved: verified badge', 'Shown on your profile and listed higher in search', p.status === 'VERIFIED' ? 'done' : 'todo'],
   ]
   const dot = { done: 'bg-ok', current: 'bg-accent-600', todo: 'bg-slate-300' }
   const verified = p.status === 'VERIFIED'
@@ -91,26 +91,22 @@ export default function VerificationStatus() {
 
         <div className="space-y-5">
           <section className="card p-6">
-            <h2 className="font-display text-lg font-bold text-navy">{verified ? 'Your portal' : 'While you wait'}</h2>
+            <h2 className="font-display text-lg font-bold text-navy">What verification gives you</h2>
+            <p className="mt-1 text-sm text-slate-600">Every tutor feature works with or without verification.</p>
             <ul className="mt-3 space-y-2 text-sm">
               {[
-                [true, 'Edit your profile, rate and bio'],
-                [true, 'Preview how parents will see you'],
-                [verified, 'Receive booking requests'],
-                [verified, 'Set availability and withdraw earnings'],
-              ].map(([open, label]) => (
+                'A verified badge on your profile and tutor card',
+                'Listed before unverified tutors in Find a Tutor and in matching',
+              ].map((label) => (
                 <li key={label} className="flex items-center gap-3">
-                  <span className={`w-20 shrink-0 rounded-full px-2.5 py-1 text-center text-xs font-semibold ${open ? 'bg-ok-50 text-green-800' : 'bg-red-50 text-red-700'}`}>{open ? 'Allowed' : 'Locked'}</span>
+                  <span className={`w-20 shrink-0 rounded-full px-2.5 py-1 text-center text-xs font-semibold ${verified ? 'bg-ok-50 text-green-800' : 'bg-slate-100 text-slate-600'}`}>{verified ? 'You have it' : 'After review'}</span>
                   <span className="text-navy">{label}</span>
                 </li>
               ))}
             </ul>
             <div className="mt-4 flex flex-wrap gap-2">
-              {p.status === 'NOT_SUBMITTED' ? (
-                <Link to="/tutor/setup" className="btn-primary min-h-11 px-5">Continue setup</Link>
-              ) : verified ? (
-                <Link to="/tutor" className="btn-primary min-h-11 px-5">Go to dashboard</Link>
-              ) : null}
+              {p.status === 'NOT_SUBMITTED' && <Link to="/tutor/setup" className="btn-primary min-h-11 px-5">Continue setup</Link>}
+              <Link to="/tutor" className={`${p.status === 'NOT_SUBMITTED' ? 'btn-outline px-4' : 'btn-primary px-5'} min-h-11`}>Go to dashboard</Link>
               <Link to="/tutor/preview" className="btn-outline min-h-11 px-4">Preview my profile</Link>
               <Link to="/tutor/setup" className="btn-outline min-h-11 px-4">Edit profile</Link>
             </div>
