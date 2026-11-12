@@ -12,6 +12,7 @@ import { subjectsOf } from '../../utils/childSubjects.js'
 import { sendEmail } from '../../services/email.service.js'
 import { renderEmail } from '../../services/notification.service.js'
 import { deleteUserSessions } from '../../services/assistant/session.js'
+import { childPhotoFields } from '../../services/privateMedia.js'
 
 // PUT /parent/account/email-reminders { enabled }
 export async function setEmailReminders(req, res) {
@@ -53,7 +54,7 @@ export async function exportMyData(req, res) {
     },
     address: req.parent.address,
     tutorPreferences: req.parent.preferences ?? null,
-    children: children.map((c) => ({ name: c.name, educationLevel: c.educationLevel, grade: c.grade, gradeYear: c.gradeYear, subjects: subjectsOf(c), preferredLanguage: c.preferredLanguage, goals: c.goals, notes: c.notes, photoUrl: c.photoUrl })),
+    children: children.map((c) => ({ name: c.name, educationLevel: c.educationLevel, grade: c.grade, gradeYear: c.gradeYear, subjects: subjectsOf(c), preferredLanguage: c.preferredLanguage, goals: c.goals, notes: c.notes, ...childPhotoFields(c) })),
     bookings: bookings.map((b) => ({
       id: b.id,
       status: b.status,

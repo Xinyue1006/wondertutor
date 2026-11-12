@@ -1,4 +1,4 @@
-import { mediaLink } from './privateMedia.js'
+import { childPhotoFields, mediaLink } from './privateMedia.js'
 // Shapes a Booking (with relations) for the Parent Portal.
 import { toTutorCard } from './tutor.service.js'
 
@@ -40,7 +40,7 @@ export function toBookingDto(b) {
     cancelReason: b.cancelReason,
     createdAt: b.createdAt,
     tutor: b.tutor && { ...toTutorCard(b.tutor, b.subject), levels: undefined },
-    child: b.child && { id: b.child.id, name: b.child.name, educationLevel: b.child.educationLevel, grade: b.child.grade, photoUrl: b.child.photoUrl },
+    child: b.child && { id: b.child.id, name: b.child.name, educationLevel: b.child.educationLevel, grade: b.child.grade, photoUrl: childPhotoFields(b.child).photoUrl },
     payment: b.payment && {
       id: b.payment.id, status: b.payment.status, amount: num(b.payment.amount), method: b.payment.method,
       gatewayRef: b.payment.gatewayRef, paidAt: b.payment.paidAt,

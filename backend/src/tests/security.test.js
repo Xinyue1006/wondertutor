@@ -30,13 +30,15 @@ describe('uploads must be in our own Cloudinary account', () => {
     expect(isOwnUpload(null)).toBe(false)
   })
 
-  test('profile, child and review photos from another account are refused; ours are accepted', async () => {
+  test('adult profile photos use our cloud; child photos additionally require private owner-scoped storage', async () => {
     const p = await makeParent()
     expect((await api(p.token).put('/parent/profile/photo', { profilePhotoUrl: theirs })).status).toBe(400)
     expect((await api(p.token).put('/parent/profile/photo', { profilePhotoUrl: ours })).status).toBe(200)
     const child = { name: 'Sarah', educationLevel: 'PRIMARY', grade: 5 }
     expect((await api(p.token).post('/parent/children', { ...child, photoUrl: theirs })).status).toBe(400)
-    expect((await api(p.token).post('/parent/children', { ...child, photoUrl: ours })).status).toBe(201)
+    expect((await api(p.token).post('/parent/children', { ...child, photoUrl: ours })).status).toBe(400)
+    const privateChild = `https://res.cloudinary.com/our-cloud/image/authenticated/wondertutor/children/${p.parent.id}/photo.jpg`
+    expect((await api(p.token).post('/parent/children', { ...child, photoUrl: privateChild })).status).toBe(201)
   })
 })
 

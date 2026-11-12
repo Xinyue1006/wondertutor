@@ -4,6 +4,8 @@ Review began 11 November and completed 12 November 2026 (Malaysia time). Scope: 
 
 ## Result and practical limits
 
+Follow-up after this review: [child-avatar privacy](CHILD_PHOTO_PRIVACY_2026-11-12.md) now protects new child-photo uploads and their DTO delivery. Final follow-up regressions passed 483 backend and 234 frontend tests, with a synthetic live Cloudinary signed/unsigned access check. The original results and gap list below describe the earlier review snapshot; old public references still require ownership-verified cleanup. Ranking, suspension and other client-policy decisions have not been silently changed.
+
 Your assigned screens and APIs have substantial functional coverage, and this review fixed concrete concurrency, reporting, moderation and usability defects. The final local regression and browser checks pass. **This is not a certification that the entire platform is ready to take real clients' money.** Tutor lesson delivery and financial Admin remain incomplete in this integrated branch, external service/deployment checks remain, and only actual clients can establish satisfaction.
 
 GitHub `origin/main` was fetched and merged into `xinyue/admin-complaints` as `512c4d1`. The user subsequently authorized committing and pushing this review on the same branch; consult Git history for its current publication status. The separate `origin/yanhsi/tutor-availability` branch has additional unmerged scheduling work; it was inspected but not silently merged over the integrated implementation. Existing `docs/OVERNIGHT_REVIEW.md` was preserved outside the commit.

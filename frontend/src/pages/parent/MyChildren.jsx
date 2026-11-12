@@ -47,7 +47,7 @@ export default function MyChildren() {
   function openForm(c) {
     setError('')
     setEditing(c)
-    setForm(c === 'new' ? blank : { name: c.name, grade: `${c.educationLevel}:${c.grade}`, subjects: childSubjects(c), preferredLanguage: c.preferredLanguage || '', goals: c.goals || '', notes: c.notes || '', photoUrl: c.photoUrl })
+    setForm(c === 'new' ? blank : { name: c.name, grade: `${c.educationLevel}:${c.grade}`, subjects: childSubjects(c), preferredLanguage: c.preferredLanguage || '', goals: c.goals || '', notes: c.notes || '', photoUrl: c.photoReference, photoDisplayUrl: c.photoUrl, photoNeedsMigration: c.photoNeedsMigration, photoUnavailable: c.photoUnavailable })
   }
   function closeForm() {
     setEditing(null)
@@ -145,7 +145,10 @@ export default function MyChildren() {
       <Modal open={!!editing} onClose={() => { if (!busy) closeForm() }} title={editing === 'new' ? 'Add a child' : 'Edit child'}>
         <form onSubmit={save} className="space-y-4">
           <ErrorBox>{error}</ErrorBox>
-          <PhotoPicker value={form.photoUrl} name={form.name || 'Child'} onChange={(url) => setForm({ ...form, photoUrl: url })} />
+          <PhotoPicker purpose="child-avatar" value={form.photoUrl} previewValue={form.photoDisplayUrl} name={form.name || 'Child'} onChange={(url) => setForm({ ...form, photoUrl: url, photoDisplayUrl: null, photoNeedsMigration: false, photoUnavailable: false })} />
+          <p className="text-xs text-slate-600">Child photos use private storage and temporary viewing links. Parent profile and public review photos are separate.</p>
+          {form.photoNeedsMigration && <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800"><p role="status">An older photo used a public link and is hidden here. Upload a private replacement and ask the centre to remove or migrate the old cloud file; hiding it here does not revoke that old link.</p><button type="button" disabled={busy} className="mt-2 min-h-10 font-semibold underline" onClick={() => setForm({ ...form, photoUrl: null, photoDisplayUrl: null, photoNeedsMigration: false })}>Remove old photo from this profile</button><p className="mt-1 text-xs">Save to remove the stored reference. The centre must separately revoke the old cloud file.</p></div>}
+          {form.photoUnavailable && <p role="status" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">The private photo is temporarily unavailable. You can still save the child's other details. Please try again later or ask the centre to check photo storage.</p>}
           <label className="block"><span className="mb-1.5 block text-sm font-bold text-navy">Child's Name <span className="text-red-500">*</span></span>
             <input autoFocus className="input h-11" maxLength={60} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Sarah Tan" /></label>
           <label className="block"><span className="mb-1.5 block text-sm font-bold text-navy">Education Level <span className="text-red-500">*</span></span>
