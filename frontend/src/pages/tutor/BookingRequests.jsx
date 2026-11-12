@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import api, { errorMessage } from '../../api/client'
 import TutorPageHeader from '../../components/TutorPageHeader'
 import { ErrorBox, LoadError, Spinner, StatusPill } from '../../components/ui/Common'
@@ -45,6 +45,7 @@ function BookingDetails({ b, onUpdate }) {
   const button = (action, primary = false) => <button type="button" disabled={busy} className={(primary ? 'btn-primary' : 'btn-outline') + ' min-h-11'} onClick={() => choose(action)}>{labels[action]}</button>
   return <section className="card min-w-0 space-y-4 break-words p-4 sm:p-6" aria-label="Booking details">
     <StatusPill status={b.status} />
+    {['CONFIRMED', 'COMPLETED', 'DISPUTED'].includes(b.status) && <div><Link className="btn-primary min-h-11" to={'/tutor/bookings/' + b.id + '/session'}>{b.status === 'CONFIRMED' ? 'Open session' : 'View session record'}</Link></div>}
     <h2 className="text-xl font-bold text-navy">{b.subject} with {b.child.name}</h2>
     <p>{fmtDate(b.startAt)} · {fmtTimeRange(b.startAt, b.endAt)} (Malaysia time)</p>
     <dl className="grid gap-3 rounded-xl bg-brand-25 p-4 text-sm sm:grid-cols-2">

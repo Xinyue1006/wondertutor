@@ -2,8 +2,8 @@ import { prisma } from '../config/prisma.js'
 
 const defaults = { GPS_RADIUS_METRES: 100, RATING_THRESHOLD: 3, BASE_COMMISSION_RATE: 10 }
 
-export async function getSettings() {
-  const rows = await prisma.systemSetting.findMany({ where: { key: { in: Object.keys(defaults) } } })
+export async function getSettings(db = prisma) {
+  const rows = await db.systemSetting.findMany({ where: { key: { in: Object.keys(defaults) } } })
   return { ...defaults, ...Object.fromEntries(rows.map(({ key, value }) => [key, Number(value)])) }
 }
 

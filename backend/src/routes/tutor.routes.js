@@ -7,6 +7,7 @@ import * as exceptions from '../controllers/tutor/availabilityExceptions.control
 import * as profile from '../controllers/tutor/profile.controller.js'
 import * as availability from '../controllers/tutor/availability.controller.js'
 import * as bookings from '../controllers/tutor/bookings.controller.js'
+import * as session from '../controllers/tutor/lessonSession.controller.js'
 
 const router = validateIdParams(Router()) // every :id in these URLs must be a positive whole number
 router.use(requireAuth, requireRole('TUTOR'), loadTutorProfile)
@@ -27,6 +28,8 @@ router.post('/submit-for-verification', profile.submitForVerification)
 // Teaching features: availability, requests, sessions and earnings go below this line
 router.get('/dashboard', profile.dashboard)
 router.get('/bookings', bookings.list)
+router.get('/bookings/:id/session', session.get)
+router.post('/bookings/:id/session', session.update)
 router.post('/bookings/:id', bookings.update)
 router.get('/availability', availability.getSchedule)
 router.put('/availability', availability.updateSchedule)
