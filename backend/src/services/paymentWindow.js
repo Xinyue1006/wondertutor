@@ -1,7 +1,7 @@
 // Payment window [YH]. An accepted booking holds its hour for 24 hours while the parent pays, and never later than
 // PAYMENT_DEADLINE_MINUTES before the lesson. Older bookings have no payBy, so only the second limit applies to them.
 import { AppError } from '../utils/AppError.js'
-import { PAYMENT_DEADLINE_MINUTES } from './lifecycle.service.js'
+export const PAYMENT_DEADLINE_MINUTES = 60
 
 export const PAYMENT_WINDOW_HOURS = 24
 

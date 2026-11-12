@@ -11,6 +11,29 @@ import { SUBJECTS } from '../../data/catalog.js'
 import { subjectsOf } from '../../utils/childSubjects.js'
 import { recordReference, referenceWhere } from '../../utils/publicIds.js'
 
+import { assertCanAccept, newPayBy } from '../../services/paymentWindow.js'
+import { escalateBooking } from '../../services/tutorBooking.service.js'
+
+export async function negotiate(req, res) {
+  const b = await ownBooking(req)
+  const data = z.discriminatedUnion('action', [
+    z.object({ action: z.literal('counter'), price: ringgit('Hourly rate') }),
+    z.object({ action: z.literal('escalate'), reason: z.string().trim().min(1).max(200) }),
+  ]).parse(req.body)
+  await prisma.$transaction(async tx => {
+    await tx.$queryRaw`SELECT id FROM TutorProfile WHERE id = ${b.tutorId} FOR UPDATE`
+    const current = await tx.booking.findUnique({ where: { id: b.id } })
+    if (current.updatedAt.getTime() !== b.updatedAt.getTime()) throw new AppError(409, 'Booking changed. Refresh and try again.')
+    if (data.action === 'escalate') return escalateBooking(tx, b, req.user.id, data.reason)
+    if (b.status !== 'COUNTER_OFFERED' || b.startAt <= new Date()) throw new AppError(409, 'This offer is no longer open.')
+    if (data.price === Number(b.counterPrice)) throw new AppError(400, 'Accept the offer or choose a different price.')
+    await changeStatus(tx, b, { status: 'PENDING', proposedPrice: data.price, counterPrice: null })
+  })
+  await notify(b.tutor.userId, { type: 'BOOKING_UPDATED', title: data.action === 'counter' ? 'Parent proposed a new rate' : 'Parent requested admin review',
+    message: data.action === 'counter' ? 'New offer: RM' + data.price + ' per hour.' : data.reason, link: '/tutor/bookings?booking=' + b.id })
+  res.json({ booking: toBookingDto(await reload(b.id)) })
+}
+
 const createSchema = z.object({
   tutorId: id('Tutor'),
   childId: recordReference('Child'),
@@ -163,9 +186,10 @@ export async function acceptCounter(req, res) {
     if (!tutor) throw new AppError(409, 'This tutor is no longer available. Please choose another tutor.')
     await assertSlotBookable({ tutorId: b.tutorId, startAt: b.startAt, endAt: b.endAt, teachingMode: b.teachingMode }, tx)
     await assertChildFree({ childId: b.childId, startAt: b.startAt, endAt: b.endAt, ignoreBookingId: b.id }, tx)
+    assertCanAccept(b.startAt)
     const changed = await tx.booking.updateMany({
       where: { id: b.id, status: b.status, counterPrice: b.counterPrice, startAt: b.startAt, endAt: b.endAt },
-      data: { status: 'AWAITING_PAYMENT', agreedPrice: b.counterPrice },
+      data: { status: 'AWAITING_PAYMENT', agreedPrice: b.counterPrice, payBy: newPayBy(b.startAt) },
     })
     if (!changed.count) throw new AppError(409, 'This counter offer has changed. Please refresh the page and try again.')
   })

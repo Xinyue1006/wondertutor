@@ -74,13 +74,15 @@ describe('lesson reminder emails', () => {
 })
 
 describe('payment reminders', () => {
-  test('a booking waiting for payment gets one reminder when less than 24 hours are left to pay', async () => {
+  test('a booking waiting for payment gets one reminder in the final six hours', async () => {
     const p = await makeParent()
     const b = await lesson(p, 'AWAITING_PAYMENT', '16:00')
     await sendPaymentReminders(hoursBefore(b, 48)) // far away: too early
     expect(emailsTo(p)).toHaveLength(0)
 
-    await sendPaymentReminders(hoursBefore(b, 20))
+    await sendPaymentReminders(hoursBefore(b, 8))
+    expect(emailsTo(p)).toHaveLength(0)
+    await sendPaymentReminders(hoursBefore(b, 7))
     const mails = emailsTo(p)
     expect(mails).toHaveLength(1)
     expect(mails[0].subject).toBe('WonderTutor — Payment due soon')

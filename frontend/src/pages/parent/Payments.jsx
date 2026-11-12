@@ -10,8 +10,7 @@ import { gradeLabel } from '../../lib/education'
 import { recordRef } from '../../lib/recordRef'
 
 const lessonTitle = (b) => `${b.subject}${b.isTrial ? ' Trial' : ''} Lesson`
-// Unpaid bookings are released 1 hour before the lesson (the backend scheduler uses the same rule)
-const payBy = (b) => new Date(new Date(b.startAt).getTime() - 60 * 60_000)
+const payBy = (b) => new Date(Math.min(b.payBy ? Date.parse(b.payBy) : Infinity, Date.parse(b.startAt) - 3_600_000))
 const BANK_KEY = 'wt_preferred_bank'
 const savedBank = () => { try { return localStorage.getItem(BANK_KEY) || '' } catch { return '' } }
 

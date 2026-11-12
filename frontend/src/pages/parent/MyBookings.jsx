@@ -212,7 +212,7 @@ function LessonBlock({ b }) {
 
 const Btn = ({ kind = 'outline', children, ...rest }) => <button className={`${kind === 'primary' ? 'btn-primary' : kind === 'danger' ? 'btn-danger' : 'btn-outline'} w-full`} {...rest}>{children}</button>
 
-function PendingRow({ b, onDetail, onCancel }) {
+function PendingRow({ b, onDetail, onCancel, act }) {
   return (
     <>
       <div>
@@ -227,9 +227,26 @@ function PendingRow({ b, onDetail, onCancel }) {
             </li>))}
         </ol>
       </div>
-      <div className="space-y-2"><Btn onClick={() => onDetail(b)}>View Details <Icon name="arrow-right" className="h-4 w-4" /></Btn><Btn kind="danger" onClick={() => onCancel(b)}>Cancel Request</Btn></div>
+      <div className="space-y-2"><Btn onClick={() => onDetail(b)}>View Details <Icon name="arrow-right" className="h-4 w-4" /></Btn><Btn kind="danger" onClick={() => onCancel(b)}>Cancel Request</Btn><NegotiationForm b={b} act={act} /></div>
     </>
   )
+}
+
+function NegotiationForm({ b, act, counter = false }) {
+  const [action, setAction] = useState('')
+  if (!action) return <div className="flex flex-wrap gap-2">
+    {counter && <Btn onClick={() => setAction('counter')}>Offer another rate</Btn>}
+    <Btn onClick={() => setAction('escalate')}>Ask admin to review</Btn>
+  </div>
+  return <form className="space-y-2" onSubmit={async e => {
+    e.preventDefault()
+    const value = new FormData(e.currentTarget).get('value')
+    if (await act('/parent/bookings/' + recordRef(b) + '/negotiate', action === 'counter' ? { action, price: Number(value) } : { action, reason: value })) setAction('')
+  }}>
+    {action === 'counter' ? <label>Hourly rate (RM)<input className="input text-base" name="value" type="number" min="0.01" max="1000" step="0.01" required /></label> :
+      <label>What should admin review?<textarea className="input text-base" name="value" maxLength={200} required /></label>}
+    <div className="flex flex-wrap gap-2"><button className="btn-primary min-h-11">Send</button><button type="button" className="btn-outline min-h-11" onClick={() => setAction('')}>Go back</button></div>
+  </form>
 }
 
 function CounterRow({ b, onDetail, act }) {
@@ -247,6 +264,7 @@ function CounterRow({ b, onDetail, act }) {
       <div className="space-y-2">
         <Btn kind="primary" onClick={() => act(`/parent/bookings/${recordRef(b)}/accept-counter`)}>Accept Counter Offer</Btn>
         <Btn onClick={() => act(`/parent/bookings/${recordRef(b)}/decline-counter`)}>Decline</Btn>
+        <NegotiationForm b={b} act={act} counter />
         <Btn onClick={() => onDetail(b)}>View Details <Icon name="arrow-right" className="h-4 w-4" /></Btn>
       </div>
     </>
@@ -285,6 +303,7 @@ function PayRow({ b, onDetail, onCancel, onReschedule, act }) {
     <>
       <div className="space-y-2">
         <StatusPill status="AWAITING_PAYMENT" />
+        {b.payBy && <p className="text-sm">Pay by {fmtDate(b.payBy)}, {fmtTime(b.payBy)} (Malaysia time).</p>}
         <div className="rounded-xl bg-brand-25 px-4 py-3">
           <div className="text-xs text-slate-500">Agreed price</div>
           <div className="text-lg font-extrabold text-navy">RM{b.agreedPrice} / hour <span className="text-sm font-semibold text-slate-500">· total {money(b.totalAmount)}</span></div>
@@ -319,6 +338,7 @@ function UpcomingRow({ b, onDetail, onCancel, onReschedule, act }) {
         <RescheduleBanner b={b} act={act} />
       </div>
       <div className="space-y-2">
+        {b.teachingMode === 'ONLINE' && /^https:\/\//i.test(b.meetingLink || '') && <a className="btn-primary min-h-11" href={b.meetingLink} target="_blank" rel="noreferrer">Join online class</a>}
         <Btn kind="primary" onClick={() => onDetail(b)}>View Lesson Details</Btn>
         {!started && canAskReschedule(b) && <Btn onClick={() => onReschedule(b)}><Icon name="calendar" className="h-4 w-4" /> Reschedule</Btn>}
         {!started && <Btn kind="danger" onClick={() => onCancel(b)}>Cancel Booking</Btn>}
@@ -360,13 +380,14 @@ function CompletedRow({ b, onDetail, onReview }) {
   )
 }
 
-function CancelledRow({ b, onDetail }) {
+function CancelledRow({ b, onDetail, act }) {
   return (
     <>
       <div className="space-y-2">
         <StatusPill status={b.status} />
         {(b.rejectionReason || b.cancelReason) && <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">{b.rejectionReason || b.cancelReason}</div>}
         {b.payment?.status === 'REFUNDED' && <StatusPill status="REFUNDED" />}
+        {b.status === 'CANCELLED' && <NegotiationForm b={b} act={act} />}
       </div>
       <div><Btn onClick={() => onDetail(b)}>View Details <Icon name="arrow-right" className="h-4 w-4" /></Btn></div>
     </>

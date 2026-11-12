@@ -23,6 +23,7 @@ export function toBookingDto(b) {
     id: b.id,
     publicId: b.publicId,
     status: b.status,
+    payBy: b.payBy,
     subject: b.subject,
     startAt: b.startAt,
     endAt: b.endAt,

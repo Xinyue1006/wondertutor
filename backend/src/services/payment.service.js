@@ -1,6 +1,7 @@
 // Turns a gateway result (paid / not paid) into the right changes in our own data. The mock gateway, the Billplz
 // browser return and the Billplz server callback all end here, so a payment is settled in exactly one way.
 import { Prisma } from '@prisma/client'
+import { PAYMENT_DEADLINE_MINUTES } from './paymentWindow.js'
 import { prisma } from '../config/prisma.js'
 import { AppError } from '../utils/AppError.js'
 import { notify, notifyWithEmail } from './notification.service.js'
@@ -39,7 +40,10 @@ export async function settlePayment(paymentId, { paid, method = 'FPX', real = fa
       data: { status: 'PAID', paidAt: new Date(), method, commissionRate: rate, commissionAmount },
     })
     if (!done.count) throw new AppError(409, 'This payment has already been processed')
-    const confirmed = await tx.booking.updateMany({ where: { id: payment.bookingId, status: 'AWAITING_PAYMENT' }, data: { status: 'CONFIRMED' } })
+    const now = new Date()
+    const confirmed = await tx.booking.updateMany({ where: { id: payment.bookingId, status: 'AWAITING_PAYMENT',
+      startAt: { gt: new Date(now.getTime() + PAYMENT_DEADLINE_MINUTES * 60_000) }, OR: [{ payBy: null }, { payBy: { gt: now } }],
+    }, data: { status: 'CONFIRMED' } })
     if (confirmed.count) return
     if (!real) throw new AppError(400, 'This booking is no longer waiting for payment. You have not been charged.')
     // Paid too late: the parent paid at the gateway after the booking was cancelled or its slot released.

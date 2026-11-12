@@ -11,7 +11,7 @@ import { env } from '../../config/env.js'
 import { AppError } from '../../utils/AppError.js'
 import { bookingInclude, toBookingDto } from '../../services/booking.dto.js'
 import { recordReference, referenceWhere } from '../../utils/publicIds.js'
-import { PAYMENT_DEADLINE_MINUTES } from '../../services/lifecycle.service.js'
+import { paymentDeadline } from '../../services/paymentWindow.js'
 import { mytParts } from '../../utils/time.js'
 import { billplzConfigured, createBill, getBill, signatureIsValid } from '../../services/billplz.service.js'
 import { settlePayment } from '../../services/payment.service.js'
@@ -75,9 +75,7 @@ export async function checkout(req, res) {
   if (!booking) throw new AppError(404, 'Booking not found')
   if (booking.status !== 'AWAITING_PAYMENT' || booking.agreedPrice == null)
     throw new AppError(400, 'This booking is not waiting for payment')
-  // Same deadline as the expiry scheduler: an unpaid booking is released 1 hour before the lesson
-  if (booking.startAt.getTime() - Date.now() < PAYMENT_DEADLINE_MINUTES * 60_000)
-    throw new AppError(400, `Payment closes ${PAYMENT_DEADLINE_MINUTES} minutes before the lesson starts. Please book another time.`)
+  if (paymentDeadline(booking) <= new Date()) throw new AppError(400, 'Payment closes at the pay-by time. Please book another time.')
 
   const amount = lessonAmount(booking)
   if (billplzConfigured()) return checkoutWithBillplz(req, res, booking, amount)

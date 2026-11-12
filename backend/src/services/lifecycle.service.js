@@ -2,12 +2,12 @@
 //
 //  1. Requests the tutor never answered (PENDING) or counter-offers the parent never answered (COUNTER_OFFERED)
 //     expire when the lesson time arrives.
-//  2. Bookings waiting for payment (AWAITING_PAYMENT) expire if they are still unpaid 1 hour before the lesson,
+//  2. Unpaid holds expire at their pay-by time or one hour before the lesson, whichever comes first,
 //     which gives the tutor a clear answer and frees the slot for other parents.
 //  3. Parents and tutors get an in-app reminder once, during the 24 hours before a confirmed lesson. The parent also gets
 //     an email (unless they switched reminder emails off in My Profile).
 //  4. A parent whose booking is waiting for payment gets one reminder (in-app and email) when the payment deadline is
-//     less than 24 hours away.
+//     six hours away or closer.
 //
 // Nothing here moves money: an expired booking was never paid. Each function takes `now` so tests can control time.
 import { prisma } from '../config/prisma.js'
@@ -16,9 +16,10 @@ import { promoteChildren } from './progression.service.js'
 import { publicReference } from '../utils/publicIds.js'
 import { cleanupExpiredSessions } from './session.service.js'
 
-export const PAYMENT_DEADLINE_MINUTES = 60
+import { paymentDeadline, PAYMENT_DEADLINE_MINUTES } from './paymentWindow.js'
+export { PAYMENT_DEADLINE_MINUTES }
 export const REMINDER_HOURS = 24
-export const PAYMENT_REMINDER_HOURS = 24
+export const PAYMENT_REMINDER_HOURS = 6
 const OFF_NOTE = 'You get reminder emails because they are switched on in My Profile > Privacy & account. You can switch them off there.'
 
 const when = (d) =>
@@ -27,7 +28,7 @@ const when = (d) =>
 async function expire(booking, reason, parentMessage) {
   // updateMany with the old status: if the parent or tutor acted at the same moment, their action wins
   const { count } = await prisma.booking.updateMany({
-    where: { id: booking.id, status: booking.status },
+    where: { id: booking.id, status: booking.status, startAt: booking.startAt, payBy: booking.payBy },
     data: { status: 'CANCELLED', cancelReason: reason, cancelledById: null },
   })
   if (!count) return false
@@ -41,7 +42,7 @@ export async function expireStaleBookings(now = new Date()) {
   const include = { parent: true, tutor: true }
   const unanswered = await prisma.booking.findMany({ where: { status: { in: ['PENDING', 'COUNTER_OFFERED'] }, startAt: { lte: now } }, include })
   const deadline = new Date(now.getTime() + PAYMENT_DEADLINE_MINUTES * 60_000)
-  const unpaid = await prisma.booking.findMany({ where: { status: 'AWAITING_PAYMENT', startAt: { lte: deadline } }, include })
+  const unpaid = await prisma.booking.findMany({ where: { status: 'AWAITING_PAYMENT', OR: [{ startAt: { lte: deadline } }, { payBy: { lte: now } }] }, include })
 
   let expired = 0
   for (const b of unanswered) {
@@ -51,7 +52,8 @@ export async function expireStaleBookings(now = new Date()) {
     if (ok) expired++
   }
   for (const b of unpaid) {
-    if (await expire(b, 'Expired: payment was not completed at least 1 hour before the lesson', `Your ${b.subject} lesson on ${when(b.startAt)} was released because payment was not completed at least 1 hour before it started.`)) expired++
+    const reason = b.payBy && b.payBy < new Date(b.startAt - PAYMENT_DEADLINE_MINUTES * 60_000) ? 'Expired: payment was not completed within 24 hours' : 'Expired: payment was not completed at least 1 hour before the lesson'
+    if (await expire(b, reason, `Your ${b.subject} lesson on ${when(b.startAt)} was released because the payment deadline passed.`)) expired++
   }
   return { expired }
 }
@@ -82,14 +84,16 @@ async function remind(user, payload) {
   else await notify(user.id, payload)
 }
 
-// Bookings the tutor accepted that are still unpaid: one reminder when less than 24 hours are left to pay
-// (the deadline is 1 hour before the lesson, see PAYMENT_DEADLINE_MINUTES)
+// Remind once during the final six hours of the payment window.
 export async function sendPaymentReminders(now = new Date()) {
   const horizon = new Date(now.getTime() + PAYMENT_DEADLINE_MINUTES * 60_000 + PAYMENT_REMINDER_HOURS * 3_600_000)
   const deadline = new Date(now.getTime() + PAYMENT_DEADLINE_MINUTES * 60_000)
   const unpaid = await prisma.booking.findMany({
     // startAt after the deadline: bookings that are about to expire are released by expireStaleBookings instead
-    where: { status: 'AWAITING_PAYMENT', startAt: { gt: deadline, lte: horizon } },
+    where: { status: 'AWAITING_PAYMENT', startAt: { gt: deadline }, AND: [
+      { OR: [{ payBy: null }, { payBy: { gt: now } }] },
+      { OR: [{ startAt: { lte: horizon } }, { payBy: { lte: new Date(now.getTime() + PAYMENT_REMINDER_HOURS * 3_600_000) } }] },
+    ] },
     include: { parent: { include: { user: true } }, child: true },
   })
   let sent = 0
@@ -97,7 +101,7 @@ export async function sendPaymentReminders(now = new Date()) {
     const link = `/parent/payments?booking=${publicReference(b)}`
     const already = await prisma.notification.findFirst({ where: { userId: b.parent.userId, type: 'PAYMENT_REMINDER', link: { in: [link, `/parent/payments?booking=${b.id}`] } } })
     if (already) continue
-    const payBy = when(new Date(b.startAt.getTime() - PAYMENT_DEADLINE_MINUTES * 60_000))
+    const payBy = when(paymentDeadline(b))
     await remind(b.parent.user, {
       type: 'PAYMENT_REMINDER',
       title: 'Payment due soon',

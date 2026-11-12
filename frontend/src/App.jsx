@@ -16,6 +16,7 @@ import ForgotPassword from './pages/auth/ForgotPassword'
 import NotFound from './pages/NotFound'
 const Availability = lazy(() => import('./pages/tutor/Availability'))
 const TutorDashboard = lazy(() => import('./pages/tutor/Dashboard'))
+const BookingRequests = lazy(() => import('./pages/tutor/BookingRequests'))
 const DateAvailability = lazy(() => import('./pages/tutor/DateAvailability'))
 const ParentDashboard = lazy(() => import('./pages/parent/Dashboard'))
 const FindTutor = lazy(() => import('./pages/parent/FindTutor'))
@@ -93,7 +94,7 @@ export default function App() {
           <Route index element={<TutorDashboard />} />
           <Route path="availability" element={<Availability />} />
           <Route path="availability/dates" element={<DateAvailability />} />
-          <Route path="bookings" element={<Placeholder title="Booking Requests" />} />
+          <Route path="bookings" element={<BookingRequests />} />
           <Route path="students" element={<Placeholder title="My Students" />} />
           <Route path="earnings" element={<Placeholder title="Earnings & Withdrawals" />} />
           <Route path="setup" element={<ProfileSetup />} />
