@@ -35,6 +35,7 @@ import ProfileSetup from './pages/tutor/ProfileSetup'
 import VerificationStatus from './pages/tutor/VerificationStatus'
 import ProfilePreview from './pages/tutor/ProfilePreview'
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'))
+const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'))
 const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'))
 const AdminComplaints = lazy(() => import('./pages/admin/AdminComplaints'))
 
@@ -107,7 +108,7 @@ export default function App() {
           <Route path="complaints" element={<AdminComplaints />} />
           <Route path="bookings" element={<Placeholder title="Booking Oversight" note="Yan Hsi" />} />
           <Route path="finance" element={<Placeholder title="Financial Management" note="Yan Hsi" />} />
-          <Route path="settings" element={<Placeholder title="System Configuration" note="Yan Hsi" />} />
+          <Route path="settings" element={<AdminSettings />} />
         </Route>
       </Route>
 

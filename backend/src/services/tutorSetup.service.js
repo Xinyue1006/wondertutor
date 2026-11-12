@@ -1,4 +1,5 @@
 import { mediaLink } from './privateMedia.js'
+import { baseCommission } from './systemSettings.service.js'
 // Tutor profile setup and verification [YH].
 // A new tutor fills in the setup wizard as a draft, submits it, and Admin reviews the uploaded documents.
 // Tutors can use every feature before that; once Admin approves an identity document AND a qualification
@@ -39,6 +40,10 @@ export async function recomputeVerified(db, tutorId) {
   const approved = await db.qualification.groupBy({ by: ['kind'], where: { tutorId, status: 'APPROVED' } })
   const kinds = new Set(approved.map((r) => r.kind))
   const isVerified = kinds.has('IDENTITY') && kinds.has('QUALIFICATION')
+  if (isVerified) {
+    const rate = await baseCommission(db)
+    await db.tutorProfile.updateMany({ where: { id: tutorId, isVerified: false, commissionRate: null }, data: { commissionRate: rate } })
+  }
   await db.tutorProfile.update({ where: { id: tutorId }, data: { isVerified } })
   return isVerified
 }

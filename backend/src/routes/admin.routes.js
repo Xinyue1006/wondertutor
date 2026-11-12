@@ -5,6 +5,7 @@ import { requireAuth, requireRole } from '../middleware/auth.js'
 import * as users from '../controllers/admin/users.controller.js'
 import * as complaints from '../controllers/admin/complaints.controller.js'
 import { moderateReview } from '../controllers/admin/reviews.controller.js'
+import * as settings from '../controllers/admin/settings.controller.js'
 
 const router = validateIdParams(Router(), { publicIds: [
   { prefix: '/complaints/', model: 'complaint', scope: () => ({}), notFound: 'Complaint not found' },
@@ -29,6 +30,7 @@ router.get('/complaints/:id', complaints.getComplaint)
 router.patch('/complaints/:id', complaints.updateComplaint)
 router.patch('/reviews/:id/moderation', moderateReview)
 
-// [YH] booking oversight / finance / system settings go here
+router.get('/settings', settings.list)
+router.patch('/settings', settings.update)
 
 export default router
