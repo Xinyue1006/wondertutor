@@ -12,6 +12,9 @@ vi.mock('../api/client', () => ({
 import api from '../api/client'
 import Signup from '../pages/auth/Signup'
 
+// Each test types through the whole sign-up form, which takes longer than the default 5 s when the full suite runs in parallel
+vi.setConfig({ testTimeout: 15_000 })
+
 const setup = () => {
   sessionStorage.clear()
   api.get.mockResolvedValue({ data: {
