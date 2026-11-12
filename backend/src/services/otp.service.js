@@ -9,6 +9,7 @@ const MAX_ATTEMPTS = 5
 const RESEND_COOLDOWN_SECONDS = 60
 
 const PURPOSE_TEXT = {
+  bank: { subject: 'Confirm your WonderTutor bank details', note: 'Use this code only to change your withdrawal account.' },
   verify: { subject: 'Your WonderTutor verification code', note: "If you didn't sign up, ignore this email." },
   reset: { subject: 'Reset your WonderTutor password', note: "If you didn't ask to reset your password, ignore this email. Your password stays the same." },
   change: { subject: 'Confirm your new WonderTutor email', note: "If you didn't ask to use this email for WonderTutor, ignore this message. Nothing changes until the code is entered." },

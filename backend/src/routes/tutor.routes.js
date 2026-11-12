@@ -8,6 +8,8 @@ import * as profile from '../controllers/tutor/profile.controller.js'
 import * as availability from '../controllers/tutor/availability.controller.js'
 import * as bookings from '../controllers/tutor/bookings.controller.js'
 import * as session from '../controllers/tutor/lessonSession.controller.js'
+import * as earnings from '../controllers/tutor/earnings.controller.js'
+import { rateLimit } from '../middleware/rateLimit.js'
 
 const router = validateIdParams(Router()) // every :id in these URLs must be a positive whole number
 router.use(requireAuth, requireRole('TUTOR'), loadTutorProfile)
@@ -27,6 +29,10 @@ router.post('/submit-for-verification', profile.submitForVerification)
 
 // Teaching features: availability, requests, sessions and earnings go below this line
 router.get('/dashboard', profile.dashboard)
+router.get('/earnings', earnings.dashboard)
+router.post('/earnings/bank-code', rateLimit({ name: 'bank-code', max: 5, windowMs: 900000, keyBy: req => req.user.id }), earnings.bankCode)
+router.put('/earnings/bank', rateLimit({ name: 'bank-confirm', max: 10, windowMs: 900000, keyBy: req => req.user.id }), earnings.bank)
+router.post('/earnings/withdrawals', earnings.withdraw)
 router.get('/bookings', bookings.list)
 router.get('/bookings/:id/session', session.get)
 router.post('/bookings/:id/session', session.update)

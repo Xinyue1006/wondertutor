@@ -18,6 +18,8 @@ const Availability = lazy(() => import('./pages/tutor/Availability'))
 const TutorDashboard = lazy(() => import('./pages/tutor/Dashboard'))
 const BookingRequests = lazy(() => import('./pages/tutor/BookingRequests'))
 const LessonSession = lazy(() => import('./pages/tutor/LessonSession'))
+const Earnings = lazy(() => import('./pages/tutor/Earnings'))
+const WithdrawalReviews = lazy(() => import('./pages/admin/WithdrawalReviews'))
 const DateAvailability = lazy(() => import('./pages/tutor/DateAvailability'))
 const ParentDashboard = lazy(() => import('./pages/parent/Dashboard'))
 const FindTutor = lazy(() => import('./pages/parent/FindTutor'))
@@ -98,7 +100,7 @@ export default function App() {
           <Route path="bookings" element={<BookingRequests />} />
           <Route path="bookings/:id/session" element={<LessonSession />} />
           <Route path="students" element={<Placeholder title="My Students" />} />
-          <Route path="earnings" element={<Placeholder title="Earnings & Withdrawals" />} />
+          <Route path="earnings" element={<Earnings />} />
           <Route path="setup" element={<ProfileSetup />} />
           {/* Verification now lives on My Profile; notifications already sent still link to this address */}
           <Route path="verification" element={<Navigate to="/tutor/setup" replace />} />
@@ -113,7 +115,7 @@ export default function App() {
           <Route path="users" element={<AdminUsers />} />
           <Route path="complaints" element={<AdminComplaints />} />
           <Route path="bookings" element={<Placeholder title="Booking Oversight" note="Yan Hsi" />} />
-          <Route path="finance" element={<Placeholder title="Financial Management" note="Yan Hsi" />} />
+          <Route path="finance" element={<WithdrawalReviews />} />
           <Route path="settings" element={<AdminSettings />} />
         </Route>
       </Route>
