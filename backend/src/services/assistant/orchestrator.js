@@ -41,6 +41,20 @@ function validCards(cards) {
   return out.slice(0, 6)
 }
 
+function waitToRetry(ms, signal) {
+  return new Promise((resolve, reject) => {
+    let timer
+    const abort = () => {
+      clearTimeout(timer)
+      signal?.removeEventListener('abort', abort)
+      reject(new ProviderError(signal?.reason === 'timeout' ? 'timeout' : 'cancelled', 'Retry stopped'))
+    }
+    if (signal?.aborted) return abort()
+    timer = setTimeout(() => { signal?.removeEventListener('abort', abort); resolve() }, ms)
+    signal?.addEventListener('abort', abort, { once: true })
+  })
+}
+
 async function callModel(provider, req, deadline, signal, timings) {
   // At most one retry for a transient failure, and only while there is time left
   for (let attempt = 0; ; attempt++) {
@@ -58,9 +72,17 @@ async function callModel(provider, req, deadline, signal, timings) {
       if (signal?.aborted) throw new ProviderError('cancelled', 'Cancelled')
       if (ac.signal.aborted && ac.signal.reason === 'timeout') throw new ProviderError('timeout', 'Took too long')
       const pe = err instanceof ProviderError ? err : new ProviderError('bad_response', 'Unexpected AI error')
-      // Repeating an explicit overload/quota response immediately adds latency
-      // while the service is still busy. Keep the bounded retry for transport errors.
-      if (pe.transient && ![429, 503].includes(pe.httpStatus) && attempt === 0 && deadline - Date.now() > 1000) continue
+      // One overload retry may recover a brief capacity failure. Pause with
+      // jitter, keep the original turn deadline, and let Cancel stop the pause.
+      // Quota errors are never retried; transport errors keep one bounded retry.
+      if (pe.transient && pe.kind !== 'rate_limit' && pe.httpStatus !== 429 && attempt === 0) {
+        const remainingAfterFailure = deadline - Date.now()
+        if (pe.httpStatus === 503 && remainingAfterFailure > 2000) {
+          await waitToRetry(500 + Math.floor(Math.random() * 501), ac.signal)
+          continue
+        }
+        if (pe.httpStatus !== 503 && remainingAfterFailure > 1000) continue
+      }
       throw pe
     } finally {
       timings.push(Date.now() - attemptStarted)
@@ -89,7 +111,7 @@ const MISSING = { not_found: 'not_found', not_in_results: 'not_found', no_childr
 const cancelled = (reason) => Object.assign(new AppError(reason === 'deleted' ? 404 : 499, reason === 'deleted' ? USER_MESSAGES.gone : 'Cancelled'), { assistantStatus: 'cancelled' })
 const stopIfCancelled = (turn) => { if (turn.signal.aborted) throw new ProviderError('cancelled', 'Cancelled') }
 
-export async function handleMessage({ user, parent, body, signal, now = new Date(), db = prisma, allowQuickQuestions = true }) {
+export async function handleMessage({ user, parent, body, signal, now = new Date(), db = prisma, allowQuickQuestions = true, onToolResult }) {
   const data = messageRequestSchema.parse(body)
   let session
   if (data.conversationId) {
@@ -108,13 +130,13 @@ export async function handleMessage({ user, parent, body, signal, now = new Date
     throw err
   }
   try {
-    return await runTurn({ user, parent, data, session, turn, now, db, allowQuickQuestions })
+    return await runTurn({ user, parent, data, session, turn, now, db, allowQuickQuestions, onToolResult })
   } finally {
     endTurn(session, turn)
   }
 }
 
-async function runTurn({ user, parent, data, session, turn, now, db, allowQuickQuestions }) {
+async function runTurn({ user, parent, data, session, turn, now, db, allowQuickQuestions, onToolResult }) {
   const started = Date.now()
   const requestId = opaque()
   const log = { requestId, tools: [], providerMs: [], outcome: 'ok', usage: { inputTokens: 0, outputTokens: 0 }, prompt: PROMPT_VERSION, faq: FAQ_VERSION }
@@ -185,6 +207,15 @@ async function runTurn({ user, parent, data, session, turn, now, db, allowQuickQ
     const seenCalls = new Set()
     let calls = 0
     let text = null
+    let successfulReads = 0
+    let planHadErrors = false
+
+    // Trusted evaluation instrumentation, never accepted from the HTTP body.
+    // Observe real execution even when a completed plan needs no further model
+    // request. A snapshot prevents the observer changing the tool's own result.
+    const reportToolResult = (name, result) => {
+      if (typeof onToolResult === 'function') onToolResult({ name, response: structuredClone(result) })
+    }
 
     const readTool = async (name, args) => {
       stopIfCancelled(turn)
@@ -193,6 +224,9 @@ async function runTurn({ user, parent, data, session, turn, now, db, allowQuickQ
       log.tools.push(out.ok ? name : `${String(name).slice(0, 40)}:rejected`)
       if (out.ok && out.result?.error && MISSING[out.result.error]) ctx.evidence.push({ kind: 'missing', tool: name, reason: MISSING[out.result.error] })
       if (out.ok && (out.result?.needsClarification === 'subject' || out.result?.needsClarification === 'level')) ctx.needs = out.result.needsClarification
+      if (!out.ok || out.result?.error) planHadErrors = true
+      else if (name !== 'finish_lookup' && !out.result?.needsClarification) successfulReads++
+      reportToolResult(name, out.result)
       return out
     }
 
@@ -218,17 +252,31 @@ async function runTurn({ user, parent, data, session, turn, now, db, allowQuickQ
       if (round === cfg.maxToolRounds) { log.outcome = 'tool_loop'; break }
       contents.push({ role: 'model', parts }) // unchanged, so any thoughtSignature is returned as required
       const responses = []
-      for (const p of fcs) {
+      let finishLast = false
+      // A corrected plan can recover a rejected argument from an earlier batch.
+      // Completion still requires a fresh successful read in this error-free
+      // batch, rather than relying on preliminary evidence from before an error.
+      successfulReads = 0
+      planHadErrors = false
+      for (const [index, p] of fcs.entries()) {
         stopIfCancelled(turn) // between tool calls
         const { name, args } = p.functionCall
         const key = `${name}:${JSON.stringify(args ?? {})}`
         let result
-        if (++calls > cfg.maxToolCalls) result = { error: 'too_many_calls', message: 'Tool call limit reached. Answer with what you have.' }
-        else if (seenCalls.has(key)) result = { error: 'duplicate_call', message: 'This exact call was already made; use its earlier result.' }
+        if (++calls > cfg.maxToolCalls) {
+          result = { error: 'too_many_calls', message: 'Tool call limit reached. Answer with what you have.' }
+          planHadErrors = true
+          reportToolResult(name, result)
+        } else if (name !== 'finish_lookup' && seenCalls.has(key)) {
+          result = { error: 'duplicate_call', message: 'This exact call was already made; use its earlier result.' }
+          planHadErrors = true
+          reportToolResult(name, result)
+        }
         else {
-          seenCalls.add(key)
+          if (name !== 'finish_lookup') seenCalls.add(key)
           const out = await readTool(name, args)
           result = out.result
+          finishLast = index === fcs.length - 1 && name === 'finish_lookup' && out.ok && result.finished === true
         }
         // Gemini 3.5 correlates responses by both name and the provider's call
         // id. Preserve that id for successful, rejected and duplicate calls;
@@ -236,6 +284,16 @@ async function runTurn({ user, parent, data, session, turn, now, db, allowQuickQ
         responses.push({ functionResponse: { ...(typeof p.functionCall.id === 'string' && { id: p.functionCall.id }), name, response: boundResult(result) } })
       }
       contents.push({ role: 'user', parts: responses })
+      // The trusted tools already supply the exact clarification. Do not spend
+      // another generation merely rephrasing it or risk guessing past it.
+      if (ctx.clarification || ctx.needs) break
+      // Only the model can declare that all parts of its plan are complete.
+      // Never stop on preliminary evidence alone: homework and other dependent
+      // queries may still need a later read using a reference from this batch.
+      if (finishLast && successfulReads > 0 && ctx.evidence.length && !planHadErrors) {
+        log.completion = 'finished_lookup'
+        break
+      }
     }
     }
     stopIfCancelled(turn)

@@ -32,6 +32,7 @@ test('sends system instruction, contents and function declarations with the key 
   expect(seen.body.systemInstruction.parts[0].text).toBe('rules')
   expect(seen.body.tools[0].functionDeclarations[0].name).toBe('list_bookings')
   expect(seen.body.generationConfig.maxOutputTokens).toBe(100)
+  expect(seen.body.generationConfig).not.toHaveProperty('temperature')
   expect(out.parts).toEqual(parts) // thoughtSignature kept for the next request
   expect(out.usage).toEqual({ inputTokens: 12, outputTokens: 3 })
 })
@@ -51,6 +52,15 @@ test('maps errors to safe categories without exposing the provider body', async 
   await expect(run()).rejects.toMatchObject({ kind: 'bad_response' })
   reply = () => [200, { candidates: [] }]
   await expect(run()).rejects.toMatchObject({ kind: 'bad_response' })
+})
+
+test('supported Flash models use minimal thinking without changing unknown model settings', async () => {
+  reply = () => [200, { candidates: [{ content: { parts: [{ text: 'Hello!' }] } }] }]
+  await geminiProvider({ ...cfg(), model: 'gemini-3.6-flash' }).generate({ system: 's', contents: [] })
+  expect(seen.body.generationConfig.thinkingConfig).toEqual({ thinkingLevel: 'minimal' })
+  expect(seen.body.generationConfig).not.toHaveProperty('temperature')
+  await geminiProvider(cfg()).generate({ system: 's', contents: [] })
+  expect(seen.body.generationConfig).not.toHaveProperty('thinkingConfig')
 })
 
 test('a disabled or unconfigured provider refuses without a network call', async () => {

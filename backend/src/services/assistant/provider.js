@@ -32,7 +32,16 @@ export function geminiProvider(cfg = env.ai) {
         contents,
         tools: tools?.length ? [{ functionDeclarations: tools }] : undefined,
         toolConfig: tools?.length ? { functionCallingConfig: { mode: 'AUTO' } } : undefined,
-        generationConfig: { maxOutputTokens, temperature: 0.2 },
+        // Gemini 3 models recommend their default sampling settings. A forced
+        // low temperature can degrade tool selection and increase latency.
+        generationConfig: {
+          maxOutputTokens,
+          // These Flash models support minimal thinking. Keep a small lookup
+          // from spending the interactive turn budget on extended reasoning.
+          ...(/^gemini-3\.(?:1-flash-lite|5-flash-lite|6-flash|8-flash)$/.test(cfg.model) && {
+            thinkingConfig: { thinkingLevel: 'minimal' },
+          }),
+        },
       }
       let res
       try {
@@ -49,7 +58,7 @@ export function geminiProvider(cfg = env.ai) {
       // Provider error bodies are never passed on (they can echo the request); only the category is reported
       if (res.status === 429) throw new ProviderError('rate_limit', 'AI service is busy', { transient: true, httpStatus: res.status })
       if (res.status >= 500) throw new ProviderError('unavailable', 'AI service error', { transient: true, httpStatus: res.status })
-      if (!res.ok) throw new ProviderError('bad_response', `AI service rejected the request (${res.status})`)
+      if (!res.ok) throw new ProviderError('bad_response', `AI service rejected the request (${res.status})`, { httpStatus: res.status })
       let data
       try {
         data = await res.json()

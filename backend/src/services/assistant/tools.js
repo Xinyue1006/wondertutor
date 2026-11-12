@@ -217,7 +217,9 @@ const hourly = (b) => num(b.agreedPrice) ?? (b.status === 'COUNTER_OFFERED' ? nu
 const bookingSelect = { include: { child: { select: { name: true } }, tutor: { select: { user: { select: { fullName: true } } } } } }
 
 async function listBookings(ctx, args) {
+  if (args.from && args.to && args.from > args.to) return { error: 'invalid_range', message: 'from must be on or before to' }
   const where = { parentId: ctx.parent.id }
+  if (args.subject) where.subject = args.subject
   if (args.childRef) {
     const childId = resolveRef(ctx.session, 'child', args.childRef)
     if (!childId) return NOT_FOUND
@@ -250,7 +252,7 @@ async function listBookings(ctx, args) {
     })
     for (const it of items) source(ctx, 'booking', it.bookingRef, `Booking ${it.date} ${it.subject}`, '/parent/bookings')
   }
-  return { filter: { when, status: args.status ?? (when === 'upcoming' ? 'CONFIRMED' : null), from: args.from ?? null, to: args.to ?? null, timezone: 'Asia/Kuala_Lumpur' }, count: items.length, bookings: items }
+  return { filter: { when, status: args.status ?? (when === 'upcoming' ? 'CONFIRMED' : null), subject: args.subject ?? null, from: args.from ?? null, to: args.to ?? null, timezone: 'Asia/Kuala_Lumpur' }, count: items.length, bookings: items }
 }
 
 async function getLessonDetails(ctx, { bookingRef }) {
@@ -415,6 +417,11 @@ const childRefP = S('STRING', { description: 'Child reference from list_children
 const dayP = S('STRING', { description: 'Malaysian date YYYY-MM-DD' })
 
 export const TOOLS = {
+  finish_lookup: {
+    description: 'Control only, no data access: place LAST after all independent read tools that fully answer this question. The server displays their evidence immediately. Do not use before dependent lookups have returned or when more information is needed.',
+    parameters: S('OBJECT', { properties: {} }),
+    run: () => ({ finished: true }),
+  },
   list_children: {
     description: "List the parent's own children (references, level, grade, saved subjects, language, learning preferences, goals).",
     parameters: S('OBJECT', { properties: {} }),
@@ -444,8 +451,8 @@ export const TOOLS = {
     run: explainTutorMatch,
   },
   list_bookings: {
-    description: "The parent's bookings. Default: upcoming confirmed lessons (the next lesson). when=past for earlier lessons; from/to are inclusive Malaysian dates.",
-    parameters: S('OBJECT', { properties: { childRef: childRefP, when: S('STRING', { enum: ['upcoming', 'past', 'any'] }), status: S('STRING', { enum: ['PENDING', 'COUNTER_OFFERED', 'AWAITING_PAYMENT', 'CONFIRMED', 'COMPLETED', 'REJECTED', 'CANCELLED', 'DISPUTED'] }), from: dayP, to: dayP, limit: S('INTEGER') } }),
+    description: "The parent's bookings. Default: upcoming confirmed lessons (the next lesson). Optionally filter by subject and/or childRef; omit subject for all subjects. when=past for earlier lessons; from/to are inclusive Malaysian dates.",
+    parameters: S('OBJECT', { properties: { childRef: childRefP, subject: S('STRING', { enum: SUBJECTS }), when: S('STRING', { enum: ['upcoming', 'past', 'any'] }), status: S('STRING', { enum: ['PENDING', 'COUNTER_OFFERED', 'AWAITING_PAYMENT', 'CONFIRMED', 'COMPLETED', 'REJECTED', 'CANCELLED', 'DISPUTED'] }), from: dayP, to: dayP, limit: S('INTEGER') } }),
     run: listBookings,
   },
   get_lesson_details: {

@@ -202,11 +202,45 @@ const PASSIVE_CLAIM = [
 const WRITE_CLAIM = [...FIRST_PERSON_CLAIM, ...PASSIVE_CLAIM]
 // Words that carry an account fact: money, status, time, attendance or progress. Present in three languages.
 const FACT_WORDS = [
-  /\b(paid|payment|owe[sd]?|refund(?:ed|s)?|approved|rejected|declined|completed|confirmed|cancell?ed|pending|overdue|attended|absent|improv\w*|progress(?:ed)?|score[sd]?|grades?|marks?|rank(?:ed)?|balance|invoice|receipt|lesson|class|booking|homework|complaint|notification|today|tomorrow|yesterday|tonight|morning|afternoon|evening|monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|april|june|july|august|september|october|november|december)\b/i,
+  /\b(paid|payments?|owe[sd]?|refund(?:ed|s)?|approved|rejected|declined|completed|confirmed|cancell?ed|pending|overdue|attended|absent|improv\w*|progress(?:ed)?|score[sd]?|grades?|marks?|rank(?:ed)?|balances?|invoices?|receipts?|lessons?|class(?:es)?|bookings?|homework|complaints?|notifications?|today|tomorrow|yesterday|tonight|morning|afternoon|evening|monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|april|june|july|august|september|october|november|december)\b/i,
   /\b(bayar\w*|dibayar|bayaran|baki|hutang|dikembalikan|diluluskan|ditolak|selesai|disahkan|dibatalkan|tertunggak|hadir|tidak hadir|lewat|meningkat|kemajuan|markah|gred|kelas|tempahan|kerja rumah|aduan|esok|hari ini|semalam|petang|malam|pagi|isnin|selasa|rabu|khamis|jumaat|sabtu|ahad)\b/i,
   /(付|款|钱|费|退|批准|通过|拒绝|完成|确认|取消|待|逾期|出勤|缺席|迟到|进步|提高|提升|退步|成绩|分数|排名|排第|余额|课|作业|投诉|通知|今天|明天|昨天|今晚|早上|下午|晚上|星期|周[一二三四五六日]|[一二三四五六七八九十]月|点钟?|号)/,
 ]
 const DIGITS = /[\p{N}]|RM|\$|%|％/u
+
+// Mentioning a feature in a capability statement or a clarification question is
+// different from asserting an account fact. Keep status, time, amounts and write
+// claims subject to the existing checks; only neutral topic nouns are removed
+// from these narrowly scoped sentences before the factual-vocabulary screen.
+const CAPABILITY_START = /^(?:i can (?:help|find|look up|check)|i(?:'m| am) (?:here|able) to help|saya boleh (?:bantu|membantu|cari|semak)|我可以(?:帮|協助|协助))/iu
+const GUIDANCE_QUESTION = /^(?:can i (?:help|assist)|which\b|what\b|would you like\b|could you (?:tell|clarify|specify)|can you (?:tell|clarify|specify)|do you mean\b|(?:yang mana|anak mana|subjek apa|boleh (?:anda|awak|saya))\b|你想|您想|请问|請問|想要)/iu
+const HELP_QUESTION = /^how (?:can|may) i (?:help|assist)(?: you)?(?: with .+)?[?？]$/iu
+const GUIDANCE_TOPICS = /\b(?:lessons?|classes|bookings?|homework|complaints?|notifications?|progress|grades?|refunds?|payments?|kelas|tempahan|kerja rumah|aduan|bayaran|kemajuan|gred)\b|(?:课程|課程|功课|功課|作业|作業|付款|退款|投诉|投訴|通知|学习进度|學習進度|成绩|成績)/giu
+const SOCIAL_QUESTION = /^(?:how (?:can|may) i (?:help|assist)(?: you)?(?: with (?:your )?(?:tutoring needs|wondertutor|tutoring|tutor search))?(?: today)?|how(?:'s| is) it going)[?？!！]?$/iu
+const GUIDANCE_WORDS = new Set((`i i'm am can may here able to help assist you your own a an the find search look up check read view or and with for about saved recorded upcoming latest recent tutor tutors teacher teachers tutoring needs wondertutor child child's children children's profiles profile details information records subjects subject education level lessons lesson classes class bookings booking homework complaints complaint notifications notification progress grades grade refunds refund payments payment policies policy which what how would like could tell clarify specify do mean want need should is this me us today saya boleh bantu membantu cari mencari semak menyemak tutor guru atau dan kelas tempahan kerja rumah aduan bayaran kemajuan gred anda anak profil maklumat subjek yang mana awak`).split(/\s+/u))
+
+function approvedGuidanceSentence(s) {
+  // Only a vocabulary of feature descriptions/questions is admitted. An
+  // appended assertion ("because your lessons are free", "; it is fractions")
+  // must not inherit the allowance from an earlier capability prefix.
+  if (/[:;；：]/u.test(s)) return false
+  if (CAPABILITY_START.test(s) && /\b(?:is|am|are|was|were|has|have|had|be|been)\b/iu.test(s.replace(/^i(?: am|'m) (?:here|able) to\s+/iu, ''))) return false
+  if (/[㐀-鿿]/u.test(s)) {
+    return s.replace(/我可以|帮你|帮您|帮助|協助|协助|查询|查詢|查看|找|老师|老師|教师|教師|导师|導師|课程|課程|功课|功課|作业|作業|付款|退款|投诉|投訴|通知|学习进度|學習進度|成绩|成績|或|和|及|[、，,。.!！?？\s]/gu, '') === ''
+  }
+  const words = s.toLowerCase().replace(/’/gu, "'").match(/[\p{L}']+/gu) || []
+  return words.length > 0 && words.every(word => GUIDANCE_WORDS.has(word))
+}
+
+function claimVocabulary(text) {
+  return (text.match(/[^.!?。！？]+[.!?。！？]?/gu) || []).map(sentence => {
+    const s = sentence.trim()
+    if (SOCIAL_QUESTION.test(s)) return ''
+    if (HELP_QUESTION.test(s) && approvedGuidanceSentence(s)) return s.replace(GUIDANCE_TOPICS, '').replace(/\btoday\b/giu, '')
+    if (approvedGuidanceSentence(s) && (CAPABILITY_START.test(s) || (GUIDANCE_QUESTION.test(s) && /[?？]$/u.test(s)))) return s.replace(GUIDANCE_TOPICS, '')
+    return s
+  }).join(' ')
+}
 
 export function screenModelProse(text, session) {
   if (typeof text !== 'string' || !text.trim()) return { ok: false, reason: 'empty' }
@@ -214,7 +248,7 @@ export function screenModelProse(text, session) {
   if (WRITE_CLAIM.some((re) => re.test(text))) return { ok: false, reason: 'write_claim' }
   for (const m of text.matchAll(/\[\[([a-z]+_\d+)\]\]/g)) if (!session.refs.has(m[1])) return { ok: false, reason: 'unknown_ref' }
   if (DIGITS.test(text.replace(/\[\[[a-z]+_\d+\]\]/g, ''))) return { ok: false, reason: 'unsupported_figure' }
-  if (FACT_WORDS.some((re) => re.test(text.replace(/\[\[[a-z]+_\d+\]\]/g, '')))) return { ok: false, reason: 'unsupported_account_claim' }
+  if (FACT_WORDS.some((re) => re.test(claimVocabulary(text.replace(/\[\[[a-z]+_\d+\]\]/g, ''))))) return { ok: false, reason: 'unsupported_account_claim' }
   return { ok: true }
 }
 

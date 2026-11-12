@@ -235,11 +235,13 @@ describe('4. clarification for children', () => {
   test('a search without subject or level asks instead of guessing', async () => {
     script(call('search_tutors', { mode: 'ONLINE' }), say('Which subject and level?'))
     const res = await send(A, { message: 'find me a tutor' })
-    const fr = calls[1].contents.at(-1).parts[0].functionResponse.response
-    expect(fr.needsClarification).toBe('subject')
+    expect(calls).toHaveLength(1) // trusted clarification needs no wording-only AI round
+    expect(res.responseKind).toBe('clarification')
     expect(res.cards).toEqual([])
     expect(res.status).toBe(200)
     expect(res.text).toMatch(/\?/)
+    expect(res.text).toMatch(/subject/i)
+    expect(res.matchResult).toBeNull()
   })
 
   test('looking up children does not hide a later request for missing search criteria', async () => {
@@ -332,7 +334,7 @@ describe('9. "paid this month" matches the Payments page at Malaysian month boun
 })
 
 describe('10. provider failures fall back clearly; normal pages keep working', () => {
-  test('explicit overload and quota errors do not trigger an immediate second request', async () => {
+  test('quota errors are not retried and overload recovery is limited to one delayed retry', async () => {
     for (const httpStatus of [429, 503]) {
       let calls = 0
       setProvider({ name: 'mock', generate: async () => {
@@ -341,7 +343,7 @@ describe('10. provider failures fall back clearly; normal pages keep working', (
       } })
       const response = await send(A, { message: 'show my next lesson' })
       expect(response.status).toBe(httpStatus)
-      expect(calls).toBe(1)
+      expect(calls).toBe(httpStatus === 503 ? 2 : 1)
     }
   })
 

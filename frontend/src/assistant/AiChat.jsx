@@ -49,6 +49,7 @@ export default function AiChat({ capabilities, onUseGuided, visible = true }) {
   const [conversationId, setConversationId] = useState(null)
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
+  const [waiting, setWaiting] = useState(false)
   const [accepted, setAccepted] = useState(() => noticeSeen(userId))
   const [lastFailed, setLastFailed] = useState(null) // { message, selection } to retry
   const request = useRef(null) // { id, ac } of the ONE request whose result may still be shown (null = nothing in flight)
@@ -61,6 +62,7 @@ export default function AiChat({ capabilities, onUseGuided, visible = true }) {
   useEffect(() => () => {
     const r = request.current
     request.current = null
+    clearTimeout(r?.waitingTimer)
     r?.ac.abort()
   }, [])
 
@@ -77,10 +79,12 @@ export default function AiChat({ capabilities, onUseGuided, visible = true }) {
     const req = { id: ++requestSeq.current, ac: new AbortController() }
     request.current = req
     const isCurrent = () => request.current === req // false once cancelled, cleared, replaced or unmounted
+    setWaiting(false)
+    req.waitingTimer = setTimeout(() => { if (isCurrent()) setWaiting(true) }, 8000)
     setMessages((m) => [...m, { id: seq++, from: 'user', text: shownText || value }])
     setBusy(true)
     try {
-      const reply = await sendAssistantMessage({ conversationId, message: value, selection }, req.ac.signal)
+      const reply = await sendAssistantMessage({ conversationId, message: value, selection }, req.ac.signal, capabilities?.limits?.requestTimeoutMs)
       if (!isCurrent()) return
       setConversationId(reply.conversationId)
       setMessages((m) => [...m, { id: seq++, from: 'ai', ...reply }])
@@ -94,9 +98,11 @@ export default function AiChat({ capabilities, onUseGuided, visible = true }) {
       setLastFailed({ message: value, selection, quickQuestions })
       setMessages((m) => [...m, { id: seq++, from: 'system', text: errorMessage(err), unavailable: status === 503 || status === 429 }])
     } finally {
+      clearTimeout(req.waitingTimer)
       if (isCurrent()) {
         request.current = null
         setBusy(false)
+        setWaiting(false)
       }
     }
   }
@@ -105,8 +111,10 @@ export default function AiChat({ capabilities, onUseGuided, visible = true }) {
     const req = request.current
     if (!req) return
     request.current = null // invalidate first: from now on nothing from this request may touch the screen
+    clearTimeout(req.waitingTimer)
     req.ac.abort()
     setBusy(false)
+    setWaiting(false)
     setMessages((m) => [...m, { id: seq++, from: 'system', text: 'Stopped. Nothing was saved from that question.' }])
   }
 
@@ -114,12 +122,14 @@ export default function AiChat({ capabilities, onUseGuided, visible = true }) {
     const id = conversationId
     const req = request.current
     request.current = null
+    clearTimeout(req?.waitingTimer)
     req?.ac.abort()
     setMessages([])
     setText('')
     setConversationId(null)
     setLastFailed(null)
     setBusy(false)
+    setWaiting(false)
     if (id) deleteConversation(id).catch(() => { /* it expires on its own */ })
   }
 
@@ -204,10 +214,13 @@ export default function AiChat({ capabilities, onUseGuided, visible = true }) {
         )}
         <div aria-live="polite" role="status" className="text-sm text-slate-500">
           {busy && (
-            <span className="inline-flex items-center gap-2">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-brand-500" /> Looking that up…
-              <button type="button" onClick={cancel} className="min-h-9 rounded-lg px-2 font-semibold text-brand-600 hover:bg-brand-50">Cancel</button>
-            </span>
+            <div className="space-y-1">
+              <span className="inline-flex items-center gap-2">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-brand-500" /> Looking that up…
+                <button type="button" onClick={cancel} className="min-h-9 rounded-lg px-2 font-semibold text-brand-600 hover:bg-brand-50">Cancel</button>
+              </span>
+              {waiting && <p className="text-xs">Still working on your question. You can cancel at any time.</p>}
+            </div>
           )}
           {!busy && lastFailed && (
             <button type="button" onClick={() => send(lastFailed.message, lastFailed.selection)} className="min-h-9 rounded-lg px-2 font-semibold text-brand-600 hover:bg-brand-50">Retry</button>

@@ -3,7 +3,7 @@
 // Every entry was checked against the CODE that enforces it (source = file/function) on the review date. When the
 // project documents (CLAUDE.md, reports) say more than the code does, the answer sticks to what the code does and the
 // gap is recorded in OPEN_POLICY_QUESTIONS for the project owner. Bump FAQ_VERSION whenever an answer changes.
-export const FAQ_VERSION = '2026-11-11.1'
+export const FAQ_VERSION = '2026-11-13.1'
 const REVIEWED = '2026-11-09'
 
 export const FAQ = [
@@ -27,25 +27,25 @@ export const FAQ = [
     id: 'faq.counter-offer',
     topic: 'Price proposals and counter-offers',
     keywords: ['counter', 'offer', 'propose', 'price', 'negotiate', 'harga', 'tawar', '还价', '价钱'],
-    answer: 'When you send a booking request you propose an hourly price. The tutor can accept it, reject it with a reason, or send a counter-offer. You can accept the counter-offer (the booking then waits for payment) or decline it.',
-    source: 'backend/src/controllers/parent/bookings.controller.js#acceptCounter/declineCounter',
-    reviewed: REVIEWED,
+    answer: 'When you send a booking request you propose an hourly price. The tutor can accept it, reject it with a reason, or send a counter-offer. You can accept the counter-offer (the booking then waits for payment), propose a different price, decline it, or request administrator review. Sending a request does not confirm a lesson; payment is required after acceptance.',
+    source: 'backend/src/controllers/parent/bookings.controller.js#acceptCounter/declineCounter/negotiate; backend/src/services/tutorBooking.service.js',
+    reviewed: '2026-11-13',
   },
   {
     id: 'faq.payment-deadline',
     topic: 'Payment deadline',
     keywords: ['deadline', 'pay before', 'expire', 'expired', 'unpaid', 'bayar', 'tamat', '付款期限', '过期'],
-    answer: 'A booking is confirmed only after payment. If a booking waiting for payment is still unpaid 1 hour before the lesson starts, it is released and the slot becomes free again. You get one reminder when the payment deadline is less than 24 hours away. Requests the tutor never answered, and counter-offers you never answered, expire when the lesson time arrives.',
-    source: 'backend/src/services/lifecycle.service.js (PAYMENT_DEADLINE_MINUTES = 60, PAYMENT_REMINDER_HOURS = 24)',
-    reviewed: REVIEWED,
+    answer: 'A booking is confirmed only after payment. After acceptance you have up to 24 hours to pay, with a cutoff 1 hour before the lesson starts, whichever is earlier. If payment is still incomplete at that deadline, the booking is released. Older bookings without a recorded pay-by time use the 1-hour cutoff. One payment reminder is sent during the final 6 hours of the payment window. Requests the tutor never answered, and counter-offers you never answered, expire when the lesson time arrives.',
+    source: 'backend/src/services/paymentWindow.js; backend/src/services/lifecycle.service.js (PAYMENT_WINDOW_HOURS = 24, PAYMENT_DEADLINE_MINUTES = 60, PAYMENT_REMINDER_HOURS = 6)',
+    reviewed: '2026-11-13',
   },
   {
     id: 'faq.cancel-refund',
     topic: 'Cancelling and refunds (parent)',
     keywords: ['cancel', 'refund', 'money back', 'batal', 'pulangan', 'bayaran balik', '取消', '退款', '退钱'],
-    answer: 'You can cancel a request before payment at no cost. If you cancel a paid lesson before it starts, the booking is cancelled and a refund request is sent to the WonderTutor admin team, who review it and decide the amount; it is not automatic. After a paid lesson has started or finished you can send a refund request with a reason (for example if you dispute the attendance); the admin team reviews it. An approved refund status means the request was approved; it does not by itself confirm the money has reached your bank.',
-    source: 'backend/src/controllers/parent/bookings.controller.js#cancelBooking/requestRefund (type ADMIN_REVIEW)',
-    reviewed: REVIEWED,
+    answer: 'You can cancel a request before payment at no cost. If you cancel a paid lesson before it starts, the booking is cancelled and a refund request is sent to the WonderTutor admin team, who review it and decide the amount; it is not automatic. If the tutor cancels a paid lesson before it starts, a full refund request is queued automatically. After a paid lesson has started or finished you can send a refund request with a reason (for example if you dispute the attendance); the admin team reviews it. An approved refund status means the request was approved; it does not by itself confirm the money has reached your bank.',
+    source: 'backend/src/controllers/parent/bookings.controller.js#cancelBooking/requestRefund (type ADMIN_REVIEW); backend/src/services/tutorBooking.service.js#tutorAction (type AUTO)',
+    reviewed: '2026-11-13',
   },
   {
     id: 'faq.late-payment',
@@ -67,7 +67,7 @@ export const FAQ = [
     id: 'faq.availability',
     topic: 'Availability in the match score',
     keywords: ['available', 'availability', 'slot', 'free time', 'masa', '时间', '有空'],
-    answer: 'The availability part of the score compares your preferred days and times with the tutor\'s weekly availability. It does not reserve a slot or guarantee that a particular date is still free; the booking page shows the slots that can actually be booked.',
+    answer: 'The availability part of the score compares your preferred days and times with the tutor\'s availability. It does not reserve a slot or guarantee that a particular date is still free. For an actual booking date, a one-date change takes priority, then a change for that week, then the usual weekly hours. The booking page checks the lesson mode and existing bookings and shows the slots that can actually be booked.',
     source: 'backend/src/services/matching.service.js#availabilityScore; booking.service.js#getTutorSlots',
     reviewed: REVIEWED,
   },
@@ -115,7 +115,7 @@ export const FAQ = [
 
 // Things the project documents describe but the code does not (yet) enforce. The assistant must not state these.
 export const OPEN_POLICY_QUESTIONS = [
-  'CLAUDE.md lists automatic full refunds when a tutor cancels, fails check-in, or both sides agree before the session. The tutor-side cancellation/check-in features are not in this codebase yet, so the FAQ does not promise them.',
+  'Tutor cancellation now queues a full refund request. Automatic refunds for failed check-in or mutual cancellation are not established by the current implementation; do not promise these or claim that a queued refund has reached the bank.',
   'Partial-refund percentage is undecided (client open question); the admin decides the amount case by case.',
 ]
 

@@ -18,7 +18,7 @@ export function capabilities(req, res) {
     modes: enabled ? ['ai', 'guided'] : ['guided'],
     readOnly: true,
     suggestions: suggestedQuestions('en'),
-    limits: { maxMessageLength: 2000, maxTurns: env.ai.maxTurns, conversationMinutes: Math.round(env.ai.conversationTtlMs / 60000) },
+    limits: { requestTimeoutMs: env.ai.timeoutMs, maxMessageLength: 2000, maxTurns: env.ai.maxTurns, conversationMinutes: Math.round(env.ai.conversationTtlMs / 60000) },
     limitations: [
       'Read-only: it can look things up but cannot book, cancel, pay, change profiles or file complaints.',
       'Answers come from your WonderTutor records and approved policy answers only.',

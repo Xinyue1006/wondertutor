@@ -19,8 +19,10 @@ POST /api/parent/assistant/messages → requireAuth + PARENT + loadParentProfile
                                        ← functionCall(s)                                 ←──
                                        → allowlisted read tool, Zod-validated arguments,
                                          ownership in every query, minimised + redacted result
-                                       → (bounded loop: ≤4 rounds, ≤8 calls, 15 s deadline)
-                                       ← final text                                      ←──
+                                       → (bounded loop: ≤4 rounds, ≤8 calls, 45 s deadline)
+                                       → finish_lookup after a complete validated read plan,
+                                         or trusted clarification: no wording-only generation
+                                       ← final text only when another model round is needed ←──
                                        → visible answer written by the SERVER from tool evidence
                                          (model prose only if there is no evidence and it passes a screen)
                                        → server-built cards + sources (strict schemas)
@@ -112,12 +114,12 @@ Every tool that returns account data also records a small **evidence** object (c
 | a clarification (several children, missing subject or level) | the model's wording **only if it is a fact-free question**; otherwise a server question |
 | no evidence at all | the model's wording **only if** it passes `screenModelProse()`; otherwise a server sentence that says nothing was looked up and what to ask |
 
-`screenModelProse()` is deliberately conservative: it rejects text that contains any digit, currency or percent sign, an unknown `[[ref]]`, a first-person or passive completed-action claim ("I have booked", "has been approved", Malay and Chinese equivalents), or any word from a list of account-fact vocabulary (money, status, time, attendance, progress; English, Malay, Chinese). Examples that are replaced: "Your next lesson is tomorrow at 9pm.", "Your refund has been approved.", "Your child improved dramatically.", "RM100 has been paid." Matching-weight percentages are **not** whitelisted anywhere.
+`screenModelProse()` is deliberately conservative: it rejects text that contains any digit, currency or percent sign, an unknown `[[ref]]`, a first-person or passive completed-action claim ("I have booked", "has been approved", Malay and Chinese equivalents), or unsupported account-fact vocabulary. A bounded vocabulary of complete neutral capability sentences and clarification questions can mention feature names such as lessons or homework. Embedded assertions, status words, figures and clauses after colons/semicolons do not inherit that allowance. Examples that are replaced: "Your next lesson is tomorrow at 9pm.", "Your refund has been approved.", "Your child improved dramatically.", "RM100 has been paid.", "I can help because your lessons are free." Matching-weight percentages are **not** whitelisted anywhere.
 
 **Remaining limitations (honest):**
 
 - The screen is a vocabulary filter, not a proof. A fact-free-looking sentence in an unlisted word or another language (for example a Tamil sentence) can pass. It can only appear on turns without account evidence, and it cannot carry a number, a date, an amount or a listed status word, but it could still say something vague and wrong. The prompt asks the model not to; the server does not rely on that.
-- The screen produces false positives: harmless wording that contains a listed word (for example "lesson") is replaced by the generic template.
+- The screen can still produce false positives: harmless wording outside the approved guidance vocabulary is replaced by the generic template. It is a heuristic, not a semantic proof.
 - Server sentences are only as good as the tool the model chose. If it calls the wrong tool, the answer is a correct statement about the wrong thing (and the cards show what was looked up).
 - Malay and Chinese templates were written for this project and have not been reviewed by a native speaker.
 - Tutor bios, lesson summaries and similar free text are shown in cards (escaped plain text), not restated in the sentences.
@@ -143,7 +145,7 @@ Every tool that returns account data also records a small **evidence** object (c
 | `get_matching_catalog` | none | Subjects, levels, maximum grades, modes, languages, teaching styles |
 | `search_tutors` | Canonical criteria, `childRef`, `newSearch`, `clear[]` | Same engine and ordering as the wizard. The top 5 go to the model; up to 10 go to the card and up to 30 to the results page. **Nothing is saved** |
 | `explain_tutor_match` | `searchRef`, `tutorRef` | Recomputed score, label, reasons and rank from the stored criteria |
-| `list_bookings` | `childRef?`, `when?`, `status?`, `from/to?` (inclusive Malaysian dates), `limit ≤ 10` | Owned bookings with Malaysian date/time, status, mode and hourly price. Default: upcoming CONFIRMED |
+| `list_bookings` | `childRef?`, `subject?`, `when?`, `status?`, `from/to?` (inclusive Malaysian dates), `limit ≤ 10` | Owned bookings with Malaysian date/time, status, mode and hourly price. Subject is filtered in the ownership-scoped database query. Default: upcoming CONFIRMED |
 | `get_lesson_details` | `bookingRef` | Status, check-in/out **times only** (no photo, GPS or gateway data), and what the tutor recorded (redacted and capped) |
 | `get_learning_progress` | `childRef?`, `from/to?`, `subject?` | Same rules as the progress report: totals, subjects, the 5 most recent lessons with excerpts, and how many lessons have no summary |
 | `get_payment_summary` | `from/to?` | Same rules as the Payments page. Paid totals are gross (not net of refunds); refund requests are listed separately by status |
@@ -151,6 +153,7 @@ Every tool that returns account data also records a small **evidence** object (c
 | `list_complaints` | `status?`, `limit ≤ 10` | Category, status, date and the admin reply (redacted). The parent's complaint narrative is **not** sent |
 | `list_notifications` | `limit ≤ 20`, `unreadOnly?` | Type, redacted title, date, read flag, unread count. Never marks anything as read |
 | `search_faq` | `question` | Approved local FAQ entries with ids and sources only |
+| `finish_lookup` | `{}` only | Control marker, no database read or write. A final, valid marker after fresh successful reads allows immediate evidence-based completion. It cannot create evidence or bypass rejected calls. |
 
 Every tool follows the same rules:
 
@@ -228,7 +231,7 @@ Every tool follows the same rules:
 | `GEMINI_API_KEY` | | Server only. Never put it in a `VITE_` variable |
 | `GEMINI_MODEL` | | **Required when enabled.** Copy a current model name from https://ai.google.dev/gemini-api/docs/models. Nothing is hard-coded |
 | `GEMINI_BASE_URL` | `https://generativelanguage.googleapis.com/v1beta` | |
-| `AI_REQUEST_TIMEOUT_MS` | 15000 | Total deadline per message, including one retry |
+| `AI_REQUEST_TIMEOUT_MS` | 45000 | Total deadline per message, including bounded retry. Browser chat uses the advertised deadline + 5 seconds; ordinary API requests retain 20 seconds. |
 | `AI_MAX_TOOL_ROUNDS` / `AI_MAX_TOOL_CALLS` | 4 / 8 | |
 | `AI_CONVERSATION_TTL_MS` / `AI_MAX_TURNS` | 1800000 / 20 | |
 | `AI_MAX_CONVERSATIONS_PER_USER` / `AI_MAX_CONVERSATIONS` | 5 / 1000 | |
@@ -241,6 +244,7 @@ An enabled assistant with a missing key or model, or an out-of-range number, sto
 
 - The adapter calls `models/{GEMINI_MODEL}:generateContent` with `functionDeclarations`, using plain `fetch` so no new dependency is added.
 - Within a turn, model parts are sent back unchanged, so `thoughtSignature` values on `functionCall` parts are preserved, as newer Gemini models require.
+- Sampling overrides were removed. Supported Gemini 3.1/3.5 Flash-Lite and 3.6/3.8 Flash models explicitly use minimal thinking for interactive lookups. One transient HTTP 503 can retry after cancellable 500–1000 ms jitter within the original deadline; quota errors are not automatically retried.
 - Google also documents a newer Interactions API. This adapter does not use it.
 
 ## 8. Setup and demo
@@ -296,7 +300,7 @@ Rates describe this small synthetic set, one model and one prompt version only. 
 - **Answer evidence, not proof of truth:** see §3a for exactly what is guaranteed (server-written facts) and what is not (vocabulary-filter screen for fact-free model wording, correctness of the model's tool choice, unreviewed Malay/Chinese templates). Do not describe the assistant as free of hallucination.
 - **Privacy is risk reduction:** see §6. Redaction is pattern and known-name based.
 - **Open policy questions:** recorded in `faq.js` (`OPEN_POLICY_QUESTIONS`) for the owner to review:
-  - Automatic full refunds when a **tutor** cancels or fails check-in are described in CLAUDE.md, but the tutor-side features are not in this codebase yet. The FAQ does not promise them.
+  - Tutor cancellation now queues a full refund request. Automatic refunds for failed check-in or mutual cancellation are not established; a queued or approved request is not proof of bank settlement.
   - The partial-refund percentage is undecided.
 - **English UI:** the interface is in English. Replies follow the parent's language where the model can.
 

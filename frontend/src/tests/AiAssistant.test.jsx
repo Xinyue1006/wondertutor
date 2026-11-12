@@ -1,6 +1,6 @@
 // AI Assistant mode in the Book Robot panel: privacy notice, plain-text rendering of server references, child choices,
 // guided fallback, cancel/late-reply handling, and temporary results. The backend is mocked.
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Link, MemoryRouter, Route, Routes } from 'react-router-dom'
 import { vi } from 'vitest'
@@ -15,6 +15,7 @@ vi.mock('../api/client', () => ({
 import api from '../api/client'
 import { MatchingProvider, useMatching } from '../assistant/MatchingContext'
 import AssistantWidget from '../assistant/AssistantWidget'
+import { assistantRequestTimeoutMs } from '../assistant/aiApi'
 
 const catalog = { subjects: ['Mathematics'], locations: [], characteristics: [], homeLocation: null }
 
@@ -62,6 +63,31 @@ beforeEach(() => {
   localStorage.clear()
   sessionStorage.clear()
   currentUser = { id: 1, role: 'PARENT', fullName: 'Tan Xin Yue' }
+})
+
+test.each([
+  [45000, 50000], [60000, 65000], [120000, 125000],
+  [999999, 125000], [0, 6000], [-1000, 6000],
+  [undefined, 50000], [null, 50000], ['45000', 50000],
+  [Infinity, 50000], [NaN, 50000],
+])('the assistant request deadline is bounded for server limit %s', (serverTimeoutMs, expected) => {
+  expect(assistantRequestTimeoutMs(serverTimeoutMs)).toBe(expected)
+})
+
+test('chat requests allow the advertised server deadline plus transport time and retain cancellation', async () => {
+  setup()
+  localStorage.setItem('wt-ai-notice-v1:1', '1')
+  const originalGet = api.get.getMockImplementation()
+  api.get.mockImplementation(url => url.includes('assistant/capabilities')
+    ? Promise.resolve({ data: { enabled: true, limits: { requestTimeoutMs: 60000 } } })
+    : originalGet(url))
+  api.post.mockResolvedValueOnce(reply({ text: 'The requested records are shown here.' }))
+  const panel = await openPanel()
+  await userEvent.type(await within(panel).findByLabelText('Question for the AI assistant'), 'show my lessons{enter}')
+  await within(panel).findByText('The requested records are shown here.')
+  expect(api.post).toHaveBeenLastCalledWith('/parent/assistant/messages', { message: 'show my lessons' }, {
+    signal: expect.any(AbortSignal), timeout: 65000,
+  })
 })
 
 test('a privacy notice comes before the first AI message, with a guided alternative', async () => {
@@ -173,6 +199,44 @@ async function ready() {
   const box = await within(panel).findByLabelText('Question for the AI assistant')
   return { panel, box }
 }
+
+test('a longer request shows a patient hint after eight seconds and cancellation isolates the next request', async () => {
+  const A = deferred(), B = deferred()
+  api.post.mockImplementationOnce(() => A.promise).mockImplementationOnce(() => B.promise)
+  const { panel, box } = await ready()
+  vi.useFakeTimers()
+  const hint = () => within(panel).queryByText('Still working on your question. You can cancel at any time.')
+  const submit = (question) => {
+    fireEvent.change(box, { target: { value: question } })
+    fireEvent.submit(box.closest('form'))
+  }
+  try {
+    submit('first question')
+    await act(async () => vi.advanceTimersByTimeAsync(7999))
+    expect(hint()).not.toBeInTheDocument()
+    await act(async () => vi.advanceTimersByTimeAsync(1))
+    expect(hint()).toBeVisible()
+    expect(within(panel).queryByRole('alert')).not.toBeInTheDocument()
+    fireEvent.click(within(panel).getByRole('button', { name: 'Cancel', exact: true }))
+    expect(api.post.mock.calls[0][2].signal.aborted).toBe(true)
+    expect(hint()).not.toBeInTheDocument()
+
+    submit('second question')
+    await act(async () => vi.advanceTimersByTimeAsync(7999))
+    await act(async () => A.resolve(reply({ text: 'STALE FIRST ANSWER' })))
+    expect(hint()).not.toBeInTheDocument()
+    expect(within(panel).queryByText('STALE FIRST ANSWER')).not.toBeInTheDocument()
+    expect(api.post.mock.calls[1][2].signal.aborted).toBe(false)
+    await act(async () => vi.advanceTimersByTimeAsync(1))
+    expect(hint()).toBeVisible()
+    await act(async () => B.resolve(reply({ text: 'The second answer is ready.' })))
+    expect(within(panel).getByText('The second answer is ready.')).toBeVisible()
+    expect(hint()).not.toBeInTheDocument()
+    expect(within(panel).queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+  } finally {
+    vi.useRealTimers()
+  }
+})
 
 test('cancel A, start B, then A finishes: B stays busy and only B\'s answer appears', async () => {
   const A = deferred()

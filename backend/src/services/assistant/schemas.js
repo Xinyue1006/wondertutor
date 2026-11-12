@@ -23,6 +23,7 @@ const BOOKING_STATUSES = ['PENDING', 'COUNTER_OFFERED', 'AWAITING_PAYMENT', 'CON
 const CRITERIA_FIELDS = ['grade', 'days', 'timeStart', 'timeEnd', 'mode', 'location', 'budgetMin', 'budgetMax', 'gender', 'language', 'characteristics']
 
 export const toolArgs = {
+  finish_lookup: z.object({}).strict(),
   list_children: z.object({}).strict(),
   get_matching_catalog: z.object({}).strict(),
   search_tutors: z
@@ -49,6 +50,7 @@ export const toolArgs = {
   list_bookings: z
     .object({
       childRef: REF('child').optional(),
+      subject: z.enum(SUBJECTS).optional(),
       when: z.enum(['upcoming', 'past', 'any']).optional(),
       status: z.enum(BOOKING_STATUSES).optional(),
       from: day.optional(),

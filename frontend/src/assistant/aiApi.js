@@ -6,8 +6,14 @@ import { useAuth } from '../context/AuthContext'
 
 export const getCapabilities = () => api.get('/parent/assistant/capabilities').then((r) => r.data)
 
-export const sendAssistantMessage = ({ conversationId, message, selection }, signal) =>
-  api.post('/parent/assistant/messages', { ...(conversationId && { conversationId }), message, ...(selection && { selection }) }, { signal }).then((r) => r.data)
+// Leave time for the server's bounded AI turn and the response to travel back.
+// This applies only to chat: ordinary API requests keep their shorter deadline.
+export const assistantRequestTimeoutMs = (serverTimeoutMs) => Number.isFinite(serverTimeoutMs)
+  ? Math.min(120000, Math.max(1000, serverTimeoutMs)) + 5000
+  : 50000
+
+export const sendAssistantMessage = ({ conversationId, message, selection }, signal, serverTimeoutMs) =>
+  api.post('/parent/assistant/messages', { ...(conversationId && { conversationId }), message, ...(selection && { selection }) }, { signal, timeout: assistantRequestTimeoutMs(serverTimeoutMs) }).then((r) => r.data)
 
 export const deleteConversation = (id) => api.delete(`/parent/assistant/conversations/${encodeURIComponent(id)}`)
 

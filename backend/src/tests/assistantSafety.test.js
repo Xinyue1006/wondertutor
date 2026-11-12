@@ -128,7 +128,7 @@ describe('1. account facts come from evidence, not from the model', () => {
     expect((await turn(P, '显示第99节课')).text).toMatch(/没有找到/)
   })
 
-  test('supported answers still work: server sentences for facts, model wording for clarification', async () => {
+  test('supported answers use server facts and complete trusted clarification without another model round', async () => {
     const date = nextDate(MONDAY)
     script(call('list_bookings'), say('anything'))
     const ms = await turn(P, 'bila kelas anak saya yang seterusnya?')
@@ -138,11 +138,13 @@ describe('1. account facts come from evidence, not from the model', () => {
 
     script(call('search_tutors', { level: 'PRIMARY' }), say('Which subject should I look for?'))
     const ask = await turn(P, 'find me a tutor')
-    expect(ask.text).toBe('Which subject should I look for?') // natural clarification kept
+    expect(ask.text).toBe(clarifyText('subject', 'en'))
+    expect(calls).toHaveLength(1) // the tool already supplied the missing field
 
     script(call('search_tutors', { level: 'PRIMARY' }), say('Great, 3 tutors found for you!'))
     const bad = await turn(P, 'find me a tutor')
-    expect(bad.text).toBe(clarifyText('subject', 'en')) // an unsafe clarification is swapped for a safe template
+    expect(bad.text).toBe(clarifyText('subject', 'en')) // do not ask the model to embellish a trusted question
+    expect(calls).toHaveLength(1)
   })
 
   test('matching-weight numbers are not accepted as payment amounts', () => {
