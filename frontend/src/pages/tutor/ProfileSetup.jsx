@@ -60,8 +60,18 @@ function payloadFor(id, f) {
 }
 
 export default function ProfileSetup() {
+  const { user } = useAuth()
+  return user?.role === 'TUTOR' ? <AccountProfileSetup key={user.id} /> : null
+}
+
+function AccountProfileSetup() {
   const navigate = useNavigate()
   const { user, setUser } = useAuth()
+  const ownerId = user?.id
+  // A request begun by one tutor can finish after logout or another login.
+  // It must never restore the old user or alter the new account's header/gates.
+  const updateUser = useCallback((patch) => setUser((current) =>
+    current?.role === 'TUTOR' && current.id === ownerId ? { ...current, ...patch } : current), [ownerId, setUser])
   const [profile, setProfile] = useState(null)
   const [catalog, setCatalog] = useState(null)
   const [form, setForm] = useState(null)
@@ -84,11 +94,11 @@ export default function ProfileSetup() {
       setForm(toForm(p.data))
       setCatalog(c.data)
       // Admin may have decided since login: keep the banner in step with the server
-      setUser((u) => (u.tutorStatus === p.data.status ? u : { ...u, tutorStatus: p.data.status }))
+      updateUser({ tutorStatus: p.data.status })
     } catch (err) {
       setLoadError(errorMessage(err))
     }
-  }, [setUser])
+  }, [updateUser])
   useEffect(() => { load() }, [load])
 
   // Keyboard and screen-reader users start each step at its heading
@@ -121,7 +131,7 @@ export default function ProfileSetup() {
     try {
       await save()
       // A changed name or photo also shows in the header
-      setUser((u) => ({ ...u, fullName: form.fullName.trim() }))
+      updateUser({ fullName: form.fullName.trim() })
       if (idx < SETUP_STEPS.length - 1) setStep(SETUP_STEPS[idx + 1].id)
     } catch (err) {
       setError(errorMessage(err))
@@ -157,7 +167,7 @@ export default function ProfileSetup() {
     try {
       const res = await api.post('/tutor/submit-for-verification')
       setProfile(res.data)
-      setUser((u) => ({ ...u, tutorStatus: res.data.status }))
+      updateUser({ tutorStatus: res.data.status })
       statusCard.current?.scrollIntoView({ block: 'center' }) // the new status is shown at the top of this page
     } catch (err) {
       setError(errorMessage(err))
@@ -213,7 +223,7 @@ export default function ProfileSetup() {
 
           {step === 'basic' && <BasicStep form={form} update={update} profile={profile} catalog={catalog} />}
           {step === 'teaching' && <TeachingStep form={form} update={update} catalog={catalog} />}
-          {step === 'documents' && <DocumentsStep profile={profile} setProfile={setProfile} onStatus={(s) => setUser((u) => ({ ...u, tutorStatus: s }))} />}
+          {step === 'documents' && <DocumentsStep profile={profile} setProfile={setProfile} onStatus={(s) => updateUser({ tutorStatus: s })} />}
           {step === 'photo' && <PhotoStep profile={profile} setProfile={setProfile} name={form.fullName} />}
           {step === 'review' && <ReviewStep profile={profile} submitted={submitted} confirmed={confirmed} setConfirmed={setConfirmed} goTo={goTo} />}
 
@@ -410,7 +420,9 @@ function DocumentsStep({ profile, setProfile, onStatus }) {
         kind: doc.kind, title: doc.title.trim(), documentUrl,
         institution: doc.institution.trim() || null, year: doc.year ? Number(doc.year) : null,
       })
-      setProfile((await api.get('/tutor/profile')).data)
+      const fresh = (await api.get('/tutor/profile')).data
+      setProfile(fresh)
+      onStatus(fresh.status)
       setDoc({ kind: doc.kind, title: '', institution: '', year: '' })
       setFile(null)
     } catch (err) {

@@ -11,7 +11,9 @@ import * as session from '../controllers/tutor/lessonSession.controller.js'
 import * as earnings from '../controllers/tutor/earnings.controller.js'
 import { rateLimit } from '../middleware/rateLimit.js'
 
-const router = validateIdParams(Router()) // every :id in these URLs must be a positive whole number
+const router = validateIdParams(Router(), { publicIds: [
+  { prefix: '/bookings/', model: 'booking', scope: (req) => ({ tutorId: req.tutor.id }), notFound: 'Booking not found' },
+] })
 router.use(requireAuth, requireRole('TUTOR'), loadTutorProfile)
 
 // Every tutor can use every feature straight after sign-up. Admin verification only adds the verified badge

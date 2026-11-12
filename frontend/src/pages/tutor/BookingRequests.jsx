@@ -5,6 +5,7 @@ import TutorPageHeader from '../../components/TutorPageHeader'
 import { ErrorBox, LoadError, Spinner, StatusPill } from '../../components/ui/Common'
 import { fmtDate, fmtTime, fmtTimeRange, money } from '../../lib/format'
 import { gradeLabel } from '../../lib/education'
+import { matchesRecordRef, recordRef } from '../../lib/recordRef'
 
 const groups = {
   Requests: ['PENDING', 'COUNTER_OFFERED'], Lessons: ['AWAITING_PAYMENT', 'CONFIRMED'],
@@ -16,11 +17,12 @@ const labels = { accept: 'Accept request', decline: 'Decline request', counter: 
 
 const groupFor = b => Object.keys(groups).find(g => groups[g].includes(b.status)) || 'History'
 
-function BookingDetails({ b, onUpdate }) {
+function BookingDetails({ b, onUpdate, onReload }) {
   const [form, setForm] = useState('')
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [needsRefresh, setNeedsRefresh] = useState(false)
   const [now, setNow] = useState(Date.now)
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 60_000)
@@ -35,14 +37,27 @@ function BookingDetails({ b, onUpdate }) {
     setError('')
     setMessage('')
     try {
-      const { data } = await api.post('/tutor/bookings/' + b.id, { action, version: b.updatedAt, ...fields })
+      const { data } = await api.post('/tutor/bookings/' + recordRef(b), { action, version: b.updatedAt, ...fields })
       onUpdate(data.booking)
       setForm('')
       setMessage(action === 'link' ? 'Class link saved.' : action === 'escalate' ? 'Sent to admin for review.' : 'Booking updated.')
-    } catch (e) { setError(errorMessage(e)) }
+    } catch (e) {
+      setError(errorMessage(e))
+      setNeedsRefresh(e.response?.status === 409)
+    }
     finally { setBusy(false) }
   }
-  const button = (action, primary = false) => <button type="button" disabled={busy} className={(primary ? 'btn-primary' : 'btn-outline') + ' min-h-11'} onClick={() => choose(action)}>{labels[action]}</button>
+  async function refresh() {
+    setBusy(true)
+    try {
+      await onReload()
+      setForm('')
+      setNeedsRefresh(false)
+      setError('')
+      setMessage('Booking refreshed. Check the latest details before responding.')
+    } finally { setBusy(false) }
+  }
+  const button = (action, primary = false) => <button type="button" disabled={busy || needsRefresh} className={(primary ? 'btn-primary' : 'btn-outline') + ' min-h-11'} onClick={() => choose(action)}>{labels[action]}</button>
   return <section className="card min-w-0 space-y-4 break-words p-4 sm:p-6" aria-label="Booking details">
     <StatusPill status={b.status} />
     {['CONFIRMED', 'COMPLETED', 'DISPUTED'].includes(b.status) && <div><Link className="btn-primary min-h-11" to={'/tutor/bookings/' + b.id + '/session'}>{b.status === 'CONFIRMED' ? 'Open session' : 'View session record'}</Link></div>}
@@ -64,7 +79,7 @@ function BookingDetails({ b, onUpdate }) {
       <h3 className="font-bold text-navy">Online classroom</h3>
       <p className="text-sm text-slate-600">The parent can join from their confirmed lesson details.</p>
       {b.meetingLink && /^https:\/\//i.test(b.meetingLink) && <a href={b.meetingLink} target="_blank" rel="noreferrer" className="btn-outline min-h-11">Open class link</a>}
-      {Date.parse(b.endAt) > now && <button disabled={busy} className="btn-outline min-h-11" onClick={() => choose('link')}>{b.meetingLink ? 'Edit class link' : 'Add class link'}</button>}
+      {Date.parse(b.endAt) > now && <button disabled={busy || needsRefresh} className="btn-outline min-h-11" onClick={() => choose('link')}>{b.meetingLink ? 'Edit class link' : 'Add class link'}</button>}
     </div>}
     {request && ['PENDING','ESCALATED'].includes(request.status) && <div className="space-y-2 rounded-lg bg-brand-50 p-3">
       <b>{request.status === 'ESCALATED' ? 'Admin reviewing time change' : 'Proposed time change'}</b>
@@ -89,9 +104,10 @@ function BookingDetails({ b, onUpdate }) {
       {form === 'reschedule' && <div className="grid gap-2 sm:grid-cols-2"><label>Date<input className="input min-w-0 text-base" type="date" required name="date" /></label><label>Start time<select className="input text-base" name="startTime">{Array.from({length:15}, (_, i) => String(7+i).padStart(2,'0') + ':00').map(t => <option key={t}>{t}</option>)}</select></label></div>}
       {['cancel','decline','escalate','reschedule'].includes(form) && <label className="block">Reason<textarea className="input text-base" name="reason" required maxLength={200} /></label>}
       {form === 'cancel' && b.status === 'CONFIRMED' && <p className="text-sm">Cancelling a paid lesson requests a full refund for the parent.</p>}
-      <div className="flex flex-wrap gap-2"><button disabled={busy} className="btn-primary min-h-11">{busy ? 'Saving…' : 'Confirm'}</button><button type="button" className="btn-outline min-h-11" disabled={busy} onClick={() => choose('')}>Go back</button></div>
+      <div className="flex flex-wrap gap-2"><button disabled={busy || needsRefresh} className="btn-primary min-h-11">{busy ? 'Saving…' : 'Confirm'}</button><button type="button" className="btn-outline min-h-11" disabled={busy} onClick={() => choose('')}>Go back</button></div>
     </form>}
     {error && <ErrorBox>{error}</ErrorBox>}
+    {needsRefresh && <button type="button" className="btn-outline min-h-11" disabled={busy} onClick={refresh}>Refresh booking</button>}
     {message && <p role="status" className="font-semibold text-green-700">{message}</p>}
   </section>
 }
@@ -103,11 +119,12 @@ export default function BookingRequests() {
   const [tab, setTab] = useState('Requests')
   const [id, setId] = useState(null)
   const [mobileDetail, setMobileDetail] = useState(false)
-  const load = useCallback(async () => {
+  const load = useCallback(async (focus) => {
     try {
       const { data } = await api.get('/tutor/bookings')
       setRows(data.bookings)
-      const match = data.bookings.find(b => String(b.id) === params.get('booking'))
+      const reference = typeof focus === 'string' || typeof focus === 'number' ? focus : params.get('booking')
+      const match = data.bookings.find(b => matchesRecordRef(b, reference))
       if (match) { setTab(groupFor(match)); setId(match.id); setMobileDetail(true) }
       setError('')
     } catch (e) { setError(errorMessage(e)) }
@@ -130,7 +147,7 @@ export default function BookingRequests() {
         </button>)}</div>
         <div className={(mobileDetail ? '' : 'hidden lg:block ') + 'min-w-0 space-y-2'}>
           <button className="btn-outline min-h-11 lg:hidden" onClick={() => setMobileDetail(false)}>Back to list</button>
-          <BookingDetails key={selected.id} b={selected} onUpdate={updated} />
+          <BookingDetails key={selected.id} b={selected} onUpdate={updated} onReload={() => load(recordRef(selected))} />
         </div>
       </div>}
     </>}

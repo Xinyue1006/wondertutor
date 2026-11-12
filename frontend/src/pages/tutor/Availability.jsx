@@ -30,9 +30,12 @@ const isHeld = (hour) => hour.state === 'PENDING_PAYMENT'
 
 const scopeHours = (view, scope) => (scope === 'usual' ? view.usual : view.effective)
 
-// A week override replaces the usual hours, so the usual hours do not depend on that week's bookings
-const lockedCells = (view, scope) =>
-  (scope === 'usual' && view.override ? NO_CELLS : new Set(view.booked.map((b) => cellKey(dayOfDate(b.date), b.startTime))))
+// A dated exception does not depend on either weekly editor. A week override
+// does not depend on the usual pattern. Keep those lessons out of the editable
+// pattern, otherwise displaying them would silently add hours when saving it.
+const lockedHours = (view, scope) => scope === 'usual' && view.override ? [] : view.booked.filter((b) =>
+  (scope === 'usual' ? b.affectsUsual : b.affectsWeek) !== false)
+const lockedCells = (view, scope) => new Set(lockedHours(view, scope).map((b) => cellKey(dayOfDate(b.date), b.startTime)))
 
 // Booked hours always count as on, so saving can never drop one
 const workingCells = (view, scope) => new Set([...rangesToCells(scopeHours(view, scope)), ...lockedCells(view, scope)])
@@ -41,6 +44,7 @@ export default function Availability() {
   const calendar = useRef(null)
   const shownWeek = useRef(null)
   const latestLoad = useRef(0)
+  const mutating = useRef(false)
   const [view, setView] = useState(null) // the week as the server last sent it
   const [scope, setScope] = useState('usual') // what is being edited: 'usual' or 'week'
   const [saved, setSaved] = useState(null)
@@ -86,7 +90,7 @@ export default function Availability() {
       const { data } = week ? await api.get('/tutor/availability', { params: { week } }) : await api.get('/tutor/availability')
       if (id === latestLoad.current) showView(data, nextScope) // a quick Next, Next must not show an older answer
     } catch (err) {
-      setLoadError(errorMessage(err))
+      if (id === latestLoad.current) setLoadError(errorMessage(err))
     }
   }, [showView])
   useEffect(() => { load() }, [load])
@@ -141,6 +145,7 @@ export default function Availability() {
 
   // Every edit goes through here, so a stale message never stays next to changed hours and past hours never change
   const edit = useCallback((change) => {
+    if (mutating.current) return
     clearMessages()
     setCells((prev) => keepPast(change(prev), prev, past))
   }, [clearMessages, past])
@@ -148,7 +153,9 @@ export default function Availability() {
   const choices = modeChoices(view?.offers)
   const teachAs = choices.includes(picked) ? picked : choices[choices.length - 1]
   const frozen = useMemo(() => new Set([...locked, ...past]), [locked, past])
-  const paint = (ranges, as = teachAs) => setModes((prev) => setCellModes(prev, ranges, as, frozen))
+  const paint = (ranges, as = teachAs) => {
+    if (!mutating.current) setModes((prev) => setCellModes(prev, ranges, as, frozen))
+  }
 
   // Redrawn from the cell set after every change, so there is no separate event state to keep in sync
   const events = useMemo(() => {
@@ -158,7 +165,7 @@ export default function Availability() {
     return [
       ...cellsToRanges(active, modes).map((range) => ({ ...rangeToEvent(range, weekStart), title: label(range), extendedProps: { kind: 'block', range } })),
       ...cellsToRanges(past).map((range) => ({ ...rangeToEvent(range, weekStart), display: 'background', classNames: ['fc-passed'], extendedProps: { kind: 'passed', range } })),
-      ...(locked.size ? view.booked : []).map((b) => ({
+      ...lockedHours(view, scope).map((b) => ({
         ...rangeToEvent({ dayOfWeek: dayOfDate(b.date), startTime: b.startTime, endTime: hourEnd(b.startTime) }, weekStart),
         display: 'background',
         classNames: ['fc-locked', isHeld(b) ? 'fc-held' : 'fc-booked'],
@@ -166,12 +173,13 @@ export default function Availability() {
         extendedProps: { kind: 'locked', hour: b },
       })),
     ]
-  }, [view, weekStart, cells, modes, past, locked])
+  }, [view, weekStart, cells, modes, past, scope])
 
   const confirmDiscard = () => !dirty || window.confirm(DISCARD)
 
   // Previous, Today, Next and the chips move the calendar; datesSet then loads the week it landed on
   function moveCalendar(move) {
+    if (mutating.current) return
     if (!confirmDiscard()) return
     clearMessages()
     move(calendar.current.getApi())
@@ -185,6 +193,7 @@ export default function Availability() {
   }
 
   function changeScope(next) {
+    if (mutating.current) return
     if (next === scope || !confirmDiscard()) return
     clearMessages()
     showHours(view, next)
@@ -193,6 +202,7 @@ export default function Availability() {
   const inPastHere = (moment) => scope === 'week' && momentIsPast(moment, now)
 
   function onSelect(info) {
+    if (mutating.current) { info.view?.calendar.unselect(); return }
     const range = eventToRange(info.start, info.end)
     if (mode === 'add') {
       edit((prev) => addHours(prev, [range.dayOfWeek], range.startTime, range.endTime))
@@ -203,6 +213,7 @@ export default function Availability() {
 
   // Model-level lock check: FullCalendar has already moved the block on screen, so a refused change is reverted
   function onMoveOrResize(info) {
+    if (mutating.current) { info.revert(); return }
     const from = eventToRange(info.oldEvent.start, info.oldEvent.end)
     const to = eventToRange(info.event.start, info.event.end)
     const next = moveRange(cells, from, to)
@@ -249,6 +260,8 @@ export default function Availability() {
   }
 
   async function run(action) {
+    if (mutating.current) return
+    mutating.current = true
     setBusy(true)
     clearMessages()
     try {
@@ -256,6 +269,7 @@ export default function Availability() {
     } catch (err) {
       setSaveError(errorMessage(err))
     } finally {
+      mutating.current = false
       setBusy(false)
     }
   }
@@ -300,7 +314,7 @@ export default function Availability() {
   if (!view) return <Spinner />
 
   const total = cells.size
-  const shownLocks = locked.size ? view.booked : []
+  const shownLocks = lockedHours(view, scope)
   const heldCount = shownLocks.filter(isHeld).length
   const available = [...cells].filter((key) => !locked.has(key) && !past.has(key)).length
   const label = weekLabel(weekStart)
@@ -320,7 +334,7 @@ export default function Availability() {
         right={<Link to="/tutor/availability/dates" className="btn-outline min-h-11"><Icon name="edit" className="h-4 w-4" />Set different hours for one date</Link>}
       />
 
-      <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <fieldset disabled={busy} aria-busy={busy} className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <section className="card min-w-0 p-4 md:p-5" aria-label="Weekly hours">
           <div className="mb-4 flex items-center gap-2 border-b border-brand-100 pb-4">
             <Icon name="calendar" className="h-5 w-5 text-brand-500" />
@@ -392,14 +406,14 @@ export default function Availability() {
                 displayEventEnd
                 dayHeaderFormat={{ weekday: 'short', day: 'numeric' }}
                 dayHeaderContent={renderDayHeader}
-                selectable
+                selectable={!busy}
                 selectMirror
-                editable={mode === 'add'}
+                editable={!busy && mode === 'add'}
                 eventInteractive
                 longPressDelay={300}
                 selectLongPressDelay={300}
-                selectAllow={(s) => s.start.getUTCDate() === s.end.getUTCDate() && !inPastHere(s.start)}
-                eventAllow={(drop, event) => !inPastHere(drop.start) && !inPastHere(event.start)}
+                selectAllow={(s) => !mutating.current && s.start.getUTCDate() === s.end.getUTCDate() && !inPastHere(s.start)}
+                eventAllow={(drop, event) => !mutating.current && !inPastHere(drop.start) && !inPastHere(event.start)}
                 eventOverlap
                 selectOverlap
                 events={events}
@@ -449,7 +463,7 @@ export default function Availability() {
             paint(days.map((dayOfWeek) => ({ dayOfWeek, startTime: from, endTime: to })), choices.includes(as) ? as : teachAs)
           }}
         />
-      </div>
+      </fieldset>
 
       {copyOpen && <CopyDialog weeks={nextWeeks} changed={view.changedWeeks} busy={busy} onClose={() => setCopyOpen(false)} onCopy={copyTo} />}
     </div>

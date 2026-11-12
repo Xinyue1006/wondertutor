@@ -2,7 +2,7 @@
 import { prisma } from '../config/prisma.js'
 import { AppError } from '../utils/AppError.js'
 import { addDays, fromMinutes, mytParts, mytToDate, toMinutes } from '../utils/time.js'
-import { effectiveSlots, effectiveSlotsForDate, slotAllows } from './availability.service.js'
+import { effectiveSlots, effectiveSlotsForDate, slotAllows, slotsCoverInterval } from './availability.service.js'
 
 // A tutor's slot is blocked only once a booking is waiting for payment or paid.
 // Plain PENDING requests don't block it — the tutor may still reject or counter them.
@@ -59,11 +59,13 @@ export async function assertSlotBookable({ tutorId, startAt, endAt, ignoreBookin
   const { date, time } = mytParts(startAt)
   const availability = await effectiveSlotsForDate(tutorId, date, db)
   const end = mytParts(endAt)
-  const inside = availability.find(
-    (a) => toMinutes(a.startTime) <= toMinutes(time) && toMinutes(a.endTime) >= toMinutes(end.time) && end.date === date,
-  )
-  if (!inside) throw new AppError(400, 'The tutor is not available at that time')
-  if (teachingMode && !slotAllows(inside.mode, teachingMode)) throw new AppError(400, `This hour is for ${inside.mode.toLowerCase()} lessons only`)
+  // A half-hour reschedule can span touching ranges with different compatible
+  // modes (e.g. BOTH until 17:00, then ONLINE). Check the whole interval, not one row.
+  if (!slotsCoverInterval(availability, startAt, endAt)) throw new AppError(400, 'The tutor is not available at that time')
+  if (teachingMode && !slotsCoverInterval(availability, startAt, endAt, teachingMode)) {
+    const blocked = availability.find(a => toMinutes(a.startTime) < toMinutes(end.time) && toMinutes(a.endTime) > toMinutes(time) && !slotAllows(a.mode, teachingMode))
+    throw new AppError(400, `This hour is for ${blocked.mode.toLowerCase()} lessons only`)
+  }
   const clash = await db.booking.findFirst({
     where: { tutorId, status: { in: SLOT_BLOCKING }, startAt: { lt: endAt }, endAt: { gt: startAt }, ...(ignoreBookingId && { id: { not: ignoreBookingId } }) },
   })

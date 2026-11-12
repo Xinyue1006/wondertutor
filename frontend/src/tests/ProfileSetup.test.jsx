@@ -1,10 +1,11 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { vi } from 'vitest'
 
 const setUser = vi.fn()
-vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: { role: 'TUTOR', tutorStatus: 'NOT_SUBMITTED' }, setUser }) }))
+let authUser
+vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: authUser, setUser }) }))
 vi.mock('../api/client', () => ({
   default: { get: vi.fn(), put: vi.fn(), post: vi.fn(), delete: vi.fn() },
   errorMessage: (e) => e?.response?.data?.message || e.message,
@@ -43,7 +44,11 @@ function setup(profile) {
   return render(<MemoryRouter><ProfileSetup /></MemoryRouter>)
 }
 
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  vi.clearAllMocks()
+  authUser = { id: 12, role: 'TUTOR', tutorStatus: 'NOT_SUBMITTED' }
+  setUser.mockImplementation((update) => { authUser = typeof update === 'function' ? update(authUser) : update })
+})
 
 describe('tutor profile setup', () => {
   test('Save and continue is blocked while a required field is missing, and nothing is saved', async () => {
@@ -162,5 +167,33 @@ describe('setup step checks (mirror the server)', () => {
     const teaching = { subjects: COMPLETE.subjects, hourlyRate: '60.555', yearsExperience: '4', offersPhysical: true, offersOnline: false, bio: COMPLETE.bio, teachingApproach: '' }
     expect(checkStep('teaching', teaching, COMPLETE)).toMatch(/2 decimal places/)
     expect(checkStep('teaching', { ...teaching, hourlyRate: '60' }, COMPLETE)).toBe('')
+  })
+})
+
+describe('profile responses belong to the signed-in tutor', () => {
+  test.each([null, { id: 99, role: 'TUTOR', tutorStatus: 'NOT_SUBMITTED', fullName: 'Different tutor' }])('a late profile read cannot change the next session: %s', async (nextUser) => {
+    let finish
+    api.get.mockImplementation((url) => url === '/tutor/catalog'
+      ? Promise.resolve({ data: CATALOG })
+      : new Promise((resolve) => { finish = () => resolve({ data: { ...COMPLETE, status: 'VERIFIED' } }) }))
+    const { unmount } = render(<MemoryRouter><ProfileSetup /></MemoryRouter>)
+    unmount()
+    authUser = nextUser
+    await act(async () => finish())
+    expect(authUser).toBe(nextUser)
+    const update = setUser.mock.calls.at(-1)[0]
+    expect(() => update(null)).not.toThrow()
+    expect(update(null)).toBeNull()
+  })
+
+  test('a late save cannot restore the old tutor after logout', async () => {
+    const { unmount } = setup(COMPLETE)
+    let finish
+    api.put.mockImplementationOnce(() => new Promise((resolve) => { finish = () => resolve({ data: COMPLETE }) }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Save and continue' }))
+    unmount()
+    authUser = null
+    await act(async () => finish())
+    expect(authUser).toBeNull()
   })
 })

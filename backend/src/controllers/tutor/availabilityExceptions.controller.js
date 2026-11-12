@@ -4,7 +4,7 @@ import { AppError } from '../../utils/AppError.js'
 import { hhmm, ymd } from '../../utils/validators.js'
 import { mytParts, mytToDate, toMinutes } from '../../utils/time.js'
 import { CHILD_BLOCKING } from '../../services/booking.service.js'
-import { effectiveSlotsForDate, slotAllows } from '../../services/availability.service.js'
+import { effectiveSlotsForDate, slotsCoverInterval } from '../../services/availability.service.js'
 
 const range = z.object({ startTime: hhmm(), endTime: hhmm() })
 const schema = z.object({ date: ymd(), ranges: z.array(range).max(24) }).superRefine((data, ctx) => {
@@ -42,7 +42,7 @@ export async function remove(req,res) {
     const start = mytToDate(date,'00:00')
     const end = new Date(start.getTime()+86400000)
     const lessons = await tx.booking.findMany({ where: { tutorId: req.tutor.id, status: { in: CHILD_BLOCKING }, startAt: { lt: end }, endAt: { gt: start } } })
-    if (lessons.some(b => !hours.some(r => mytToDate(date,r.startTime) <= b.startAt && mytToDate(date,r.endTime) >= b.endAt && slotAllows(r.mode, b.teachingMode))))
+    if (lessons.some(b => !slotsCoverInterval(hours, b.startAt, b.endAt, b.teachingMode)))
       throw new AppError(409, 'The weekly schedule conflicts with an existing lesson or request.')
   })
   res.json({ ok: true })

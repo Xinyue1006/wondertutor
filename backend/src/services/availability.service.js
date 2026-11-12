@@ -2,7 +2,7 @@
 // means the lesson cells 14-15, 15-16 and 16-17. A week override replaces the usual hours for that one week only.
 import { prisma } from '../config/prisma.js'
 import { AppError } from '../utils/AppError.js'
-import { addDays, mytParts, mytToDate, fromMinutes, toMinutes } from '../utils/time.js'
+import { addDays, mytParts, mytToDate, toMinutes } from '../utils/time.js'
 import { assertEditableWeek, currentWeekStart, fromDbDate, isEditableWeek, lastWeekStart, toDbDate, weekStartOf } from '../utils/week.js'
 import { SLOT_BLOCKING } from './booking.service.js'
 import { paymentDeadline } from './paymentWindow.js'
@@ -19,6 +19,22 @@ const HOUR = 60
 
 // Whether an hour with this slot mode can be booked as this teaching mode
 export const slotAllows = (slotMode, teachingMode) => slotMode === 'BOTH' || slotMode === teachingMode
+
+// Whole intervals may cross touching ranges with different compatible modes.
+// Used by booking/rescheduling and when removing an exact-date override.
+export function slotsCoverInterval(slots, startAt, endAt, teachingMode) {
+  const start = mytParts(startAt), end = mytParts(endAt)
+  if (endAt <= startAt || end.date !== start.date) return false
+  let cursor = toMinutes(start.time)
+  const allowed = slots.filter(s => !teachingMode || slotAllows(s.mode, teachingMode))
+    .sort((a, b) => toMinutes(a.startTime) - toMinutes(b.startTime))
+  for (const slot of allowed) {
+    if (toMinutes(slot.startTime) > cursor) return false
+    cursor = Math.max(cursor, toMinutes(slot.endTime))
+    if (cursor >= toMinutes(end.time)) return true
+  }
+  return false
+}
 
 // Per weekday: sort the ranges, then join overlapping or touching ones of the same mode (14-16 and 16-18 become 14-18)
 export function normaliseSlots(slots) {
@@ -84,28 +100,38 @@ async function ruledByWeekOrUsual(hours, tutorId, db) {
   return hours.filter((h) => !skip.has(h.date))
 }
 
-// Upcoming bookings that hold their hour, as a Malaysia date and whole hour. `week` limits them to that one week.
+// Every grid hour touched by an active booking. Rescheduled lessons may start on
+// a half hour, so protecting just the rounded start would lose their final half.
 async function bookedHours(tutorId, { week } = {}, db = prisma) {
   const now = new Date()
+  const weekEnd = week && addDays(week, 7)
   const bookings = await db.booking.findMany({
     where: {
       tutorId,
       status: { in: SLOT_BLOCKING },
-      startAt: week ? { gt: now, gte: mytToDate(week, '00:00'), lt: mytToDate(addDays(week, 7), '00:00') } : { gt: now },
+      endAt: { gt: now },
+      ...(week && { startAt: { lt: mytToDate(weekEnd, '00:00') }, AND: [{ endAt: { gt: mytToDate(week, '00:00') } }] }),
     },
-    select: { startAt: true, status: true, payBy: true, teachingMode: true },
+    select: { startAt: true, endAt: true, status: true, payBy: true, teachingMode: true },
   })
   const seen = new Map()
-  for (const { startAt, status, payBy, teachingMode } of bookings) {
-    const { date, time, dow } = mytParts(startAt)
-    const hour = fromMinutes(Math.floor(toMinutes(time) / HOUR) * HOUR)
-    const key = `${date} ${hour}`
-    const entry = status === 'CONFIRMED'
-      ? { date, startTime: hour, dayOfWeek: dow, state: 'BOOKED', teachingMode }
-      : { date, startTime: hour, dayOfWeek: dow, state: 'PENDING_PAYMENT', holdUntil: paymentDeadline({ payBy, startAt }).toISOString(), teachingMode }
-    // Two rows on one hour: a paid lesson wins, otherwise the hour stays held until the later deadline
-    const other = seen.get(key)
-    if (!other || (other.state !== 'BOOKED' && (entry.state === 'BOOKED' || entry.holdUntil > other.holdUntil))) seen.set(key, entry)
+  for (const { startAt, endAt, status, payBy, teachingMode } of bookings) {
+    const start = new Date(startAt)
+    start.setUTCMinutes(0, 0, 0) // Malaysia has whole-hour UTC offset and no DST
+    for (let cursor = start.getTime(); cursor < endAt.getTime(); cursor += HOUR * 60_000) {
+      const { date, time, dow } = mytParts(new Date(cursor))
+      if (week && (date < week || date >= weekEnd)) continue
+      const key = `${date} ${time}`
+      const entry = status === 'CONFIRMED'
+        ? { date, startTime: time, dayOfWeek: dow, state: 'BOOKED', teachingMode }
+        : { date, startTime: time, dayOfWeek: dow, state: 'PENDING_PAYMENT', holdUntil: paymentDeadline({ payBy, startAt }).toISOString(), teachingMode }
+      // A paid lesson wins the display state; two adjoining lessons with different
+      // modes need BOTH on their shared grid hour, even though they do not overlap.
+      const other = seen.get(key)
+      const requiredMode = other && other.teachingMode !== teachingMode ? 'BOTH' : teachingMode
+      const winner = !other || (other.state !== 'BOOKED' && (entry.state === 'BOOKED' || entry.holdUntil > other.holdUntil)) ? entry : other
+      seen.set(key, { ...winner, teachingMode: requiredMode })
+    }
   }
   return [...seen.values()].sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime))
 }
@@ -161,12 +187,19 @@ export async function getWeekView(tutorId, weekStart) {
     prisma.tutorProfile.findUnique({ where: { id: tutorId }, select: { offersOnline: true, offersPhysical: true, quickAdd: true } }),
   ])
   const override = row ? normaliseSlots(row.slots) : null
+  const dated = booked.length ? await prisma.availabilityException.findMany({
+    where: { tutorId, date: { in: [...new Set(booked.map(h => h.date))] } }, select: { date: true },
+  }) : []
+  const datedDays = new Set(dated.map(d => d.date))
   return {
     weekStart,
     usual,
     override,
     effective: override ?? usual,
-    booked, // both paid lessons and hours held for payment
+    booked: booked.map(h => ({ ...h,
+      ...(datedDays.has(h.date) && { affectsWeek: false }),
+      ...((row || datedDays.has(h.date)) && { affectsUsual: false }),
+    })), // scope flags stop date/week overrides from locking unrelated usual hours
     changedWeeks: changed,
     offers: { online: tutor.offersOnline, physical: tutor.offersPhysical }, // the profile limits which modes can be chosen
     quickAdd: tutor.quickAdd,

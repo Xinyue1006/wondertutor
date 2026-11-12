@@ -22,7 +22,7 @@ export async function ownBooking(tutorId, id, db = prisma) {
 export function tutorBooking(b) {
   const r = b.reschedules[0]
   return {
-    id: b.id, subject: b.subject, parentName: b.parent.user.fullName, child: b.child,
+    id: b.id, publicId: b.publicId, subject: b.subject, parentName: b.parent.user.fullName, child: b.child,
     parentSince: b.parent.user.createdAt, completedLessons: b.parent._count.bookings,
     startAt: b.startAt, endAt: b.endAt, status: b.status, teachingMode: b.teachingMode,
     proposedPrice: Number(b.proposedPrice), counterPrice: b.counterPrice, agreedPrice: b.agreedPrice,

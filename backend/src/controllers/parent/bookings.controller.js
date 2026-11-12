@@ -9,7 +9,7 @@ import { mytToDate, toMinutes } from '../../utils/time.js'
 import { hhmm, id, ringgit, ymd } from '../../utils/validators.js'
 import { SUBJECTS } from '../../data/catalog.js'
 import { subjectsOf } from '../../utils/childSubjects.js'
-import { recordReference, referenceWhere } from '../../utils/publicIds.js'
+import { publicReference, recordReference, referenceWhere } from '../../utils/publicIds.js'
 
 import { assertCanAccept, newPayBy } from '../../services/paymentWindow.js'
 import { escalateBooking } from '../../services/tutorBooking.service.js'
@@ -30,7 +30,7 @@ export async function negotiate(req, res) {
     await changeStatus(tx, b, { status: 'PENDING', proposedPrice: data.price, counterPrice: null })
   })
   await notify(b.tutor.userId, { type: 'BOOKING_UPDATED', title: data.action === 'counter' ? 'Parent proposed a new rate' : 'Parent requested admin review',
-    message: data.action === 'counter' ? 'New offer: RM' + data.price + ' per hour.' : data.reason, link: '/tutor/bookings?booking=' + b.id })
+    message: data.action === 'counter' ? 'New offer: RM' + data.price + ' per hour.' : data.reason, link: '/tutor/bookings?booking=' + publicReference(b) })
   res.json({ booking: toBookingDto(await reload(b.id)) })
 }
 
@@ -109,7 +109,7 @@ export async function createBooking(req, res) {
   // Lessons are 1 hour long (one cell of the availability grid)
   const bookings = await prisma.$transaction(async (tx) => {
     // Serialise requests for this child. Checking and inserting separately allowed
-    // simultaneous browser requests to both pass the overlap/trial checks.
+    // simultaneous browser requests to both pass the overlap checks.
     await tx.$queryRaw`SELECT id FROM TutorProfile WHERE id = ${tutor.id} FOR UPDATE`
     await tx.$queryRaw`SELECT id FROM Child WHERE id = ${child.id} FOR UPDATE`
 
@@ -290,6 +290,7 @@ export async function cancelBooking(req, res) {
     }
     // A checkout that was started but not finished can never be completed for a cancelled lesson
     if (b.payment?.status === 'PENDING') await tx.payment.update({ where: { id: b.payment.id }, data: { status: 'FAILED' } })
+    await tx.rescheduleRequest.updateMany({ where: { bookingId: b.id, status: 'PENDING' }, data: { status: 'REJECTED' } })
   })
   const updated = await reload(b.id)
 

@@ -101,3 +101,17 @@ expired when now >= payBy
 | Repeated provider callback or ambiguous bill-creation timeout | Existing idempotency and original-bill reconciliation continue working; no duplicate charge/bill is created blindly. |
 
 These are review requirements and proposed acceptance cases, not a claim that the branch has passed them. No application tests, live payment calls, database migrations or external messages were performed for this review.
+
+## Implementation follow-up — 13 November 2026
+
+The preceding sections are the historical branch review. Availability and tutor booking work subsequently reached `main`; this follow-up repairs confirmed integration defects without changing the date → week → usual precedence or enabling trial lessons.
+
+- Every hour touched by a booked interval is protected, including both 16:00 and 17:00 cells for a 16:30–17:30 lesson. Adjacent online/physical lessons retain both required modes on a shared grid hour.
+- Booking and date-override removal use the same interval coverage check. Touching compatible ranges such as BOTH → ONLINE can cover an online reschedule; a gap or incompatible mode cannot.
+- API scope flags keep exact-date lessons out of weekly/usual editing locks and keep week overrides out of the usual pattern. Displaying those lessons must not silently add recurring hours on Save.
+- Pending availability saves freeze native controls and calendar edits. Out-of-order load errors cannot replace a newer successful view.
+- Profile setup is account-scoped. A late load, save or document upload cannot restore a logged-out tutor or change another signed-in tutor's verification state.
+- Tutor booking links/actions accept owned public UUIDs, with the existing authorization checks. A stale booking response offers Refresh booking and preserves the selected record when its status moves between tabs.
+- Parent cancellation rejects pending reschedule proposals, preventing stale actionable requests.
+
+New interval/integration and frontend regressions cover these defects. Eleven Chrome checks using synthetic mocked APIs passed at 1440/375/320 px, including real calendar interaction and conflict recovery. Mocked UI checks do not establish payment-provider settlement or the behavior of features that remain placeholders. Combined verification and live browser evidence are recorded in the assistant reliability follow-up after syncing concurrent `main` updates.

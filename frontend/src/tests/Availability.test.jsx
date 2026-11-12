@@ -943,3 +943,43 @@ describe('slot states', () => {
     })
   })
 })
+
+describe('availability integration safeguards', () => {
+  test.each(['usual', 'week'])('a lesson controlled by a date exception never adds hours to the %s pattern', async (scope) => {
+    const hours = [slot(2, '14:00', '15:00')]
+    await setup(weekView({ usual: hours, effective: hours, booked: [
+      { date: WEEK, startTime: '09:00', state: 'BOOKED', affectsUsual: false, affectsWeek: false },
+    ] }))
+    if (scope === 'week') await asWeek()
+    expect(screen.queryByRole('img', { name: BOOKED_NAME })).not.toBeInTheDocument()
+    expect(screen.queryByText('09:00–10:00')).not.toBeInTheDocument()
+    select(2, '15:00', '16:00')
+    await userEvent.click(button(scope === 'week' ? 'Save this week' : 'Save usual hours'))
+    expect(api.put.mock.calls[0][1].slots).toEqual([slot(2, '14:00', '16:00')])
+  })
+
+  test('editing and navigation are frozen while saving, so the response cannot discard later edits', async () => {
+    await setup(weekView({ booked: [] }))
+    select(2, '10:00', '12:00')
+    let finish
+    api.put.mockImplementationOnce((_, body) => new Promise((resolve) => {
+      finish = () => resolve({ data: weekView({ booked: [], usual: body.slots, effective: body.slots }) })
+    }))
+    await userEvent.click(button('Save usual hours'))
+    expect(button('Clear all')).toBeDisabled()
+    expect(button('Next')).toBeDisabled()
+    expect(weekScope()).toBeDisabled()
+    expect(button('Add')).toBeDisabled()
+    expect(calendar.selectable).toBe(false)
+    expect(calendar.editable).toBe(false)
+    select(5, '14:00', '15:00')
+    const move = moved(span(2, '10:00', '12:00'), span(5, '14:00', '16:00'))
+    act(() => calendar.eventDrop(move))
+    expect(move.revert).toHaveBeenCalledOnce()
+    expect(screen.queryByText('14:00–15:00')).not.toBeInTheDocument()
+    await act(async () => finish())
+    expect(screen.getByText('10:00–12:00')).toBeInTheDocument()
+    expect(button('Save usual hours')).toBeDisabled()
+    expect(button('Next')).toBeEnabled()
+  })
+})
