@@ -425,11 +425,11 @@ export const TOOLS = {
     run: getCatalog,
   },
   search_tutors: {
-    description: 'Rank tutors with the platform matching engine. Subject and level are required (or a childRef to take level and grade from). Keeps previous preferences unless newSearch=true; use clear to remove a preference.',
+    description: 'Rank tutors with the platform matching engine. Call for tutor searches even with incomplete or empty arguments: returns needsClarification if subject or level is missing. Only use childRef for a child the parent named or selected. Keeps previous preferences unless newSearch=true; use clear to remove a preference.',
     parameters: S('OBJECT', {
       properties: {
         newSearch: S('BOOLEAN'), childRef: childRefP, subject: S('STRING', { enum: SUBJECTS }), level: S('STRING', { enum: ['KINDERGARTEN', 'PRIMARY', 'SECONDARY'] }),
-        grade: S('INTEGER'), days: S('ARRAY', { items: S('INTEGER'), description: '0=Sunday..6=Saturday' }), timeStart: S('STRING', { description: 'HH:mm' }), timeEnd: S('STRING', { description: 'HH:mm' }),
+        grade: S('INTEGER', { description: 'Year within the education level. Always include the number stated in Primary/Standard/Darjah/Tahun or Secondary/Form/Tingkatan, including Chinese school years. Do not omit a stated year.' }), days: S('ARRAY', { items: S('INTEGER'), description: '0=Sunday..6=Saturday' }), timeStart: S('STRING', { description: 'HH:mm' }), timeEnd: S('STRING', { description: 'HH:mm' }),
         mode: S('STRING', { enum: ['ONLINE', 'PHYSICAL', 'EITHER'] }), location: S('STRING'), budgetMin: S('NUMBER'), budgetMax: S('NUMBER'),
         gender: S('STRING', { enum: ['MALE', 'FEMALE', 'ANY'] }), language: S('STRING', { enum: LANGUAGES }), characteristics: S('ARRAY', { items: S('STRING', { enum: CHARACTERISTICS }) }),
         clear: S('ARRAY', { items: S('STRING', { enum: Object.keys(DEFAULTS) }) }),

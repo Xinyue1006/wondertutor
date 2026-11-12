@@ -52,9 +52,9 @@ export function AuthProvider({ children }) {
     sessionStorage.removeItem('wt_token')
   }
 
-  async function login(email, password, remember, recaptchaToken) {
+  async function login(email, password, remember, recaptchaToken, portal) {
     setNotice('')
-    const res = await api.post('/auth/login', { email, password, recaptchaToken: recaptchaToken || undefined })
+    const res = await api.post('/auth/login', { email, password, recaptchaToken: recaptchaToken || undefined, ...(portal === 'ADMIN' && { portal }) })
     saveSession(res.data.token, res.data.user, remember)
     return res.data.user
   }

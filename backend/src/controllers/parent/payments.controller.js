@@ -213,16 +213,25 @@ export async function gatewayReturn(req, res) {
   if (!signatureIsValid({ ...params, 'billplz[x_signature]': body.x_signature })) throw new AppError(400, 'This payment result could not be verified')
 
   const { result } = await settleFromBillplz(body.id, { parentId: req.parent.id })
-  const fresh = await prisma.payment.findFirstOrThrow({ where: { gatewayRef: body.id, booking: { parentId: req.parent.id } }, include: { refunds: true } })
-  const effectiveResult = result === 'ALREADY' && fresh.status === 'PAID' && fresh.refunds.some((r) => r.type === 'AUTO') ? 'LATE' : result
+  const fresh = await prisma.payment.findFirstOrThrow({ where: { gatewayRef: body.id, booking: { parentId: req.parent.id } }, include: { refunds: true, booking: { select: { status: true } } } })
+  let effectiveResult = result
+  if (result === 'ALREADY') {
+    if (['REFUNDED', 'PARTIALLY_REFUNDED'].includes(fresh.status)) effectiveResult = fresh.status
+    else if (fresh.status === 'PAID' && fresh.refunds.some((r) => r.type === 'AUTO')) effectiveResult = 'LATE'
+    else if (fresh.status === 'PAID' && fresh.booking.status !== 'CONFIRMED') effectiveResult = 'RECORDED'
+  }
   const messages = {
     SUCCESS: 'Payment successful. Your lesson is confirmed.',
     ALREADY: fresh.status === 'PAID' ? 'Payment successful. Your lesson is confirmed.' : 'This payment was not completed. You have not been charged.',
     LATE: 'We received your payment, but the booking had already been released. A full refund has been queued.',
     FAILED: 'The payment was not completed. You have not been charged.',
     WAITING: 'We have not received the payment yet. If you already paid, it can take a minute to show up: check Payments again shortly.',
+    REFUNDED: 'This payment is recorded as fully refunded in WonderTutor. Check Payments for the refund details.',
+    PARTIALLY_REFUNDED: 'This payment is recorded as partly refunded in WonderTutor. Check Payments for the refund details.',
+    RECORDED: 'This payment was received, but the booking is no longer confirmed. Check Payments for the current lesson and refund status.',
   }
-  const status = effectiveResult === 'SUCCESS' || (effectiveResult === 'ALREADY' && fresh.status === 'PAID') ? 'SUCCESS' : effectiveResult === 'LATE' ? 'LATE' : effectiveResult === 'WAITING' ? 'WAITING' : 'FAILED'
+  const status = ['REFUNDED', 'PARTIALLY_REFUNDED', 'RECORDED'].includes(effectiveResult) ? effectiveResult
+    : effectiveResult === 'SUCCESS' || (effectiveResult === 'ALREADY' && fresh.status === 'PAID') ? 'SUCCESS' : effectiveResult === 'LATE' ? 'LATE' : effectiveResult === 'WAITING' ? 'WAITING' : 'FAILED'
   // `outcome` (not `status`) so it cannot be confused with an HTTP status
   res.json({ outcome: status, message: messages[effectiveResult] })
 }

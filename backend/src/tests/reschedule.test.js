@@ -23,6 +23,31 @@ const answer = (b, rid, action) => api(parent.token).post(`/parent/bookings/${b.
 const hhmm = (d) => new Date(d).toLocaleTimeString('en-GB', { timeZone: 'Asia/Kuala_Lumpur', hour: '2-digit', minute: '2-digit' })
 
 describe('parent asks to reschedule', () => {
+  test('an unanswered request cannot move a lesson after it has started', async () => {
+    const t = await makeTutor()
+    const p = await makeParent()
+    const b = await makeBooking({ parent: p.parent, child: p.child, tutor: t.tutor, date: '2020-01-06', start: '16:00', status: 'CONFIRMED' })
+    const r = await prisma.rescheduleRequest.create({ data: { bookingId: b.id, requestedById: t.user.id, newStartAt: new Date(Date.now() + 86400000), newEndAt: new Date(Date.now() + 90000000) } })
+    const response = await api(p.token).post(`/parent/bookings/${b.id}/reschedule/${r.id}/accept`)
+    expect(response.status).toBe(400)
+    expect(response.message).toMatch(/already started/)
+    expect((await prisma.rescheduleRequest.findUnique({ where: { id: r.id } })).status).toBe('PENDING')
+  })
+
+  test('two lessons cannot be rescheduled into the same tutor slot concurrently', async () => {
+    const t = await makeTutor()
+    const families = await Promise.all([makeParent(), makeParent()])
+    const bookings = await Promise.all(families.map((p, i) => makeBooking({ parent: p.parent, child: p.child, tutor: t.tutor, date, start: `${16 + i}:00`, status: 'CONFIRMED' })))
+    const snapshots = await Promise.all(bookings.map(full))
+    const requests = await Promise.all(snapshots.map((b, i) => requestReschedule({ booking: b, byUserId: families[i].user.id, date, startTime: '19:00' })))
+    const answers = await Promise.allSettled(requests.map((r, i) => respondReschedule({ booking: snapshots[i], requestId: r.id, byUserId: t.user.id, accept: true })))
+    expect(answers.filter((r) => r.status === 'fulfilled')).toHaveLength(1)
+    expect(answers.find((r) => r.status === 'rejected').reason.status).toBe(409)
+    const current = await prisma.booking.findMany({ where: { tutorId: t.tutor.id } })
+    expect(current.filter((b) => hhmm(b.startAt) === '19:00')).toHaveLength(1)
+    expect(await prisma.rescheduleRequest.count({ where: { bookingId: { in: bookings.map((b) => b.id) }, status: 'PENDING' } })).toBe(1)
+  })
+
   test('simultaneous requests create only one pending reschedule', async () => {
     const t = await makeTutor()
     const p = await makeParent()

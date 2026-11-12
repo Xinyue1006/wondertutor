@@ -73,6 +73,7 @@ const USER_MESSAGES = {
   rate_limit: 'The AI assistant is busy right now. Please try again in a minute, or use Guided Tutor Search.',
   unavailable: 'The AI assistant is not available right now. Guided Tutor Search still works.',
   bad_response: 'The AI assistant could not answer that. Please try again, or use Guided Tutor Search.',
+  blocked: 'The AI service blocked this response. You can use the normal pages or Guided Tutor Search instead.',
   disabled: 'The AI assistant is switched off. You can still use Guided Tutor Search.',
   tool_loop: 'The AI assistant could not finish that request. Please ask in a simpler way.',
   busy: 'The previous question in this chat is still being answered. Please wait a moment and try again.',
@@ -211,16 +212,16 @@ async function runTurn({ user, parent, data, session, turn, now, db }) {
       finish('tool_loop')
       return { conversationId: session.id, messageId: opaque(), status: 'answer', text: finalText, entities: {}, cards, sources, criteria: null, matchResult: null, asOf: now.toISOString() }
     }
-    if (ctx.evidence.length) {
+    if (ctx.clarification || ctx.needs) {
+      // A preliminary lookup must not hide the question needed to finish the task.
+      const askedByModel = prose.ok && /[?？]/.test(text)
+      finalText = askedByModel ? text : ctx.clarification ? ctx.clarification.title : clarifyText(ctx.needs, lang)
+      log.answer = askedByModel ? 'model_prose' : 'server_clarification'
+    } else if (ctx.evidence.length) {
       // Account facts: written by the server from this turn's evidence. The model's own wording is not shown.
       finalText = composeFromEvidence(ctx, lang)
       log.answer = 'server_evidence'
       if (text) log.modelProse = prose.ok ? 'unused' : prose.reason
-    } else if (ctx.clarification || ctx.needs) {
-      // A clarification must actually ask. Natural model wording is kept only if it is a fact-free question.
-      const askedByModel = prose.ok && /[?？]/.test(text)
-      finalText = askedByModel ? text : ctx.clarification ? ctx.clarification.title : clarifyText(ctx.needs, lang)
-      log.answer = askedByModel ? 'model_prose' : 'server_clarification'
     } else {
       finalText = prose.ok ? text : noEvidenceText(lang)
       log.answer = prose.ok ? 'model_prose' : 'server_no_evidence'
@@ -243,7 +244,7 @@ async function runTurn({ user, parent, data, session, turn, now, db }) {
     return {
       conversationId: session.id,
       messageId: opaque(),
-      status: ctx.clarification ? 'clarification' : 'answer',
+      status: ctx.clarification || ctx.needs ? 'clarification' : 'answer',
       text: finalText,
       entities,
       cards,

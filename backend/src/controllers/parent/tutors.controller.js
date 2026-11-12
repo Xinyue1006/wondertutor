@@ -189,7 +189,7 @@ export async function getTutor(req, res) {
   if (!tutor) throw new AppError(404, 'Tutor not found')
 
   const [grouped, fav, week] = await Promise.all([
-    prisma.review.groupBy({ by: ['rating'], where: { tutorId: id }, _count: { _all: true } }),
+    prisma.review.groupBy({ by: ['rating'], where: { tutorId: id, isHidden: false }, _count: { _all: true } }),
     prisma.favouriteTutor.findUnique({ where: { parentId_tutorId: { parentId: req.parent.id, tutorId: id } } }),
     getTutorSlots(id, todayMyt(), 7),
   ])
@@ -208,14 +208,15 @@ const levelWord = { KINDERGARTEN: 'Kindergarten', PRIMARY: 'Primary', SECONDARY:
 // GET /parent/tutors/:id/reviews?sort=recent|highest|lowest&page=1
 export async function tutorReviews(req, res) {
   const tutorId = Number(req.params.id)
+  if (!await prisma.tutorProfile.findFirst({ where: { id: tutorId, user: { status: 'ACTIVE' } }, select: { id: true } })) throw new AppError(404, 'Tutor not found')
   const sort = z.enum(['recent', 'highest', 'lowest']).default('recent').parse(req.query.sort)
-  const page = Math.max(1, Number(req.query.page) || 1)
+  const page = z.coerce.number().int().min(1).max(10000).default(1).parse(req.query.page)
   const take = 5
   const orderBy = { recent: { createdAt: 'desc' }, highest: { rating: 'desc' }, lowest: { rating: 'asc' } }[sort]
   const [total, reviews] = await Promise.all([
-    prisma.review.count({ where: { tutorId } }),
+    prisma.review.count({ where: { tutorId, isHidden: false } }),
     prisma.review.findMany({
-      where: { tutorId },
+      where: { tutorId, isHidden: false },
       orderBy,
       skip: (page - 1) * take,
       take,

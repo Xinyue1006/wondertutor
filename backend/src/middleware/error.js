@@ -22,6 +22,7 @@ export function errorHandler(err, req, res, next) {
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     if (err.code === 'P2002') return res.status(409).json({ message: 'This has already been saved. Please refresh the page.' })
     if (err.code === 'P2025') return res.status(404).json({ message: 'This record no longer exists. Please refresh the page.' })
+    if (err.code === 'P2034') return res.status(409).json({ message: 'Another request changed this record at the same time. Please refresh and try again.' })
   }
   // A JSON body that is not valid JSON (express.json() parse error)
   if (err.type === 'entity.parse.failed') return res.status(400).json({ message: 'The request body is not valid JSON' })

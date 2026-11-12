@@ -108,7 +108,7 @@ function UserMenu() {
 
   return (
     <div className="relative" ref={ref}>
-      <button onClick={() => setOpen((o) => !o)} className="flex items-center gap-3 rounded-xl px-1 py-1 hover:bg-brand-50">
+      <button onClick={() => setOpen((o) => !o)} aria-label="Account menu" aria-expanded={open} className="flex items-center gap-3 rounded-xl px-1 py-1 hover:bg-brand-50">
         <Avatar src={user.profilePhotoUrl} name={user.fullName} className="h-10 w-10" />
         <span className="hidden text-left leading-tight sm:block lg:hidden xl:block">
           <span className="block text-sm font-semibold text-navy">{user.fullName}</span>
@@ -137,7 +137,7 @@ function UserMenu() {
             </Link>
           )}
           <button
-            onClick={() => { logout(); navigate('/login') }}
+            onClick={() => { logout(); navigate(user.role === 'ADMIN' ? '/admin/login' : '/login') }}
             className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50"
           >
             <Icon name="logout" className="h-4 w-4" /> Log out
@@ -149,26 +149,57 @@ function UserMenu() {
 }
 
 // Bell icon with unread dot + dropdown list (in-app notifications)
-function NotificationBell() {
+export function NotificationBell() {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [data, setData] = useState({ unread: 0, notifications: [] })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const request = useRef(0)
   const ref = useRef(null)
   useClickOutside(ref, useCallback(() => setOpen(false), []))
 
-  const load = useCallback(() => api.get('/notifications').then((r) => setData(r.data)).catch(() => {}), [])
+  const load = useCallback(() => {
+    const current = ++request.current
+    setLoading(true)
+    setError('')
+    return api.get('/notifications')
+      .then((r) => { if (current === request.current) setData(r.data) })
+      .catch(() => { if (current === request.current) setError("We couldn't load notifications. Please try again.") })
+      .finally(() => { if (current === request.current) setLoading(false) })
+  }, [])
   useEffect(() => {
     load()
     // Light polling so new booking replies show up without a refresh; skipped while the tab is in the background
     const t = setInterval(() => { if (!document.hidden) load() }, 60000)
-    return () => clearInterval(t)
+    return () => { clearInterval(t); ++request.current }
   }, [load])
 
   async function openItem(n) {
-    setOpen(false)
-    if (!n.isRead) await api.post(`/notifications/${n.id}/read`).catch(() => {})
-    load()
-    if (n.link) navigate(n.link)
+    if (busy) return
+    setBusy(true)
+    setError('')
+    try {
+      if (!n.isRead) await api.post(`/notifications/${n.id}/read`)
+      setOpen(false)
+      load()
+      if (n.link) navigate(n.link)
+    } catch {
+      setError("We couldn't mark this notification as read. Please try again.")
+    } finally { setBusy(false) }
+  }
+
+  async function markAll() {
+    if (busy) return
+    setBusy(true)
+    setError('')
+    try {
+      await api.post('/notifications/read-all')
+      await load()
+    } catch {
+      setError("We couldn't mark notifications as read. Please try again.")
+    } finally { setBusy(false) }
   }
 
   return (
@@ -193,17 +224,21 @@ function NotificationBell() {
             {data.unread > 0 && (
               <button
                 className="text-xs font-semibold text-brand-500 hover:underline"
-                onClick={() => api.post('/notifications/read-all').then(load).catch(() => {})}
+                disabled={busy || loading}
+                onClick={markAll}
               >
                 Mark all as read
               </button>
             )}
           </div>
           <div className="max-h-96 overflow-y-auto">
-            {data.notifications.length === 0 && <p className="p-6 text-center text-sm text-slate-500">You're all caught up.</p>}
+            {loading && <p role="status" className="px-4 py-3 text-sm text-slate-600">Loading notifications…</p>}
+            {error && <div className="px-4 py-3"><p role="alert" className="text-sm text-red-700">{error}</p><button type="button" onClick={load} disabled={loading} className="mt-2 text-sm font-semibold text-brand-600 hover:underline">Try again</button></div>}
+            {!loading && !error && data.notifications.length === 0 && <p className="p-6 text-center text-sm text-slate-500">You're all caught up.</p>}
             {data.notifications.map((n) => (
               <button
                 key={n.id}
+                disabled={busy}
                 onClick={() => openItem(n)}
                 className={`flex w-full gap-3 border-b border-slate-50 px-4 py-3 text-left hover:bg-brand-50 ${n.isRead ? '' : 'bg-brand-25'}`}
               >
@@ -225,7 +260,7 @@ function NotificationBell() {
 // Footer for the signed-in portals. Different from the public footer: it is about using the portal
 // (shortcuts, account, where to get help), not about marketing the platform.
 const ACCOUNT_LINKS = {
-  PARENT: [['/parent/profile', 'My Profile'], ['/parent/children', 'My Children'], ['/parent/favourites', 'Saved Tutors'], ['/parent/complaints', 'My Complaints']],
+  PARENT: [['/parent/profile', 'My Profile'], ['/parent/children', 'My Children'], ['/parent/favourites', 'Saved Tutors'], ['/parent/complaints', 'My Complaints'], ['/parent/help', 'Help & FAQs']],
   TUTOR: [],
   ADMIN: [],
 }
@@ -260,7 +295,7 @@ function AppFooter({ items }) {
           <ul className="space-y-0.5">
             {account.map(([to, label]) => <li key={to}><Link to={to} className={link}>{label}</Link></li>)}
             <li>
-              <button type="button" onClick={() => { logout(); navigate('/login') }} className={`${link} text-red-700 hover:text-red-800`}>Log out</button>
+              <button type="button" onClick={() => { logout(); navigate(user.role === 'ADMIN' ? '/admin/login' : '/login') }} className={`${link} text-red-700 hover:text-red-800`}>Log out</button>
             </li>
           </ul>
         </nav>

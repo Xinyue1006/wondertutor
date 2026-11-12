@@ -15,6 +15,7 @@ const schema = z.object({
 })
 
 export const complaintInclude = {
+  review: { select: { id: true, rating: true, comment: true, photoUrl: true, isHidden: true, moderationReason: true, moderatedAt: true, tutorId: true } },
   filedBy: { select: { id: true, fullName: true, email: true } },
   againstUser: { select: { id: true, fullName: true } },
   booking: { select: { id: true, subject: true, startAt: true } },
@@ -28,6 +29,7 @@ export const toComplaintDto = (c) => ({
   adminResponse: c.adminResponse,
   createdAt: c.createdAt,
   updatedAt: c.updatedAt,
+  review: c.review && { id: c.review.id, rating: c.review.rating, comment: c.review.comment, photoUrl: c.review.photoUrl, isHidden: c.review.isHidden, moderationReason: c.review.moderationReason, moderatedAt: c.review.moderatedAt, tutorId: c.review.tutorId },
   filedBy: c.filedBy && { id: c.filedBy.id, name: c.filedBy.fullName, email: c.filedBy.email },
   against: c.againstUser && { id: c.againstUser.id, name: c.againstUser.fullName },
   booking: c.booking && { id: c.booking.id, subject: c.booking.subject, startAt: c.booking.startAt },

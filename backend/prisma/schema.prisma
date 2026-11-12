@@ -461,6 +461,11 @@ model Review {
   rating    Int           // 1-5
   comment   String?       @db.Text
   photoUrl  String?
+  isHidden  Boolean       @default(false)
+  moderationReason String? @db.Text
+  moderatedAt DateTime?
+  moderatedById Int?
+  reports   Complaint[]
   createdAt DateTime      @default(now())
 }
 
@@ -472,6 +477,8 @@ model Complaint {
   againstUser   User?           @relation("ComplaintAgainst", fields: [againstUserId], references: [id])
   bookingId     Int?
   booking       Booking?        @relation(fields: [bookingId], references: [id])
+  reviewId      Int?
+  review        Review?         @relation(fields: [reviewId], references: [id], onDelete: SetNull)
   category      String
   description   String          @db.Text
   evidenceUrl   String?
@@ -481,6 +488,8 @@ model Complaint {
   handledBy     User?           @relation("ComplaintHandler", fields: [handledById], references: [id])
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
+
+  @@unique([filedById, reviewId])
 }
 
 // A formal warning an Admin gives to a user (before any deactivation). The user is also notified in-app.

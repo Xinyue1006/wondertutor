@@ -20,6 +20,7 @@ function StepBadge({ children }) {
 
 export default function ForgotPassword() {
   const { state } = useLocation()
+  const loginPath = state?.adminLogin ? '/admin/login' : '/login'
   const [step, setStep] = useState(1)
   const [email, setEmail] = useState(state?.email || '')
   const [code, setCode] = useState('')
@@ -74,7 +75,7 @@ export default function ForgotPassword() {
             <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-ok-50 text-ok"><Icon name="check-circle" className="h-6 w-6" /></span>
             <h1 className="font-display text-2xl font-bold text-navy">Password reset</h1>
             <p className="text-slate-700">Your password has been changed. Log in with your new password.</p>
-            <Link to="/login" state={{ email }} className="btn-primary h-11 w-full">Go to Log in</Link>
+            <Link to={loginPath} state={{ email }} className="btn-primary h-11 w-full">Go to Log in</Link>
           </div>
         ) : step === 1 ? (
           <form onSubmit={sendCode} noValidate className="space-y-4">
@@ -119,7 +120,7 @@ export default function ForgotPassword() {
         )}
 
         {!done && (
-          <Link to="/login" className="mt-4 inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-brand-600 hover:underline">
+          <Link to={loginPath} className="mt-4 inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-brand-600 hover:underline">
             <Icon name="arrow-left" className="h-4 w-4" /> Back to login
           </Link>
         )}

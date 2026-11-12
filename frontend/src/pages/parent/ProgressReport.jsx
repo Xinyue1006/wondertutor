@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import api, { errorMessage } from '../../api/client'
 import Icon from '../../components/ui/Icon'
@@ -34,26 +34,34 @@ export default function ProgressReport() {
   const [error, setError] = useState('')
   const [filterError, setFilterError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [loadedId, setLoadedId] = useState(null)
+  const request = useRef(0)
 
   const load = useCallback(() => {
-    if (range.from && range.to && range.from > range.to) return setFilterError('The start date must be on or before the end date.')
+    const current = ++request.current
+    if (range.from && range.to && range.from > range.to) {
+      setLoading(false)
+      return setFilterError('The start date must be on or before the end date.')
+    }
     setFilterError('')
     setError('')
     setLoading(true)
     api.get(`/parent/children/${id}/report`, { params: { from: range.from, to: range.to, subject } })
-      .then((r) => setData(r.data))
-      .catch((e) => setError(errorMessage(e)))
-      .finally(() => setLoading(false))
+      .then((r) => { if (current === request.current) { setData(r.data); setLoadedId(id) } })
+      .catch((e) => { if (current === request.current) setError(errorMessage(e)) })
+      .finally(() => { if (current === request.current) setLoading(false) })
   }, [id, range, subject])
-  useEffect(() => { load() }, [load])
+  useEffect(() => { load(); return () => { ++request.current } }, [load])
 
   const pick = (p) => { setPreset(p); if (p !== 'custom') setRange(presetRange(p)) }
 
-  if (error && !data) return <div><BackLink id={id} /><LoadError message={error} onRetry={load} /></div>
-  if (!data) return <Spinner />
+  const currentData = loadedId === id ? data : null
+  if (error && !currentData) return <div><BackLink id={id} /><LoadError message={error} onRetry={load} /></div>
+  if (!currentData) return <Spinner />
   const { child, totals, subjects, lessons, period } = data
 
   function download() {
+    if (loading || error || filterError) return
     const rows = [['Date', 'Time', 'Subject', 'Tutor', 'Mode', 'Attendance', 'Topics covered', 'Summary', 'Observations', 'Homework / follow-up', 'Recommendation']]
     for (const l of lessons) {
       const s = l.summary
@@ -97,15 +105,17 @@ export default function ProgressReport() {
               </SelectBox>
             </label>
             <div className="ml-auto flex gap-2">
-              <button type="button" onClick={download} disabled={!lessons.length} className="btn-outline px-4 disabled:opacity-50">Download CSV</button>
-              <button type="button" onClick={() => window.print()} className="btn-primary px-4">Print / Save as PDF</button>
+              <button type="button" onClick={download} disabled={!lessons.length || loading || !!error || !!filterError} className="btn-outline px-4 disabled:opacity-50">Download CSV</button>
+              <button type="button" disabled={loading || !!error || !!filterError} onClick={() => window.print()} className="btn-primary px-4">Print / Save as PDF</button>
             </div>
           </div>
           <ErrorBox>{filterError || error}</ErrorBox>
+          {error && !loading && <button type="button" onClick={load} className="text-sm font-semibold text-brand-600 hover:underline">Try again</button>}
+          {loading && <p role="status" className="text-sm text-slate-600">Updating report…</p>}
         </div>
       </div>
 
-      <article className={`card p-8 ${loading ? 'opacity-60' : ''}`} aria-label={`Learning progress report for ${child.name}`}>
+      <article className={`card p-8 ${loading ? 'opacity-60' : ''}`} aria-busy={loading} aria-label={`Learning progress report for ${child.name}`}>
         <header className="border-b border-slate-200 pb-4">
           <h1 className="text-2xl font-extrabold text-navy">Learning Progress Report</h1>
           <p className="text-sm text-slate-500">WonderTutor · Wonderland Learning Materials &amp; Tuition Centre</p>

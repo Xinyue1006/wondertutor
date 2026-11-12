@@ -13,9 +13,14 @@ export async function uploadSignature(req, res) {
   const timestamp = Math.floor(Date.now() / 1000)
   const purpose = req.body?.purpose
   if (purpose) {
-    if (req.user.role !== 'TUTOR') throw new AppError(403, 'Tutor access required')
     let folder
-    if (purpose === 'qualification') folder = 'wondertutor/qualifications/' + req.user.id
+    if (purpose === 'child-avatar') {
+      if (req.user.role !== 'PARENT') throw new AppError(403, 'Parent access required')
+      const parent = await prisma.parentProfile.findUnique({ where: { userId: req.user.id }, select: { id: true } })
+      if (!parent) throw new AppError(404, 'Parent profile not found')
+      folder = 'wondertutor/children/' + parent.id
+    } else if (req.user.role !== 'TUTOR') throw new AppError(403, 'Tutor access required')
+    else if (purpose === 'qualification') folder = 'wondertutor/qualifications/' + req.user.id
     else if (purpose === 'attendance') {
       const id = req.body.bookingId
       if (!Number.isSafeInteger(id) || id < 1) throw new AppError(400, 'Invalid booking')
@@ -23,7 +28,7 @@ export async function uploadSignature(req, res) {
       if (!booking) throw new AppError(404, 'Booking not found')
       folder = 'wondertutor/attendance/' + id
     } else throw new AppError(400, 'Unknown upload purpose')
-    const allowed_formats = purpose === 'attendance' ? 'jpg,jpeg,png' : 'jpg,jpeg,png,pdf'
+    const allowed_formats = purpose === 'attendance' || purpose === 'child-avatar' ? 'jpg,jpeg,png' : 'jpg,jpeg,png,pdf'
     const signature = createHash('sha1').update('allowed_formats=' + allowed_formats + '&folder=' + folder + '&timestamp=' + timestamp + '&type=authenticated' + apiSecret).digest('hex')
     return res.json({ cloudName, apiKey, timestamp, folder, signature, type: 'authenticated', allowed_formats })
   }

@@ -1,5 +1,6 @@
 // Payments (sandbox), commission snapshot, refund requests and reviews.
 import { prisma } from '../config/prisma.js'
+import { jest } from '@jest/globals'
 import { env } from '../config/env.js'
 import { MONDAY, api, makeBooking, makeParent, makeTutor, nextDate, resetDb, startServer, stopServer } from './helpers.js'
 
@@ -22,6 +23,23 @@ async function checkout(tutor, { price = 60, start = '17:00' } = {}) {
 }
 
 describe('checkout', () => {
+  test('a refund completed while a request is loading cannot be refunded again', async () => {
+    const t = await makeTutor()
+    const b = await makeBooking({ parent: parent.parent, child: parent.child, tutor: t.tutor, date: '2020-01-06', start: '16:00', status: 'COMPLETED' })
+    const payment = await prisma.payment.create({ data: { bookingId: b.id, amount: 55, status: 'PAID', method: 'FPX', commissionRate: 10, commissionAmount: 5.5 } })
+    const findBooking = prisma.booking.findFirst.bind(prisma.booking)
+    const spy = jest.spyOn(prisma.booking, 'findFirst').mockImplementationOnce(async (args) => {
+      const snapshot = await findBooking(args)
+      await prisma.payment.update({ where: { id: payment.id }, data: { status: 'REFUNDED' } })
+      return snapshot
+    })
+    try {
+      const response = await api(parent.token).post(`/parent/bookings/${b.id}/refund-request`, { reason: 'I need help with this lesson.' })
+      expect(response.status).toBe(409)
+      expect(await prisma.refund.count({ where: { paymentId: payment.id } })).toBe(0)
+    } finally { spy.mockRestore() }
+  })
+
   test('production refuses the built-in simulated gateway without changing payment records', async () => {
     const t = await makeTutor()
     const b = await makeBooking({ parent: parent.parent, child: parent.child, tutor: t.tutor, date: monday, start: '16:00', status: 'AWAITING_PAYMENT' })

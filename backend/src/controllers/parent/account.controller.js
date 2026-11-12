@@ -12,6 +12,7 @@ import { subjectsOf } from '../../utils/childSubjects.js'
 import { sendEmail } from '../../services/email.service.js'
 import { renderEmail } from '../../services/notification.service.js'
 import { deleteUserSessions } from '../../services/assistant/session.js'
+import { childPhotoFields } from '../../services/privateMedia.js'
 
 // PUT /parent/account/email-reminders { enabled }
 export async function setEmailReminders(req, res) {
@@ -53,7 +54,7 @@ export async function exportMyData(req, res) {
     },
     address: req.parent.address,
     tutorPreferences: req.parent.preferences ?? null,
-    children: children.map((c) => ({ name: c.name, educationLevel: c.educationLevel, grade: c.grade, gradeYear: c.gradeYear, subjects: subjectsOf(c), preferredLanguage: c.preferredLanguage, goals: c.goals, notes: c.notes, photoUrl: c.photoUrl })),
+    children: children.map((c) => ({ name: c.name, educationLevel: c.educationLevel, grade: c.grade, gradeYear: c.gradeYear, subjects: subjectsOf(c), preferredLanguage: c.preferredLanguage, goals: c.goals, notes: c.notes, ...childPhotoFields(c) })),
     bookings: bookings.map((b) => ({
       id: b.id,
       status: b.status,
@@ -76,7 +77,7 @@ export async function exportMyData(req, res) {
         paidAt: b.payment.paidAt,
         refunds: b.payment.refunds.map((r) => ({ amount: num(r.amount), status: r.status, reason: r.reason })),
       },
-      review: b.review && { rating: b.review.rating, comment: b.review.comment, photoUrl: b.review.photoUrl },
+      review: b.review && { rating: b.review.rating, comment: b.review.comment, photoUrl: b.review.photoUrl, isHidden: b.review.isHidden, moderationReason: b.review.moderationReason, moderatedAt: b.review.moderatedAt },
     })),
     complaints: complaints.map((c) => ({ category: c.category, description: c.description, status: c.status, response: c.adminResponse, filedAt: c.createdAt })),
     savedTutors: favourites.map((f) => f.tutor.user.fullName),
@@ -171,7 +172,7 @@ export async function deleteMyAccount(req, res) {
       subject: 'WonderTutor — your account was deleted',
       html: renderEmail({
         name: fullName,
-        message: 'Your WonderTutor account has been deleted and your personal details have been removed. Past lesson and payment records are kept without your name, because the centre needs them for its accounts. You are welcome to sign up again at any time.',
+        message: 'Your WonderTutor account has been deleted and your profile details have been removed. Required lesson, payment and complaint records are retained for accounting and dispute handling. Retained free-text notes and evidence may still contain names or other personal information. You are welcome to sign up again at any time.',
         note: 'If you did not do this, please contact the centre as soon as possible.',
       }),
     })

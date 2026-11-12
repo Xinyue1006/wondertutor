@@ -1,12 +1,16 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import api, { errorMessage } from '../api/client'
 import Avatar from './ui/Avatar'
 import Icon from './ui/Icon'
 
 // Uploads an image straight to Cloudinary using a one-time signature from our backend.
-export async function uploadImage(file) {
-  const { data: sig } = await api.post('/uploads/signature')
+export async function uploadImage(file, purpose) {
+  const { data: sig } = await (purpose ? api.post('/uploads/signature', { purpose }) : api.post('/uploads/signature'))
   const form = new FormData()
+  if (sig.type) {
+    form.append('type', sig.type)
+    form.append('allowed_formats', sig.allowed_formats)
+  }
   form.append('file', file)
   form.append('api_key', sig.apiKey)
   form.append('timestamp', sig.timestamp)
@@ -15,7 +19,7 @@ export async function uploadImage(file) {
   const res = await fetch(`https://api.cloudinary.com/v1_1/${sig.cloudName}/image/upload`, { method: 'POST', body: form })
   const json = await res.json()
   if (!res.ok) throw new Error(json.error?.message || 'Upload failed')
-  return json.secure_url
+  return sig.type === 'authenticated' ? json.secure_url.replace(/(\/image\/authenticated\/)s--[a-zA-Z0-9_-]+--\//, '$1') : json.secure_url
 }
 
 // Verification documents (NRIC, certificates) may be a PDF or a photo. "auto" lets Cloudinary store either.
@@ -45,7 +49,7 @@ export const uploadError = (err) =>
   err?.response?.status === 501 ? 'File upload is not set up yet (Cloudinary keys missing).' : err?.response ? errorMessage(err) : err.message
 
 // Checks the chosen file, uploads it and reports the hosted URL. Shared by every photo control.
-export async function pickImage(e, { setBusy, setError, onChange }) {
+export async function pickImage(e, { setBusy, setError, onChange, purpose }) {
   const file = e.target.files?.[0]
   e.target.value = ''
   if (!file) return
@@ -54,7 +58,7 @@ export async function pickImage(e, { setBusy, setError, onChange }) {
   setError('')
   setBusy(true)
   try {
-    onChange(await uploadImage(file))
+    onChange(await uploadImage(file, purpose))
   } catch (err) {
     setError(err?.response?.status === 501 ? 'Photo upload is not set up yet (Cloudinary keys missing).' : err?.response ? errorMessage(err) : err.message)
   } finally {
@@ -63,21 +67,39 @@ export async function pickImage(e, { setBusy, setError, onChange }) {
 }
 
 // Photo box used on My Profile and the child form. `onChange(url)` gets the hosted image URL.
-export default function PhotoPicker({ value, name, onChange, rounded = 'rounded-full' }) {
+export default function PhotoPicker({ value, previewValue, purpose, name, onChange, rounded = 'rounded-full' }) {
   const input = useRef(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [preview, setPreview] = useState(null)
+  const localPreview = useRef(null)
+  useEffect(() => () => { if (localPreview.current) URL.revokeObjectURL(localPreview.current) }, [])
 
-  const pick = (e) => pickImage(e, { setBusy, setError, onChange })
+  const clearPreview = () => {
+    if (localPreview.current) URL.revokeObjectURL(localPreview.current)
+    localPreview.current = null
+    setPreview(null)
+  }
+  const pick = (e) => {
+    const file = e.target.files?.[0]
+    return pickImage(e, { setBusy, setError, purpose, onChange: (url) => {
+      clearPreview()
+      if (purpose && file) {
+        localPreview.current = URL.createObjectURL(file)
+        setPreview(localPreview.current)
+      }
+      onChange(url)
+    } })
+  }
 
   return (
     <div className="flex items-center gap-4">
-      <Avatar src={value} name={name} className="h-20 w-20" rounded={rounded} text="text-2xl" />
+      <Avatar src={preview || previewValue || (purpose ? null : value)} name={name} className="h-20 w-20" rounded={rounded} text="text-2xl" />
       <div>
         <button type="button" disabled={busy} onClick={() => input.current?.click()} className="btn-outline px-4 py-1.5 text-xs">
           <Icon name="camera" className="h-4 w-4" /> {busy ? 'Uploading…' : value ? 'Change photo' : 'Upload photo'}
         </button>
-        {value && !busy && <button type="button" onClick={() => onChange(null)} className="ml-3 text-xs font-semibold text-red-500 hover:underline">Remove</button>}
+        {value && !busy && <button type="button" onClick={() => { clearPreview(); onChange(null) }} className="ml-3 text-xs font-semibold text-red-500 hover:underline">Remove</button>}
         <div className="mt-1 text-xs text-slate-500">JPG or PNG, up to 5MB</div>
         {error && <div className="mt-1 text-xs text-red-600">{error}</div>}
       </div>

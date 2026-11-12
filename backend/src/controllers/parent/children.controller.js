@@ -1,4 +1,4 @@
-import { mediaLink } from '../../services/privateMedia.js'
+import { childPhotoFields, mediaLink, privateAsset, unsignedReference } from '../../services/privateMedia.js'
 import { z } from 'zod'
 import { prisma } from '../../config/prisma.js'
 import { AppError } from '../../utils/AppError.js'
@@ -28,6 +28,13 @@ const toColumns = (data) => {
   return { ...rest, ...subjectColumns(cleanSubjects(data)) }
 }
 
+function photoColumns(data, parentId) {
+  if (data.photoUrl == null) return data
+  const asset = privateAsset(data.photoUrl, 'wondertutor/children/' + parentId)
+  if (!asset || asset.format === 'pdf') throw new AppError(400, 'Upload a private child photo through WonderTutor. Public photos and another family’s photos cannot be used.')
+  return { ...data, photoUrl: unsignedReference(data.photoUrl) }
+}
+
 export const toChildDto = (c) => ({
   id: c.id,
   name: c.name,
@@ -39,7 +46,7 @@ export const toChildDto = (c) => ({
   preferredLanguage: c.preferredLanguage,
   goals: c.goals,
   gradeYear: c.gradeYear,
-  photoUrl: c.photoUrl,
+  ...childPhotoFields(c),
   bookingCount: c._count?.bookings ?? undefined,
 })
 
@@ -60,7 +67,7 @@ export async function listChildren(req, res) {
 }
 
 export async function createChild(req, res) {
-  const data = childSchema.parse(req.body)
+  const data = photoColumns(childSchema.parse(req.body), req.parent.id)
   // gradeYear: the grade the parent entered is true for this school year, so the January progression starts from here
   const child = await prisma.child.create({ data: { ...toColumns(data), gradeYear: currentSchoolYear(), parentId: req.parent.id } })
   res.status(201).json({ child: toChildDto(child) })
@@ -68,7 +75,7 @@ export async function createChild(req, res) {
 
 export async function updateChild(req, res) {
   const existing = await ownChild(req)
-  const data = childSchema.parse(req.body)
+  const data = photoColumns(childSchema.parse(req.body), req.parent.id)
   // Changing the level or grade (a correction, or a child repeating a year) is true for this year, so it is not moved up again
   const gradeChanged = data.educationLevel !== existing.educationLevel || data.grade !== existing.grade
   const child = await prisma.child.update({ where: { id: existing.id }, data: { ...toColumns(data), ...((gradeChanged || existing.gradeYear == null) && { gradeYear: currentSchoolYear() }) } })

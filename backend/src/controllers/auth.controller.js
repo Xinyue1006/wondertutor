@@ -243,12 +243,13 @@ const DUMMY_HASH = bcrypt.hashSync(randomBytes(32).toString('hex'), 12)
 // POST /api/auth/login { email, password, recaptchaToken }
 // reCAPTCHA is checked before the password, so a bot cannot use this form to try passwords
 export async function login(req, res) {
-  const { email, password, recaptchaToken } = z
+  const { email, password, recaptchaToken, portal } = z
     // No strength rules at login (old passwords stay valid), only a cap so nobody can post megabytes to bcrypt
     .object({
       email: emailRule,
       password: z.string().min(1, 'Enter your password').max(200, 'Incorrect email or password'),
       recaptchaToken: z.string().max(4000).optional(),
+      portal: z.literal('ADMIN').optional(),
     })
     .parse(req.body)
   await verifyRecaptcha(recaptchaToken)
@@ -256,6 +257,7 @@ export async function login(req, res) {
   const user = await prisma.user.findUnique({ where: { email } })
   const matches = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_HASH)
   if (!user?.passwordHash || !matches) throw new AppError(401, 'Incorrect email or password')
+  if (portal === 'ADMIN' && user.role !== 'ADMIN') throw new AppError(403, 'Please use an administrator account to log in here.')
   if (!user.isEmailVerified) throw new AppError(403, 'Please verify your email before logging in')
   if (user.status === 'DEACTIVATED') throw new AppError(403, 'Your account has been deactivated. Please contact Admin.')
 
