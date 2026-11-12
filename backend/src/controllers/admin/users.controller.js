@@ -132,7 +132,7 @@ export async function getUser(req, res) {
       upcomingLessons,
       qualifications: (user.tutor?.qualifications ?? []).map(q => ({ ...q, documentUrl: mediaLink(q.documentUrl, 'wondertutor/qualifications/' + user.id) })),
       subjects: user.tutor?.subjects ?? [],
-      children: user.parent?.children.map((c) => ({ id: c.id, name: c.name, educationLevel: c.educationLevel, grade: c.grade })) ?? [],
+      children: user.parent?.children.map((c) => ({ id: c.id, publicId: c.publicId, name: c.name, educationLevel: c.educationLevel, grade: c.grade })) ?? [],
     },
   })
 }

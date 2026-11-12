@@ -10,7 +10,7 @@ import { prisma } from '../../config/prisma.js'
 import { env } from '../../config/env.js'
 import { AppError } from '../../utils/AppError.js'
 import { bookingInclude, toBookingDto } from '../../services/booking.dto.js'
-import { id } from '../../utils/validators.js'
+import { recordReference, referenceWhere } from '../../utils/publicIds.js'
 import { PAYMENT_DEADLINE_MINUTES } from '../../services/lifecycle.service.js'
 import { mytParts } from '../../utils/time.js'
 import { billplzConfigured, createBill, getBill, signatureIsValid } from '../../services/billplz.service.js'
@@ -51,6 +51,7 @@ export async function paymentsOverview(req, res) {
     },
     transactions: payments.map((p) => ({
       id: p.id,
+      publicId: p.publicId,
       status: p.status,
       amount: money(p.amount),
       method: p.method,
@@ -69,8 +70,8 @@ export async function paymentsOverview(req, res) {
 export async function checkout(req, res) {
   if (env.nodeEnv === 'production' && !billplzConfigured())
     throw new AppError(503, 'Online payments are not configured. Please contact the centre.')
-  const { bookingId } = z.object({ bookingId: id('Booking') }).parse(req.body)
-  const booking = await prisma.booking.findFirst({ where: { id: bookingId, parentId: req.parent.id }, include: { payment: true } })
+  const { bookingId } = z.object({ bookingId: recordReference('Booking') }).parse(req.body)
+  const booking = await prisma.booking.findFirst({ where: { ...referenceWhere(bookingId), parentId: req.parent.id }, include: { payment: true } })
   if (!booking) throw new AppError(404, 'Booking not found')
   if (booking.status !== 'AWAITING_PAYMENT' || booking.agreedPrice == null)
     throw new AppError(400, 'This booking is not waiting for payment')
@@ -89,7 +90,7 @@ export async function checkout(req, res) {
         data: { bookingId: booking.id, amount, commissionRate: 0, commissionAmount: 0, method: 'FPX', gatewayRef },
       })
 
-  res.status(201).json({ paymentId: payment.id, gatewayRef, amount: money(amount), banks: SANDBOX_BANKS })
+  res.status(201).json({ paymentId: payment.id, paymentPublicId: payment.publicId, gatewayRef, amount: money(amount), banks: SANDBOX_BANKS })
 }
 
 // POST /parent/payments/:id/confirm { bank, outcome }: the built-in test gateway's "callback" (never used with Billplz)
@@ -132,7 +133,7 @@ async function checkoutWithBillplz(req, res, booking, amount) {
     }
     if (existing.collection_id !== env.billplz.collectionId || existing.id !== p.gatewayRef || existing.paid || existing.state !== 'due' || !existing.url || Number(existing.amount) !== Number(cents) || !p.amount.equals(amount))
       throw new AppError(409, 'The original bill cannot be reopened. Refresh payment history or contact the centre.')
-    return res.json({ paymentId: p.id, gatewayRef: p.gatewayRef, amount: money(amount), redirectUrl: existing.url })
+    return res.json({ paymentId: p.id, paymentPublicId: p.publicId, gatewayRef: p.gatewayRef, amount: money(amount), redirectUrl: existing.url })
   }
   let payment
   try {
@@ -160,7 +161,7 @@ async function checkoutWithBillplz(req, res, booking, amount) {
   }
   const linked = await prisma.payment.updateMany({ where: { id: payment.id, OR: [{ gatewayRef: null }, { gatewayRef: bill.id }] }, data: { gatewayRef: bill.id } })
   if (!linked.count) throw new AppError(409, 'Another bill is linked to this payment. Contact the centre.')
-  res.status(201).json({ paymentId: payment.id, gatewayRef: bill.id, amount: money(amount), redirectUrl: bill.url })
+  res.status(201).json({ paymentId: payment.id, paymentPublicId: payment.publicId, gatewayRef: bill.id, amount: money(amount), redirectUrl: bill.url })
 }
 
 // Asks Billplz itself whether the bill is paid, and settles our Payment to match
@@ -266,6 +267,7 @@ export async function getReceipt(req, res) {
   const paidAt = payment.paidAt ?? payment.createdAt
   res.json({
     receipt: {
+      publicId: payment.publicId,
       number: `WT-${mytParts(paidAt).date.slice(0, 4)}-${String(payment.id).padStart(6, '0')}`,
       paidAt,
       status: payment.status,

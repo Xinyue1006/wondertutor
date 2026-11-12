@@ -1,12 +1,12 @@
 # WonderTutor current data model and domain class diagram
 
-Schema snapshot: 11 November 2026, after the review-moderation additions. Source of truth: `backend/prisma/schema.prisma` and its migrations. This document describes the **declared schema**, not proof that every environment has applied its migrations. No production database was queried by this workstream.
+Schema snapshot: 12 November 2026, including review moderation and random public references. Source of truth: `backend/prisma/schema.prisma` and its migrations. This document describes the **declared schema**, not proof that every environment has applied its migrations. No production database was queried by this workstream. Yan Hsi's weekly-availability branch is not included in this snapshot.
 
 View the exported diagrams: [full ERD](diagrams/current-erd.svg), [domain classes](diagrams/current-domain-classes.svg), and [application layers](diagrams/current-application-layers.svg). SVGs can be zoomed without losing text clarity; the Mermaid sources below remain editable.
 
 ## What the ERD currently looks like
 
-There are **25 Prisma models/tables**, shared by Parent, Tutor and Admin in one MySQL database. The central relationship is **ParentProfile → Child → Booking ← TutorProfile**. A Booking can have at most one Payment, Attendance, SessionSummary and Review. A Payment can have several Refund records. A Complaint can connect an involved user, a booking and now a reported review.
+There are **25 Prisma models/tables and 33 declared foreign-key relations**, shared by Parent, Tutor and Admin in one MySQL database. The central relationship is **ParentProfile → Child → Booking ← TutorProfile**. A Booking can have at most one Payment, Attendance, SessionSummary and Review. A Payment can have several Refund records. A Complaint can connect an involved user, a booking and now a reported review. Public references add four scalar columns; they do not add tables or change these relations.
 
 | Area | Tables |
 | --- | --- |
@@ -87,6 +87,7 @@ erDiagram
   }
   Child {
     Int id PK
+    String publicId UK "nullable; Char(36); UUIDv4 default"
     Int parentId FK
     String name
     EducationLevel educationLevel
@@ -192,6 +193,7 @@ erDiagram
   }
   Booking {
     Int id PK
+    String publicId UK "nullable; Char(36); UUIDv4 default"
     Int parentId FK
     Int childId FK
     Int tutorId FK
@@ -227,6 +229,7 @@ erDiagram
   }
   Payment {
     Int id PK
+    String publicId UK "nullable; Char(36); UUIDv4 default"
     Int bookingId FK, UK
     Decimal amount "Decimal(10, 2)"
     Decimal commissionRate "Decimal(5, 2)"
@@ -286,6 +289,7 @@ erDiagram
   }
   Complaint {
     Int id PK
+    String publicId UK "nullable; Char(36); UUIDv4 default"
     Int filedById FK
     Int againstUserId FK "nullable"
     Int bookingId FK "nullable"
@@ -332,6 +336,8 @@ erDiagram
 
 ## Integrity details to explain in the report
 
+- `Child.publicId`, `Booking.publicId`, `Payment.publicId` and `Complaint.publicId` are unique, nullable `CHAR(36)` columns with Prisma `uuid()` defaults for newly created rows. Existing rows are filled by an idempotent application script using Node `crypto.randomUUID()`. Nullable columns allow a staged deployment; null references fall back to the numeric ID until backfill finishes. The integer `id` primary keys and all existing foreign keys remain unchanged.
+- Public references reduce predictable URL enumeration; they are identifiers, not passwords or access grants. Parent routes still require authentication, the Parent role and ownership checks; Admin complaint routes still require the Admin role. Valid legacy numeric references remain accepted during the compatibility transition. See [public-ID rollout and routes](PUBLIC_IDS_2026-11-12.md).
 - `User.email` and optional `googleId` are unique. ParentProfile and TutorProfile each have a unique `userId`; both relations are optional from User. The role/profile consistency rule is enforced by application logic, not by a database XOR constraint. Admin accounts normally have neither profile.
 - `FavouriteTutor` has a **composite primary key** `(parentId, tutorId)`, preventing the same parent from saving the same tutor twice.
 - `AvailabilityException` has a **composite unique constraint** `(tutorId, date)`. Its JSON `ranges` replace weekly AvailabilitySlot hours for one date; an empty array means unavailable all day.
@@ -370,18 +376,21 @@ classDiagram
     +Boolean isVerified
   }
   class Child {
+    +String publicId
     +EducationLevel educationLevel
     +Int grade
     +Int gradeYear
     +Json subjects
   }
   class Booking {
+    +String publicId
     +DateTime startAt
     +DateTime endAt
     +BookingStatus status
     +Decimal agreedPrice
   }
   class Payment {
+    +String publicId
     +Decimal amount
     +Decimal commissionAmount
     +PaymentStatus status
@@ -397,6 +406,7 @@ classDiagram
     +Boolean isHidden
   }
   class Complaint {
+    +String publicId
     +ComplaintStatus status
     +String adminResponse
   }
@@ -464,4 +474,4 @@ Hostinger is the deployment target, not a logical application layer. One deploym
 
 ## Diagram maintenance
 
-Apply migration `20261111090000_review_moderation` through the normal reviewed release procedure for the moderation fields/relations. Do not manually change production tables from this diagram. Re-generate/update this document whenever `schema.prisma` changes. Record any additional migration and update the 25-table count if a model is added or removed. Use a domain class diagram for concepts and a deployment diagram for actual machines/processes; they answer different questions.
+Apply migrations `20261111090000_review_moderation` and `20261112090000_public_ids` through the normal reviewed release procedure for the moderation fields/relations and public-reference columns. The public-ID deployment also runs `backend/scripts/backfill-public-ids.js` after migration and Prisma Client generation; see the rollout document before deploying. Do not manually change production tables from this diagram. Re-generate/update this document whenever `schema.prisma` changes. Record any additional migration and update the 25-table/33-relation counts if a model or declared relation is added or removed. Use a domain class diagram for concepts and a deployment diagram for actual machines/processes; they answer different questions.

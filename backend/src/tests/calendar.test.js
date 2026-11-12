@@ -65,7 +65,7 @@ describe('calendar download', () => {
     const res = await download(parent.token, `/parent/bookings/${b.id}/calendar.ics`)
     expect(res.status).toBe(200)
     expect(res.headers.get('content-type')).toContain('text/calendar')
-    expect(res.headers.get('content-disposition')).toContain(`wondertutor-lesson-${b.id}.ics`)
+    expect(res.headers.get('content-disposition')).toContain(`wondertutor-lesson-${b.publicId}.ics`)
     const text = await res.text()
     expect(text).toContain(`UID:booking-${b.id}@wondertutor`)
     expect(text).toContain('Sarah: Mathematics with Test Tutor')

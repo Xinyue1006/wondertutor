@@ -7,6 +7,7 @@ import { fmtDate, fmtShortDate } from '../../lib/format'
 import ComplaintsReport from '../../components/ComplaintsReport'
 import WarnUser from '../../components/WarnUser'
 import { fmtTimeRange, money } from '../../lib/format'
+import { recordRef } from '../../lib/recordRef'
 
 const TABS = [['', 'All'], ['OPEN', 'Open'], ['IN_PROGRESS', 'In Progress'], ['RESOLVED', 'Resolved'], ['DISMISSED', 'Dismissed']]
 
@@ -70,7 +71,7 @@ function ReviewModal({ complaint: c, onClose, onDone, onReviewChanged }) {
   const [inv, setInv] = useState(null) // what the Admin needs to investigate: booking, payment, attendance, history
   const [review, setReview] = useState(null)
   const loadInvestigation = useCallback(() => {
-    if (c) api.get(`/admin/complaints/${c.id}`).then((r) => { setInv(r.data.investigation); if (r.data.complaint?.review) setReview(r.data.complaint.review) }).catch((e) => setError(errorMessage(e)))
+    if (c) api.get(`/admin/complaints/${recordRef(c)}`).then((r) => { setInv(r.data.investigation); if (r.data.complaint?.review) setReview(r.data.complaint.review) }).catch((e) => setError(errorMessage(e)))
   }, [c])
   useEffect(() => { setResponse(c?.adminResponse || ''); setReview(c?.review || null); setError(''); setInv(null); loadInvestigation() }, [c, loadInvestigation])
   if (!c) return null
@@ -82,7 +83,7 @@ function ReviewModal({ complaint: c, onClose, onDone, onReviewChanged }) {
     if (status !== 'IN_PROGRESS' && response.trim().length < 3) return setError('Write a response to the parent before resolving or dismissing.')
     setBusy(true)
     try {
-      await api.patch(`/admin/complaints/${c.id}`, { status, adminResponse: response || undefined })
+      await api.patch(`/admin/complaints/${recordRef(c)}`, { status, adminResponse: response || undefined })
       onDone()
     } catch (err) {
       setError(errorMessage(err))

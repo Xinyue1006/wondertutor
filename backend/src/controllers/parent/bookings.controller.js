@@ -9,10 +9,11 @@ import { mytToDate, toMinutes } from '../../utils/time.js'
 import { hhmm, id, ringgit, ymd } from '../../utils/validators.js'
 import { SUBJECTS } from '../../data/catalog.js'
 import { subjectsOf } from '../../utils/childSubjects.js'
+import { recordReference, referenceWhere } from '../../utils/publicIds.js'
 
 const createSchema = z.object({
   tutorId: id('Tutor'),
-  childId: id('Child'),
+  childId: recordReference('Child'),
   date: ymd('Choose a date').optional(),
   startTime: hhmm('Choose a time').optional(),
   slots: z.array(z.object({ date: ymd('Choose a date'), startTime: hhmm('Choose a time') })).min(1).max(12).optional(),
@@ -61,7 +62,7 @@ export async function createBooking(req, res) {
   slots.sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime))
 
 
-  const child = await prisma.child.findFirst({ where: { id: data.childId, parentId: req.parent.id } })
+  const child = await prisma.child.findFirst({ where: { ...referenceWhere(data.childId), parentId: req.parent.id } })
   if (!child) throw new AppError(404, 'Child not found')
 
   const tutor = await prisma.tutorProfile.findFirst({

@@ -25,6 +25,13 @@ describe('Google Calendar link', () => {
     expect(lessonLocation(b)).toBe('https://meet.example.com/abc')
     expect(lessonLocation(lesson({ teachingMode: 'ONLINE' }))).toBe('Online lesson')
   })
+
+  test('calendar details link back using the opaque booking reference', () => {
+    const publicId = '822299af-7798-4e30-984d-3dbe931bfb2f'
+    const url = new URL(googleCalendarUrl(lesson({ publicId })))
+    expect(url.searchParams.get('details')).toContain(`/parent/bookings?booking=${publicId}`)
+    expect(url.searchParams.get('details')).not.toContain('/parent/bookings?booking=7')
+  })
 })
 
 describe('who can add a lesson to a calendar', () => {

@@ -55,6 +55,7 @@ export async function buildChildReport(child, q = {}, db = prisma) {
       .sort((a, b) => b.lessons - a.lessons),
     lessons: lessons.map((b) => ({
       bookingId: b.id,
+      bookingPublicId: b.publicId,
       tutorId: b.tutorId,
       subject: b.subject,
       startAt: b.startAt,

@@ -7,6 +7,7 @@ import { EmptyState, ErrorBox, LoadError, Modal, PageTitle, SelectBox, Spinner, 
 import LessonDetails from '../../components/LessonDetails'
 import { fmtDate, fmtTime, fmtTimeRange, money } from '../../lib/format'
 import { gradeLabel } from '../../lib/education'
+import { recordRef } from '../../lib/recordRef'
 
 const lessonTitle = (b) => `${b.subject}${b.isTrial ? ' Trial' : ''} Lesson`
 // Unpaid bookings are released 1 hour before the lesson (the backend scheduler uses the same rule)
@@ -83,7 +84,7 @@ export default function Payments() {
                         <td className="px-3 py-3"><StatusPill status={t.status} /></td>
                         <td className="px-3 py-3"><div className="flex flex-col items-start gap-1">
                           <button onClick={() => setDetail(t.booking)} className="flex items-center gap-1 font-semibold text-brand-500 hover:underline">View Details <Icon name="arrow-right" className="h-4 w-4" /></button>
-                          {t.status !== 'FAILED' && <Link to={`/parent/payments/${t.id}/receipt`} className="text-xs font-semibold text-slate-600 hover:underline">Receipt</Link>}
+                          {t.status !== 'FAILED' && <Link to={`/parent/payments/${recordRef(t)}/receipt`} className="text-xs font-semibold text-slate-600 hover:underline">Receipt</Link>}
                         </div></td>
                       </tr>))}
                   </tbody>
@@ -145,7 +146,7 @@ function PayModal({ booking, banks, defaultBank, live, onClose, onDone }) {
     setBusy(true)
     setError('')
     try {
-      const checkout = await api.post('/parent/payments/checkout', { bookingId: booking.id })
+      const checkout = await api.post('/parent/payments/checkout', { bookingId: recordRef(booking) })
       if (checkout.data.reconciled) return onDone()
       window.location.assign(checkout.data.redirectUrl)
     } catch (err) {
@@ -159,8 +160,8 @@ function PayModal({ booking, banks, defaultBank, live, onClose, onDone }) {
     setBusy(true)
     setError('')
     try {
-      const checkout = await api.post('/parent/payments/checkout', { bookingId: booking.id })
-      const res = await api.post(`/parent/payments/${checkout.data.paymentId}/confirm`, { bank, outcome })
+      const checkout = await api.post('/parent/payments/checkout', { bookingId: recordRef(booking) })
+      const res = await api.post(`/parent/payments/${checkout.data.paymentPublicId || checkout.data.paymentId}/confirm`, { bank, outcome })
       setResult(res.data)
     } catch (err) {
       setError(errorMessage(err))

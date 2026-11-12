@@ -10,6 +10,7 @@ import { pickImage } from '../../components/PhotoPicker'
 import { downloadFile } from '../../lib/download'
 import { daysUntil, fmtDate, fmtDateLong, fmtTime, fmtTimeRange, money } from '../../lib/format'
 import { gradeLabel } from '../../lib/education'
+import { matchesRecordRef, recordRef } from '../../lib/recordRef'
 
 const GROUPS = {
   pending: ['PENDING', 'COUNTER_OFFERED', 'AWAITING_PAYMENT'],
@@ -42,10 +43,10 @@ export default function MyBookings() {
   useEffect(() => { load() }, [load])
 
   // Opened from a notification (".../bookings?booking=12"): show that booking's details straight away, once
-  const focusId = Number(params.get('booking'))
+  const focusId = params.get('booking')
   useEffect(() => {
     if (!focusId || !bookings) return
-    const b = bookings.find((x) => x.id === focusId)
+    const b = bookings.find((x) => matchesRecordRef(x, focusId))
     if (b) setDetail(b)
     setParams((p) => { p.delete('booking'); return p }, { replace: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -165,7 +166,7 @@ export default function MyBookings() {
         onClose={() => setRescheduleFor(null)}
         onSubmit={async (body) => {
           try {
-            await api.post(`/parent/bookings/${rescheduleFor.id}/reschedule`, body)
+            await api.post(`/parent/bookings/${recordRef(rescheduleFor)}/reschedule`, body)
             setRescheduleFor(null)
             await load()
             return null
@@ -174,7 +175,7 @@ export default function MyBookings() {
           }
         }}
       />
-      <CancelModal booking={cancelFor} onClose={() => setCancelFor(null)} onConfirm={async (reason) => { if (await act(`/parent/bookings/${cancelFor.id}/cancel`, { reason })) setCancelFor(null) }} />
+      <CancelModal booking={cancelFor} onClose={() => setCancelFor(null)} onConfirm={async (reason) => { if (await act(`/parent/bookings/${recordRef(cancelFor)}/cancel`, { reason })) setCancelFor(null) }} />
       <ReviewModal booking={reviewFor} onClose={() => setReviewFor(null)} onDone={() => { setReviewFor(null); load() }} />
     </div>
   )
@@ -244,8 +245,8 @@ function CounterRow({ b, onDetail, act }) {
         </div>
       </div>
       <div className="space-y-2">
-        <Btn kind="primary" onClick={() => act(`/parent/bookings/${b.id}/accept-counter`)}>Accept Counter Offer</Btn>
-        <Btn onClick={() => act(`/parent/bookings/${b.id}/decline-counter`)}>Decline</Btn>
+        <Btn kind="primary" onClick={() => act(`/parent/bookings/${recordRef(b)}/accept-counter`)}>Accept Counter Offer</Btn>
+        <Btn onClick={() => act(`/parent/bookings/${recordRef(b)}/decline-counter`)}>Decline</Btn>
         <Btn onClick={() => onDetail(b)}>View Details <Icon name="arrow-right" className="h-4 w-4" /></Btn>
       </div>
     </>
@@ -263,15 +264,15 @@ function RescheduleBanner({ b, act }) {
     return (
       <div role="status" className="rounded-lg bg-brand-25 px-3 py-2 text-xs text-slate-700">
         <div className="flex gap-2"><Icon name="clock" className="h-4 w-4 shrink-0 text-brand-500" /> You asked to move this lesson to <b className="text-navy">{newTime}</b>. Waiting for the tutor.</div>
-        <button onClick={() => act(`/parent/bookings/${b.id}/reschedule/${r.id}/withdraw`)} className="mt-1 min-h-9 font-semibold text-brand-600 hover:underline">Withdraw request</button>
+        <button onClick={() => act(`/parent/bookings/${recordRef(b)}/reschedule/${r.id}/withdraw`)} className="mt-1 min-h-9 font-semibold text-brand-600 hover:underline">Withdraw request</button>
       </div>
     )
   return (
     <div role="status" className="rounded-lg border border-accent/50 bg-accent-50 px-3 py-2 text-xs text-slate-700">
       <div className="flex gap-2"><Icon name="refresh" className="h-4 w-4 shrink-0 text-accent-600" /> The tutor asks to move this lesson to <b className="text-navy">{newTime}</b>.{r.reason ? ` Reason: ${r.reason}` : ''}</div>
       <div className="mt-2 flex gap-2">
-        <button onClick={() => act(`/parent/bookings/${b.id}/reschedule/${r.id}/accept`)} className="btn-primary min-h-9 px-3 text-xs">Accept new time</button>
-        <button onClick={() => act(`/parent/bookings/${b.id}/reschedule/${r.id}/decline`)} className="btn-outline min-h-9 px-3 text-xs">Decline</button>
+        <button onClick={() => act(`/parent/bookings/${recordRef(b)}/reschedule/${r.id}/accept`)} className="btn-primary min-h-9 px-3 text-xs">Accept new time</button>
+        <button onClick={() => act(`/parent/bookings/${recordRef(b)}/reschedule/${r.id}/decline`)} className="btn-outline min-h-9 px-3 text-xs">Decline</button>
       </div>
     </div>
   )
@@ -404,7 +405,7 @@ function ReviewModal({ booking, onClose, onDone }) {
     if (!rating) return setError('Please choose a star rating.')
     setBusy(true)
     try {
-      await api.post(`/parent/bookings/${booking.id}/review`, { rating, comment: comment || undefined, photoUrl: photo || undefined })
+      await api.post(`/parent/bookings/${recordRef(booking)}/review`, { rating, comment: comment || undefined, photoUrl: photo || undefined })
       setRating(0); setComment(''); setPhoto(null)
       onDone()
     } catch (err) {

@@ -8,6 +8,7 @@ import { ErrorBox, Modal, ModePills, SelectBox, Spinner, Stars, VerifiedTick } f
 import { dateLabel, dayMonth, fmtShortDate, hhmmLabel, weekdayName } from '../../lib/format'
 import { gradeLabel } from '../../lib/education'
 import { checkRinggit } from '../../lib/validation'
+import { matchesRecordRef, recordRef } from '../../lib/recordRef'
 
 const TABS = [['about', 'About', 'user'], ['teaching', 'Teaching Information', 'book'], ['availability', 'Availability', 'calendar'], ['reviews', 'Reviews', 'star']]
 
@@ -314,13 +315,13 @@ function BookingPanel({ tutor, kids }) {
   const slots = availableDays.find((d) => d.date === date)?.slots.filter((s) => s.status === 'available') || []
   const [time, setTime] = useState(slots[0]?.start || '')
   const [selectedSlots, setSelectedSlots] = useState([])
-  const [childId, setChildId] = useState(kids[0]?.id || '')
+  const [childId, setChildId] = useState(recordRef(kids[0]) || '')
   const [mode, setMode] = useState(tutor.offersPhysical ? 'PHYSICAL' : 'ONLINE')
   const [price, setPrice] = useState(String(tutor.hourlyRate))
   const [msg, setMsg] = useState('')
   const [error, setError] = useState('')
 
-  const child = kids.find((k) => k.id === Number(childId))
+  const child = kids.find((k) => matchesRecordRef(k, childId))
   const teachesChild = !child || tutor.grades.includes(gradeLabel(child.educationLevel, child.grade))
 
   function onDate(v) {
@@ -334,7 +335,7 @@ function BookingPanel({ tutor, kids }) {
     const badPrice = checkRinggit(price, 'Proposed price')
     if (badPrice) return setError(badPrice)
     const lessons = selectedSlots.length ? selectedSlots : [{ date, start: time }]
-    navigate(`/parent/tutors/${tutor.id}/book`, { state: { date: lessons[0].date, time: lessons[0].start, slots: lessons, childId: Number(childId), mode, price, msg } })
+    navigate(`/parent/tutors/${tutor.id}/book`, { state: { date: lessons[0].date, time: lessons[0].start, slots: lessons, childId: child ? recordRef(child) : childId, mode, price, msg } })
   }
 
   return (
@@ -366,13 +367,13 @@ function BookingPanel({ tutor, kids }) {
               <button type="button" className="btn-outline min-h-10 px-2" aria-label={'Remove ' + s.date + ' ' + s.start} onClick={() => setSelectedSlots(current => current.filter(x => x.date !== s.date || x.start !== s.start))}>Remove</button>
             </div>)}
           </div>}
-          <Link to={`/parent/tutors/${tutor.id}/book`} state={{ slots: selectedSlots, date: selectedSlots[0]?.date || date, time: selectedSlots[0]?.start || time, childId: Number(childId), mode, price, msg }} className="inline-flex min-h-10 items-center text-sm font-semibold text-brand-500 hover:underline">Choose other dates on the full calendar →</Link>
+          <Link to={`/parent/tutors/${tutor.id}/book`} state={{ slots: selectedSlots, date: selectedSlots[0]?.date || date, time: selectedSlots[0]?.start || time, childId: child ? recordRef(child) : childId, mode, price, msg }} className="inline-flex min-h-10 items-center text-sm font-semibold text-brand-500 hover:underline">Choose other dates on the full calendar →</Link>
           <label className="block"><span className="mb-1 block text-sm font-bold text-navy">Child <span className="text-red-500">*</span></span>
             {kids.length === 0 ? (
               <Link to="/parent/children?add=1" className="btn-outline w-full"><Icon name="plus" className="h-4 w-4" /> Add a child first</Link>
             ) : (
-              <SelectBox icon="user" value={childId} onChange={(e) => setChildId(e.target.value)} className="[&_select]:h-10">
-                {kids.map((k) => <option key={k.id} value={k.id}>{k.name} ({gradeLabel(k.educationLevel, k.grade)})</option>)}
+              <SelectBox icon="user" value={child ? recordRef(child) : childId} onChange={(e) => setChildId(e.target.value)} className="[&_select]:h-10">
+                {kids.map((k) => <option key={k.id} value={recordRef(k)}>{k.name} ({gradeLabel(k.educationLevel, k.grade)})</option>)}
               </SelectBox>
             )}
           </label>

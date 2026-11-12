@@ -1,6 +1,8 @@
 // "Add to Google Calendar": a link that opens Google Calendar with the lesson filled in. (Apple Calendar and Outlook
 // use the downloaded .ics file instead, see lib/download.js.)
 
+import { recordRef } from './recordRef'
+
 const stamp = (d) => new Date(d).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
 
 export const lessonTitle = (b) => `${b.child.name}: ${b.subject} with ${b.tutor.name}`
@@ -16,7 +18,7 @@ export function googleCalendarUrl(b) {
     `Tutor: ${b.tutor.name}`,
     `Subject: ${b.subject}${b.isTrial ? ' (trial lesson)' : ''}`,
     b.teachingMode === 'ONLINE' && b.meetingLink ? `Meeting link: ${b.meetingLink}` : '',
-    `Booking details: ${window.location.origin}/parent/bookings?booking=${b.id}`,
+    `Booking details: ${window.location.origin}/parent/bookings?booking=${recordRef(b)}`,
   ].filter(Boolean).join('\n')
   const q = new URLSearchParams({
     action: 'TEMPLATE',

@@ -18,6 +18,26 @@ const hoursBefore = (b, h) => new Date(b.startAt.getTime() - h * 3_600_000)
 const emailsTo = (p) => outbox.filter((m) => m.to === p.user.email)
 const lesson = (p, status, start) => makeBooking({ parent: p.parent, child: p.child, tutor: tutor.tutor, date, start, status })
 
+describe('reminders created before public IDs', () => {
+  test.each([
+    { kind: 'lesson', status: 'CONFIRMED', type: 'LESSON_REMINDER', page: 'bookings', send: sendLessonReminders },
+    { kind: 'payment', status: 'AWAITING_PAYMENT', type: 'PAYMENT_REMINDER', page: 'payments', send: sendPaymentReminders },
+  ])('a legacy numeric $kind notification prevents a duplicate UUID notification or email', async ({ status, type, page, send }) => {
+    const p = await makeParent()
+    const b = await lesson(p, status, '19:00')
+    const legacyLink = `/parent/${page}?booking=${b.id}`
+    const publicLink = `/parent/${page}?booking=${b.publicId}`
+    await prisma.notification.create({ data: { userId: p.user.id, type, title: 'Existing reminder', message: 'Sent before public IDs were introduced.', link: legacyLink } })
+
+    await send(hoursBefore(b, 20))
+    await send(hoursBefore(b, 10))
+
+    expect(await prisma.notification.count({ where: { userId: p.user.id, type, link: legacyLink } })).toBe(1)
+    expect(await prisma.notification.count({ where: { userId: p.user.id, type, link: publicLink } })).toBe(0)
+    expect(emailsTo(p)).toHaveLength(0)
+  })
+})
+
 describe('lesson reminder emails', () => {
   test('the parent gets an email with a link to the booking, once, and the tutor only an in-app reminder', async () => {
     const p = await makeParent()
@@ -26,7 +46,7 @@ describe('lesson reminder emails', () => {
     const mails = emailsTo(p)
     expect(mails).toHaveLength(1)
     expect(mails[0].subject).toBe('WonderTutor — Lesson reminder')
-    expect(mails[0].html).toContain(`/parent/bookings?booking=${b.id}`)
+    expect(mails[0].html).toContain(`/parent/bookings?booking=${b.publicId}`)
     expect(mails[0].html).toContain('switch them off')
     expect(outbox.some((m) => m.to === tutor.user.email)).toBe(false)
     expect(await prisma.notification.count({ where: { userId: tutor.user.id, type: 'LESSON_REMINDER' } })).toBeGreaterThan(0)

@@ -10,6 +10,7 @@ import { addDaysYmd, dateLabel, dayMonth, hhmmLabel, mondayOfYmd, todayYmd, week
 import { gradeLabel } from '../../lib/education'
 import { childSubjects } from '../../lib/subjects'
 import { checkRinggit, checkText } from '../../lib/validation'
+import { matchesRecordRef, recordRef } from '../../lib/recordRef'
 
 // Parents select dated one-hour lessons; the server rechecks every selection.
 export default function BookLesson() {
@@ -43,7 +44,7 @@ export default function BookLesson() {
     }).catch((e) => setError(errorMessage(e)))
   }, [id])
 
-  useEffect(() => { if (kidsLoaded && !childId && kids[0]) setChildId(kids[0].id) }, [kidsLoaded, kids, childId])
+  useEffect(() => { if (kidsLoaded && !childId && kids[0]) setChildId(recordRef(kids[0])) }, [kidsLoaded, kids, childId])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -55,7 +56,7 @@ export default function BookLesson() {
     return () => controller.abort()
   }, [id, week, calendarVersion])
 
-  const child = kids.find((k) => k.id === Number(childId))
+  const child = kids.find((k) => matchesRecordRef(k, childId))
 
   // Prefer the child's own subject when this tutor teaches it
   useEffect(() => {
@@ -84,7 +85,7 @@ export default function BookLesson() {
     setBusy(true)
     try {
       await api.post('/parent/bookings', {
-        tutorId: tutor.id, childId: child.id, slots: selectedSlots.map(s => ({ date: s.date, startTime: s.start })), teachingMode: mode,
+        tutorId: tutor.id, childId: recordRef(child), slots: selectedSlots.map(s => ({ date: s.date, startTime: s.start })), teachingMode: mode,
         proposedPrice: Number(price), subject, messageToTutor: msg || undefined,
       })
       setDone(true)
@@ -171,8 +172,8 @@ export default function BookLesson() {
               </div>
               <label className="block"><span className="mb-1 block text-sm font-bold text-navy">Child <span className="text-red-500">*</span></span>
                 {kids.length === 0 ? <Link to="/parent/children?add=1" className="btn-outline w-full"><Icon name="plus" className="h-4 w-4" /> Add a child first</Link> : (
-                  <SelectBox icon="user" value={childId} onChange={(e) => setChildId(e.target.value)} className="[&_select]:h-10">
-                    {kids.map((k) => <option key={k.id} value={k.id}>{k.name} ({gradeLabel(k.educationLevel, k.grade)})</option>)}
+                  <SelectBox icon="user" value={child ? recordRef(child) : childId} onChange={(e) => setChildId(e.target.value)} className="[&_select]:h-10">
+                    {kids.map((k) => <option key={k.id} value={recordRef(k)}>{k.name} ({gradeLabel(k.educationLevel, k.grade)})</option>)}
                   </SelectBox>)}
               </label>
               {!teachesChild && <div className="flex gap-2 rounded-lg bg-red-50 p-2.5 text-xs text-red-600"><Icon name="info" className="h-4 w-4 shrink-0" /> This tutor doesn't teach {gradeLabel(child.educationLevel, child.grade)}.</div>}

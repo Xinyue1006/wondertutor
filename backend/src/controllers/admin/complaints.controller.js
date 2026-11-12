@@ -154,7 +154,7 @@ export async function getComplaint(req, res) {
     ? await Promise.all([
         prisma.complaint.findMany({
           where: { againstUserId: c.againstUserId, id: { not: c.id } },
-          select: { id: true, category: true, status: true, createdAt: true },
+          select: { id: true, publicId: true, category: true, status: true, createdAt: true },
           orderBy: { createdAt: 'desc' },
           take: 20,
         }),
@@ -166,10 +166,11 @@ export async function getComplaint(req, res) {
     complaint: toComplaintDto(c),
     investigation: {
       booking: b && {
-        id: b.id, subject: b.subject, child: b.child.name, status: b.status, startAt: b.startAt, endAt: b.endAt,
+        id: b.id, publicId: b.publicId, subject: b.subject, child: b.child.name, status: b.status, startAt: b.startAt, endAt: b.endAt,
         teachingMode: b.teachingMode, agreedPrice: b.agreedPrice == null ? null : Number(b.agreedPrice), cancelReason: b.cancelReason,
       },
       payment: b?.payment && {
+        id: b.payment.id, publicId: b.payment.publicId,
         status: b.payment.status, amount: Number(b.payment.amount), method: b.payment.method, paidAt: b.payment.paidAt,
         refunds: b.payment.refunds.map((r) => ({ id: r.id, amount: Number(r.amount), type: r.type, status: r.status, reason: r.reason })),
       },

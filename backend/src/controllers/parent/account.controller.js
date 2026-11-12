@@ -54,9 +54,10 @@ export async function exportMyData(req, res) {
     },
     address: req.parent.address,
     tutorPreferences: req.parent.preferences ?? null,
-    children: children.map((c) => ({ name: c.name, educationLevel: c.educationLevel, grade: c.grade, gradeYear: c.gradeYear, subjects: subjectsOf(c), preferredLanguage: c.preferredLanguage, goals: c.goals, notes: c.notes, ...childPhotoFields(c) })),
+    children: children.map((c) => ({ publicId: c.publicId, name: c.name, educationLevel: c.educationLevel, grade: c.grade, gradeYear: c.gradeYear, subjects: subjectsOf(c), preferredLanguage: c.preferredLanguage, goals: c.goals, notes: c.notes, ...childPhotoFields(c) })),
     bookings: bookings.map((b) => ({
       id: b.id,
+      publicId: b.publicId,
       status: b.status,
       child: b.child.name,
       tutor: b.tutor.user.fullName,
@@ -70,6 +71,7 @@ export async function exportMyData(req, res) {
       agreedPrice: num(b.agreedPrice),
       cancelReason: b.cancelReason,
       payment: b.payment && {
+        publicId: b.payment.publicId,
         amount: num(b.payment.amount),
         status: b.payment.status,
         method: b.payment.method,
@@ -79,7 +81,7 @@ export async function exportMyData(req, res) {
       },
       review: b.review && { rating: b.review.rating, comment: b.review.comment, photoUrl: b.review.photoUrl, isHidden: b.review.isHidden, moderationReason: b.review.moderationReason, moderatedAt: b.review.moderatedAt },
     })),
-    complaints: complaints.map((c) => ({ category: c.category, description: c.description, status: c.status, response: c.adminResponse, filedAt: c.createdAt })),
+    complaints: complaints.map((c) => ({ publicId: c.publicId, category: c.category, description: c.description, status: c.status, response: c.adminResponse, filedAt: c.createdAt })),
     savedTutors: favourites.map((f) => f.tutor.user.fullName),
     tutorSearches: searches,
     notifications: notifications.map((n) => ({ title: n.title, message: n.message, at: n.createdAt })),

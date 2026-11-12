@@ -1,14 +1,16 @@
 import { z } from 'zod'
 import { prisma } from '../../config/prisma.js'
 import { CHARACTERISTICS, LANGUAGES, MAX_GRADE, SUBJECTS } from '../../data/catalog.js'
-import { hhmm as hhmmRule, id, optionalText } from '../../utils/validators.js'
+import { hhmm as hhmmRule, optionalText } from '../../utils/validators.js'
+import { recordReference, referenceWhere } from '../../utils/publicIds.js'
+import { AppError } from '../../utils/AppError.js'
 import { runMatchingForParent } from '../../services/matchingApp.service.js'
 
 const hhmm = hhmmRule()
 
 // What the wizard and the chatbot both collect. Only subject + level are mandatory (FR 2.x).
 export const criteriaSchema = z.object({
-  childId: id('Child').optional().nullable(),
+  childId: recordReference('Child').optional().nullable(),
   subject: z.enum(SUBJECTS, { message: 'Subject is required' }),
   level: z.enum(['KINDERGARTEN', 'PRIMARY', 'SECONDARY'], { message: 'Education level is required' }),
   grade: z.number().int().min(1, 'Choose a grade').optional().nullable(),
@@ -41,20 +43,23 @@ export async function createMatching(req, res) {
 
   // childId must be one of this parent's children
   const childId = raw.childId
-    ? (await prisma.child.findFirst({ where: { id: raw.childId, parentId: req.parent.id } }))?.id ?? null
+    ? (await prisma.child.findFirst({ where: { ...referenceWhere(raw.childId), parentId: req.parent.id } }))?.id ?? null
     : null
+  if (raw.childId && !childId) throw new AppError(404, 'Child not found')
+  // Matching and saved criteria keep numeric foreign keys internally.
+  const criteria = { ...raw, childId }
 
-  const results = await runMatching(raw, req.parent.id)
+  const results = await runMatching(criteria, req.parent.id)
   const saved = await prisma.matchingRequest.create({
     data: {
       parentId: req.parent.id,
       childId,
       source,
-      criteria: raw,
+      criteria,
       results: results.map((r) => ({ tutorId: r.id, score: r.match.score, reasons: r.match.reasons })),
     },
   })
-  res.status(201).json({ id: saved.id, criteria: raw, total: results.length, tutors: results })
+  res.status(201).json({ id: saved.id, criteria, total: results.length, tutors: results })
 }
 
 // GET /parent/matching/latest: "Continue where you left off" (re-run so ratings/availability are fresh)

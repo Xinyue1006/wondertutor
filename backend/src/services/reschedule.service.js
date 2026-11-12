@@ -11,6 +11,7 @@ import { AppError } from '../utils/AppError.js'
 import { notify } from './notification.service.js'
 import { assertChildFree, assertSlotBookable } from './booking.service.js'
 import { mytToDate } from '../utils/time.js'
+import { publicReference } from '../utils/publicIds.js'
 
 export const RESCHEDULABLE = ['AWAITING_PAYMENT', 'CONFIRMED']
 
@@ -19,7 +20,7 @@ const when = (d) =>
 
 // booking must include { parent: { userId }, tutor: { userId } }
 const otherParty = (booking, userId) => (userId === booking.parent.userId ? booking.tutor.userId : booking.parent.userId)
-const linkFor = (booking, userId) => (userId === booking.parent.userId ? `/parent/bookings?booking=${booking.id}` : '/tutor/bookings')
+const linkFor = (booking, userId) => (userId === booking.parent.userId ? `/parent/bookings?booking=${publicReference(booking)}` : '/tutor/bookings')
 
 async function assertNewTimeOk(booking, startAt, endAt, db = prisma) {
   await assertSlotBookable({ tutorId: booking.tutorId, startAt, endAt, ignoreBookingId: booking.id }, db)

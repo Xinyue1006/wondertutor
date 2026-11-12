@@ -20,4 +20,5 @@ try {
 }
 
 execSync('npx prisma migrate deploy', { stdio: 'inherit', env: { ...process.env, DATABASE_URL: url } })
+execSync('node scripts/backfill-public-ids.js', { stdio: 'inherit', env: { ...process.env, DATABASE_URL: url } })
 console.log(`Test database "${dbName}" is ready.`)

@@ -6,7 +6,9 @@ import * as users from '../controllers/admin/users.controller.js'
 import * as complaints from '../controllers/admin/complaints.controller.js'
 import { moderateReview } from '../controllers/admin/reviews.controller.js'
 
-const router = validateIdParams(Router()) // every :id in these URLs must be a positive whole number
+const router = validateIdParams(Router(), { publicIds: [
+  { prefix: '/complaints/', model: 'complaint', scope: () => ({}), notFound: 'Complaint not found' },
+] })
 router.use(requireAuth, requireRole('ADMIN'))
 
 router.get('/dashboard', users.dashboard)

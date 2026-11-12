@@ -37,6 +37,7 @@ function photoColumns(data, parentId) {
 
 export const toChildDto = (c) => ({
   id: c.id,
+  publicId: c.publicId,
   name: c.name,
   educationLevel: c.educationLevel,
   grade: c.grade,
@@ -134,9 +135,10 @@ export async function childProgress(req, res) {
     subjects: Object.values(bySubject)
       .map((s) => ({ ...s, hours: Math.round(s.hours * 10) / 10, tutors: [...s.tutors] }))
       .sort((a, b) => b.lessons - a.lessons),
-    nextLesson: next && { id: next.id, subject: next.subject, startAt: next.startAt, endAt: next.endAt, tutorName: next.tutor.user.fullName, teachingMode: next.teachingMode },
+    nextLesson: next && { id: next.id, publicId: next.publicId, subject: next.subject, startAt: next.startAt, endAt: next.endAt, tutorName: next.tutor.user.fullName, teachingMode: next.teachingMode },
     timeline: lessons.map((b) => ({
       bookingId: b.id,
+      bookingPublicId: b.publicId,
       subject: b.subject,
       startAt: b.startAt,
       endAt: b.endAt,

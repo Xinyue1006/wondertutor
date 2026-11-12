@@ -8,6 +8,7 @@ import { fmtDateLong, fmtShortDate, fmtTime, fmtTimeRange, money } from '../lib/
 import { gradeLabel } from '../lib/education'
 import { canAddToCalendar, googleCalendarUrl } from '../lib/calendar'
 import { downloadFile } from '../lib/download'
+import { recordRef } from '../lib/recordRef'
 
 function Row({ icon, label, children }) {
   return (
@@ -44,7 +45,7 @@ export default function LessonDetails({ booking: b, onClose, footer, onChanged }
     if (reason.trim().length < 10) return setError('Please explain why you are asking for a refund (at least 10 characters).')
     setBusy(true)
     try {
-      await api.post(`/parent/bookings/${b.id}/refund-request`, { reason, ...(dispute && { attendanceDispute: true }) })
+      await api.post(`/parent/bookings/${recordRef(b)}/refund-request`, { reason, ...(dispute && { attendanceDispute: true }) })
       setAsking(false); setReason('')
       onChanged?.()
       onClose()
@@ -146,7 +147,7 @@ export default function LessonDetails({ booking: b, onClose, footer, onChanged }
           <div className="flex items-center gap-2 text-sm font-bold text-navy"><Icon name="calendar" className="h-4 w-4 text-brand-500" /> Add to your calendar</div>
           <div className="mt-2 flex flex-wrap gap-2">
             <a href={googleCalendarUrl(b)} target="_blank" rel="noopener noreferrer" className="btn-outline min-h-10 px-4 text-sm">Google Calendar</a>
-            <button type="button" onClick={async () => setCalError(await downloadFile(`/parent/bookings/${b.id}/calendar.ics`, `wondertutor-lesson-${b.id}.ics`))} className="btn-outline min-h-10 px-4 text-sm">
+            <button type="button" onClick={async () => setCalError(await downloadFile(`/parent/bookings/${recordRef(b)}/calendar.ics`, `wondertutor-lesson-${recordRef(b)}.ics`))} className="btn-outline min-h-10 px-4 text-sm">
               Apple / Outlook (.ics file)
             </button>
           </div>
@@ -155,7 +156,7 @@ export default function LessonDetails({ booking: b, onClose, footer, onChanged }
       )}
       <div className="mt-3 text-xs text-slate-500">Requested on {fmtShortDate(b.createdAt)}</div>
       {['CONFIRMED', 'COMPLETED', 'CANCELLED'].includes(b.status) && (
-        <Link to={`/parent/complaints?booking=${b.id}`} className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-red-500">
+        <Link to={`/parent/complaints?booking=${recordRef(b)}`} className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-red-500">
           <Icon name="shield" className="h-3.5 w-3.5" /> Report a problem with this lesson
         </Link>
       )}

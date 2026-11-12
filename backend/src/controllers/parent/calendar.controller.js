@@ -2,6 +2,7 @@ import { prisma } from '../../config/prisma.js'
 import { env } from '../../config/env.js'
 import { AppError } from '../../utils/AppError.js'
 import { buildCalendar } from '../../services/calendar.service.js'
+import { publicReference } from '../../utils/publicIds.js'
 
 const include = { child: true, tutor: { include: { user: { select: { fullName: true } } } } }
 
@@ -17,7 +18,7 @@ export async function lessonCalendar(req, res) {
   if (!b) throw new AppError(404, 'Booking not found')
   // Only a lesson that is really going ahead belongs in a calendar (not a request that may still be declined)
   if (b.status !== 'CONFIRMED') throw new AppError(400, 'Only confirmed lessons can be added to a calendar')
-  sendIcs(res, `wondertutor-lesson-${b.id}.ics`, [b], 'WonderTutor lesson')
+  sendIcs(res, `wondertutor-lesson-${publicReference(b)}.ics`, [b], 'WonderTutor lesson')
 }
 
 // GET /parent/bookings/calendar.ics: every confirmed lesson that has not started yet, as one file

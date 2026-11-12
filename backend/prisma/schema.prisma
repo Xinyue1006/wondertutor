@@ -155,6 +155,7 @@ model ParentProfile {
 
 model Child {
   id             Int            @id @default(autoincrement())
+  publicId       String?        @unique @default(uuid()) @db.Char(36)
   parentId       Int
   parent         ParentProfile  @relation(fields: [parentId], references: [id], onDelete: Cascade)
   name           String
@@ -309,6 +310,7 @@ model Withdrawal {
 
 model Booking {
   id              Int           @id @default(autoincrement())
+  publicId        String?       @unique @default(uuid()) @db.Char(36)
   parentId        Int
   parent          ParentProfile @relation(fields: [parentId], references: [id])
   childId         Int
@@ -360,6 +362,7 @@ model RescheduleRequest {
 
 model Payment {
   id               Int           @id @default(autoincrement())
+  publicId         String?       @unique @default(uuid()) @db.Char(36)
   bookingId        Int           @unique
   booking          Booking       @relation(fields: [bookingId], references: [id])
   amount           Decimal       @db.Decimal(10, 2)
@@ -438,6 +441,7 @@ model Review {
 
 model Complaint {
   id            Int             @id @default(autoincrement())
+  publicId      String?         @unique @default(uuid()) @db.Char(36)
   filedById     Int
   filedBy       User            @relation("ComplaintBy", fields: [filedById], references: [id])
   againstUserId Int?

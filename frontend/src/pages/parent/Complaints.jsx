@@ -5,6 +5,7 @@ import Icon from '../../components/ui/Icon'
 import { EmptyState, ErrorBox, LoadError, Modal, PageTitle, SelectBox, Spinner } from '../../components/ui/Common'
 import { fmtDate, fmtShortDate } from '../../lib/format'
 import { checkText } from '../../lib/validation'
+import { matchesRecordRef, recordRef, referenceInput } from '../../lib/recordRef'
 
 export const COMPLAINT_STATUS = {
   OPEN: ['Open', 'bg-accent-100 text-amber-700'],
@@ -59,7 +60,7 @@ export default function Complaints() {
     setBusy(true)
     try {
       await api.post('/parent/complaints', {
-        bookingId: form.bookingId ? Number(form.bookingId) : null,
+        bookingId: form.bookingId ? referenceInput(recordRef(bookings.find((b) => matchesRecordRef(b, form.bookingId))) || form.bookingId) : null,
         category: form.category,
         description: form.description,
       })
@@ -122,9 +123,9 @@ export default function Complaints() {
               {data.categories.map((c) => <option key={c}>{c}</option>)}
             </SelectBox></label>
           <label className="block"><span className="mb-1.5 block text-sm font-bold text-navy">Related lesson <span className="font-normal text-slate-500">(Optional)</span></span>
-            <SelectBox value={form.bookingId} onChange={(e) => setForm({ ...form, bookingId: e.target.value })}>
+            <SelectBox value={recordRef(bookings.find((b) => matchesRecordRef(b, form.bookingId))) || form.bookingId} onChange={(e) => setForm({ ...form, bookingId: e.target.value })}>
               <option value="">Not about a specific lesson</option>
-              {bookings.map((b) => <option key={b.id} value={b.id}>{b.subject} with {b.tutor.name} · {fmtDate(b.startAt)}</option>)}
+              {bookings.map((b) => <option key={b.id} value={recordRef(b)}>{b.subject} with {b.tutor.name} · {fmtDate(b.startAt)}</option>)}
             </SelectBox></label>
           <label className="block"><span className="mb-1.5 block text-sm font-bold text-navy">What happened? <span className="text-red-500">*</span></span>
             <textarea rows={5} maxLength={1000} className="input resize-none" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Please describe the problem so our team can look into it." />

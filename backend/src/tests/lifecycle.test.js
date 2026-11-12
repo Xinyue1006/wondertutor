@@ -55,7 +55,7 @@ describe('expiring bookings', () => {
 describe('lesson reminders', () => {
   test('sent once to the parent and the tutor within 24 hours of a confirmed lesson', async () => {
     const b = await book('CONFIRMED', '20:00')
-    const link = `/parent/bookings?booking=${b.id}`
+    const link = `/parent/bookings?booking=${b.publicId}`
     const count = () => prisma.notification.count({ where: { userId: parent.user.id, type: 'LESSON_REMINDER', link } })
     await sendLessonReminders(hoursBefore(b, 30))
     expect(await count()).toBe(0) // too early
