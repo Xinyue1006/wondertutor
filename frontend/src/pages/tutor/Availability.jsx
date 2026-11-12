@@ -5,6 +5,7 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import api, { errorMessage } from '../../api/client'
 import Icon from '../../components/ui/Icon'
+import TutorPageHeader from '../../components/TutorPageHeader'
 import { ErrorBox, LoadError, Modal, Spinner } from '../../components/ui/Common'
 import {
   DAYS, DAY_END, DAY_START, HOURS, MAX_QUICK_ADD, MODE_LABELS, PRESETS, addDays, addHours, applyLockChanges, cellKey, cellsToRanges, clearHours, dateOfDay, dayOfDate,
@@ -312,15 +313,20 @@ export default function Availability() {
   const actionButton = 'btn-outline min-h-11 flex-1 basis-[calc(50%-0.375rem)] px-4 sm:flex-none sm:basis-auto'
 
   return (
-    <div className="mx-auto max-w-[76rem] py-2">
-      <div className="mb-5">
-        <h1 className="font-display text-2xl font-bold text-navy sm:text-3xl">My availability</h1>
-        <p className="mt-1 text-slate-600">Your usual hours repeat every week. You can also change one week without touching the others.</p>
-        <Link to="/tutor/availability/dates" className="mt-1 inline-flex min-h-11 items-center text-sm font-semibold text-brand-600 hover:underline">Set different hours for one date</Link>
-      </div>
+    <div>
+      <TutorPageHeader
+        title="My availability"
+        subtitle="Plan when and how you teach. Set your usual hours, or adjust one week at a time."
+        right={<Link to="/tutor/availability/dates" className="btn-outline min-h-11"><Icon name="edit" className="h-4 w-4" />Set different hours for one date</Link>}
+      />
 
       <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <section className="card min-w-0 p-4 md:p-5" aria-label="Weekly hours">
+          <div className="mb-4 flex items-center gap-2 border-b border-brand-100 pb-4">
+            <Icon name="calendar" className="h-5 w-5 text-brand-500" />
+            <h2 className="text-lg font-bold text-navy">Teaching schedule</h2>
+            <span className="ml-auto text-xs font-medium text-slate-500">Malaysia time</span>
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" onClick={() => moveCalendar((c) => c.prev())} disabled={atFirst} className={navButton}>Previous</button>
             <button type="button" onClick={() => moveCalendar((c) => c.today())} disabled={atFirst} className={navButton}>Today</button>
@@ -642,7 +648,10 @@ function AddHours({ onAdd, target, modeLabel, teachAs, onPickMode, presets, onSa
 
   return (
     <section className="card h-fit p-5" aria-labelledby="add-hours-title">
-      <h2 id="add-hours-title" className="font-display text-lg font-bold text-navy">Add many hours at once</h2>
+      <div className="mb-3 flex items-center gap-2 border-b border-brand-100 pb-3">
+        <Icon name="plus" className="h-5 w-5 shrink-0 text-brand-500" />
+        <h2 id="add-hours-title" className="text-lg font-bold text-navy">Add many hours at once</h2>
+      </div>
       <p className="mt-1 text-xs text-slate-600">Adding to: {target}</p>
       <p className="text-xs text-slate-600">Added as: {modeLabel}</p>
       <fieldset className="mt-3">

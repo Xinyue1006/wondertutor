@@ -15,6 +15,7 @@ import Signup from './pages/auth/Signup'
 import ForgotPassword from './pages/auth/ForgotPassword'
 import NotFound from './pages/NotFound'
 const Availability = lazy(() => import('./pages/tutor/Availability'))
+const TutorDashboard = lazy(() => import('./pages/tutor/Dashboard'))
 const DateAvailability = lazy(() => import('./pages/tutor/DateAvailability'))
 const ParentDashboard = lazy(() => import('./pages/parent/Dashboard'))
 const FindTutor = lazy(() => import('./pages/parent/FindTutor'))
@@ -88,7 +89,7 @@ export default function App() {
       <Route element={<ProtectedRoute roles={['TUTOR']} />}>
         <Route path="/tutor" element={<AppLayout />}>
           {/* Every page is open to every tutor; verification only adds the badge and search priority */}
-          <Route index element={<Placeholder title="Tutor Dashboard" />} />
+          <Route index element={<TutorDashboard />} />
           <Route path="availability" element={<Availability />} />
           <Route path="availability/dates" element={<DateAvailability />} />
           <Route path="bookings" element={<Placeholder title="Booking Requests" />} />

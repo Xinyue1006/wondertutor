@@ -4,6 +4,7 @@ import api, { errorMessage } from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
 import PhotoPicker, { uploadDocument, uploadError } from '../../components/PhotoPicker'
 import VerificationCard from '../../components/VerificationCard'
+import TutorPageHeader from '../../components/TutorPageHeader'
 import Icon from '../../components/ui/Icon'
 import { ErrorBox, LoadError, Spinner } from '../../components/ui/Common'
 import { LEVELS, gradeLabel } from '../../lib/education'
@@ -171,29 +172,26 @@ export default function ProfileSetup() {
   }
 
   return (
-    <div className="mx-auto max-w-[72rem] py-2">
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="font-display text-3xl font-bold text-navy">{submitted ? 'Edit your tutor profile' : 'Set up your tutor profile'}</h1>
-          <p className="mt-1 text-slate-600">Parents can find you once your subjects and rate are filled in. Verified tutors get a badge and appear higher in search. Your progress is saved as you go.</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <button type="button" onClick={saveAndExit} disabled={busy} className="btn-outline min-h-11 px-4">Save and exit</button>
-        </div>
-      </div>
+    <div>
+      <TutorPageHeader
+        title={submitted ? 'Edit your tutor profile' : 'Set up your tutor profile'}
+        subtitle="Help parents get to know your teaching. Manage your details, subjects and verification documents here."
+        right={<button type="button" onClick={saveAndExit} disabled={busy} className="btn-outline min-h-11 px-4">Save and exit</button>}
+      />
       <VerificationCard ref={statusCard} profile={profile} onUpload={() => goTo('documents')} />
-      <div className="mb-5 max-w-xs">
-        <div className="flex justify-between text-xs font-semibold text-navy"><span>Progress</span><span>{progress}%</span></div>
-        <div className="mt-1 h-2 rounded-full bg-brand-100" role="progressbar" aria-label="Setup progress" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
-          <div className="h-2 rounded-full bg-brand-500 transition-all" style={{ width: `${progress}%` }} />
-        </div>
-      </div>
 
-      <div className="grid gap-5 md:grid-cols-[17rem_1fr]">
-        <nav aria-label="Setup steps" className="card h-fit p-3">
-          <ol className="space-y-1">
+      <div className="grid min-w-0 gap-5 lg:grid-cols-[17rem_minmax(0,1fr)]">
+        <nav aria-label="Setup steps" className="card min-w-0 h-fit p-3 lg:sticky lg:top-24">
+          <div className="mb-3 border-b border-brand-100 px-3 pb-4 pt-2">
+            <p className="mb-3 text-sm font-bold text-navy">Your teaching profile</p>
+            <div className="flex justify-between text-xs font-semibold text-slate-600"><span>Profile completion</span><span>{progress}%</span></div>
+            <div className="mt-2 h-2 rounded-full bg-brand-100" role="progressbar" aria-label="Setup progress" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
+              <div className="h-2 rounded-full bg-brand-500 transition-all" style={{ width: `${progress}%` }} />
+            </div>
+          </div>
+          <ol className="flex gap-1 overflow-x-auto pb-1 lg:block lg:space-y-1 lg:overflow-visible lg:pb-0">
             {SETUP_STEPS.map((s, i) => (
-              <li key={s.id}>
+              <li key={s.id} className="shrink-0 lg:w-full">
                 <button type="button" onClick={() => goTo(s.id)} aria-current={step === s.id ? 'step' : undefined}
                   className={`flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-semibold ${step === s.id ? 'bg-brand-50 text-brand-700' : 'text-navy hover:bg-brand-25'}`}>
                   <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs ${done(s.id) ? 'bg-ok text-white' : step === s.id ? 'bg-brand-500 text-white' : 'bg-slate-100 text-slate-600'}`}>
@@ -207,8 +205,11 @@ export default function ProfileSetup() {
           </ol>
         </nav>
 
-        <form onSubmit={saveAndContinue} noValidate className="card p-6 md:p-8">
-          <h2 ref={heading} tabIndex={-1} className="font-display text-xl font-bold text-navy outline-none">{SETUP_STEPS[idx].label}</h2>
+        <form onSubmit={saveAndContinue} noValidate className="card min-w-0 p-4 sm:p-6 md:p-8">
+          <div className="mb-4 border-b border-brand-100 pb-4">
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-brand-600">Step {idx + 1} of {SETUP_STEPS.length}</p>
+            <h2 ref={heading} tabIndex={-1} className="text-xl font-bold text-navy outline-none">{SETUP_STEPS[idx].label}</h2>
+          </div>
 
           {step === 'basic' && <BasicStep form={form} update={update} profile={profile} catalog={catalog} />}
           {step === 'teaching' && <TeachingStep form={form} update={update} catalog={catalog} />}
@@ -241,7 +242,7 @@ function Text({ label, required, hint, ...rest }) {
   return (
     <label className="block">
       <span className="mb-1.5 block text-sm font-semibold text-navy">{label} {required && <span className="text-red-600" aria-hidden="true">*</span>}</span>
-      <input className="input h-11" required={required} {...rest} />
+      <input className="input h-11 text-base sm:text-sm" required={required} {...rest} />
       {hint && <span className="mt-1 block text-xs text-slate-600">{hint}</span>}
     </label>
   )

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import api, { errorMessage } from '../../api/client'
 import Avatar from '../../components/ui/Avatar'
 import Icon from '../../components/ui/Icon'
+import TutorPageHeader from '../../components/TutorPageHeader'
 import { LoadError, ModePills, Spinner, VerifiedTick } from '../../components/ui/Common'
 import { gradeLabel } from '../../lib/education'
 
@@ -29,25 +30,23 @@ export default function ProfilePreview() {
   const verified = p.status === 'VERIFIED'
 
   return (
-    <div className="mx-auto max-w-[60rem] space-y-5 py-2">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-display text-3xl font-bold text-navy">Preview of your profile</h1>
-          <p className="mt-1 text-slate-600">This is how parents see you{verified ? '' : '. The verified badge appears once Admin approves your documents'}.</p>
-        </div>
-        <Link to="/tutor/setup" className="btn-outline min-h-11 px-4"><Icon name="edit" className="h-4 w-4" /> Edit profile</Link>
-      </div>
+    <div className="space-y-5">
+      <TutorPageHeader
+        title="Preview of your profile"
+        subtitle="Check the teaching details parents see. Your contact details and identity documents stay private."
+        right={<Link to="/tutor/setup" className="btn-outline min-h-11 px-4"><Icon name="edit" className="h-4 w-4" /> Edit profile</Link>}
+      />
 
       <section className="card flex flex-wrap items-center gap-5 p-6">
         <Avatar src={p.profilePhotoUrl} name={p.fullName} className="h-20 w-20" text="text-2xl" />
         <div className="min-w-0 flex-1">
-          <h2 className="flex items-center gap-2 font-display text-2xl font-bold text-navy">
+          <h2 className="flex flex-wrap items-center gap-2 break-words font-display text-2xl font-bold text-navy">
             {p.fullName} {verified && <VerifiedTick />}
           </h2>
           <p className="text-sm text-slate-600">{[...new Set(p.subjects.map((s) => s.subject))].join(', ') || 'No subjects yet'}{p.location ? ` · ${p.location}` : ''}</p>
           <div className="mt-2"><ModePills online={p.offersOnline} physical={p.offersPhysical} /></div>
         </div>
-        <div className="text-right">
+        <div className="w-full border-t border-brand-100 pt-4 sm:w-auto sm:border-0 sm:pt-0 sm:text-right">
           <div className="font-display text-2xl font-bold text-navy">{p.hourlyRate ? `RM ${p.hourlyRate}` : 'RM –'}<span className="text-sm font-normal text-slate-600"> / hour</span></div>
           <div className="text-xs text-slate-600">{p.yearsExperience} years of experience</div>
         </div>
