@@ -109,6 +109,7 @@ export default function PublicLayout() {
                   ? <li><Link to={homeFor(user.role)} className={footerLink}>My Dashboard</Link></li>
                   : <><li><Link to="/login" className={footerLink}>Log In</Link></li><li><Link to="/signup" className={footerLink}>Sign Up</Link></li></>}
                 <li><Link to="/privacy" className={footerLink}>Privacy Notice</Link></li>
+                <li><Link to="/faq" className={footerLink}>Help & FAQs</Link></li>
               </ul>
             </nav>
             <div>

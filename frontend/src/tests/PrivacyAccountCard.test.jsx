@@ -80,7 +80,8 @@ describe('delete my account', () => {
     await userEvent.click(screen.getByRole('button', { name: /Delete my account…/ }))
     const del = await screen.findByRole('button', { name: 'Delete my account permanently' })
     expect(screen.getByText('Will be removed')).toBeInTheDocument()
-    expect(screen.getByText(/Will stay, without your name/)).toBeInTheDocument()
+    expect(screen.getByText('Records that will stay')).toBeInTheDocument()
+    expect(screen.getByText(/names or other details written in reviews/)).toBeInTheDocument()
     expect(del).toBeDisabled()
 
     const emailBox = screen.getByLabelText(/Type your email to confirm/)

@@ -76,7 +76,7 @@ export async function exportMyData(req, res) {
         paidAt: b.payment.paidAt,
         refunds: b.payment.refunds.map((r) => ({ amount: num(r.amount), status: r.status, reason: r.reason })),
       },
-      review: b.review && { rating: b.review.rating, comment: b.review.comment, photoUrl: b.review.photoUrl },
+      review: b.review && { rating: b.review.rating, comment: b.review.comment, photoUrl: b.review.photoUrl, isHidden: b.review.isHidden, moderationReason: b.review.moderationReason, moderatedAt: b.review.moderatedAt },
     })),
     complaints: complaints.map((c) => ({ category: c.category, description: c.description, status: c.status, response: c.adminResponse, filedAt: c.createdAt })),
     savedTutors: favourites.map((f) => f.tutor.user.fullName),
@@ -171,7 +171,7 @@ export async function deleteMyAccount(req, res) {
       subject: 'WonderTutor — your account was deleted',
       html: renderEmail({
         name: fullName,
-        message: 'Your WonderTutor account has been deleted and your personal details have been removed. Past lesson and payment records are kept without your name, because the centre needs them for its accounts. You are welcome to sign up again at any time.',
+        message: 'Your WonderTutor account has been deleted and your profile details have been removed. Required lesson, payment and complaint records are retained for accounting and dispute handling. Retained free-text notes and evidence may still contain names or other personal information. You are welcome to sign up again at any time.',
         note: 'If you did not do this, please contact the centre as soon as possible.',
       }),
     })

@@ -153,8 +153,21 @@ export async function getBooking(req, res) {
 export async function acceptCounter(req, res) {
   const b = await ownBooking(req)
   if (b.status !== 'COUNTER_OFFERED' || b.counterPrice == null) throw new AppError(400, 'There is no counter offer to accept')
-  await assertSlotBookable({ tutorId: b.tutorId, startAt: b.startAt, endAt: b.endAt })
-  await changeStatus(prisma, b, { status: 'AWAITING_PAYMENT', agreedPrice: b.counterPrice })
+  await prisma.$transaction(async (tx) => {
+    // Use the same resource order as booking creation and availability changes.
+    // Two competing counter offers must not both reserve the tutor's last slot.
+    await tx.$queryRaw`SELECT id FROM TutorProfile WHERE id = ${b.tutorId} FOR UPDATE`
+    await tx.$queryRaw`SELECT id FROM Child WHERE id = ${b.childId} FOR UPDATE`
+    const tutor = await tx.tutorProfile.findFirst({ where: { id: b.tutorId, user: { status: 'ACTIVE' } } })
+    if (!tutor) throw new AppError(409, 'This tutor is no longer available. Please choose another tutor.')
+    await assertSlotBookable({ tutorId: b.tutorId, startAt: b.startAt, endAt: b.endAt }, tx)
+    await assertChildFree({ childId: b.childId, startAt: b.startAt, endAt: b.endAt, ignoreBookingId: b.id }, tx)
+    const changed = await tx.booking.updateMany({
+      where: { id: b.id, status: b.status, counterPrice: b.counterPrice, startAt: b.startAt, endAt: b.endAt },
+      data: { status: 'AWAITING_PAYMENT', agreedPrice: b.counterPrice },
+    })
+    if (!changed.count) throw new AppError(409, 'This counter offer has changed. Please refresh the page and try again.')
+  })
   const updated = await reload(b.id)
   await notify(b.tutor.userId, {
     type: 'COUNTER_ACCEPTED',
@@ -205,6 +218,12 @@ export async function requestRefund(req, res) {
   const disputing = attendanceDispute && b.status === 'COMPLETED'
   await prisma.$transaction(async (tx) => {
     if (await lockPaymentAndCountOpenRefunds(tx, b.payment.id)) throw alreadyAsked()
+    // An administrator may have completed a refund, or the lesson may have
+    // changed, after the form was loaded. Validate the locked state again.
+    const payment = await tx.payment.findUnique({ where: { id: b.payment.id }, select: { status: true } })
+    const current = await tx.booking.findUnique({ where: { id: b.id }, select: { status: true, startAt: true } })
+    if (payment?.status !== 'PAID' || current?.status !== b.status || current.startAt.getTime() !== b.startAt.getTime())
+      throw new AppError(409, 'This payment or lesson has changed. Please refresh before requesting a refund.')
     await tx.refund.create({
       data: { paymentId: b.payment.id, amount: b.payment.amount, type: 'ADMIN_REVIEW', reason: disputing ? `Attendance disputed: ${reason}` : reason },
     })

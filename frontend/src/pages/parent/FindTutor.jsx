@@ -23,7 +23,7 @@ const SORTS = [
   ['nearest', 'Nearest'],
 ]
 const PAGE_SIZE = 9
-const HOURS = Array.from({ length: 15 }, (_, i) => `${String(i + 8).padStart(2, '0')}:00`) // 08:00 - 22:00
+const HOURS = Array.from({ length: 15 }, (_, i) => `${String(i + 7).padStart(2, '0')}:00`) // One-hour starts 07:00–21:00, ending by 22:00
 
 export default function FindTutor() {
   const compare = useCompare() // up to 3 tutors ticked for the side-by-side comparison

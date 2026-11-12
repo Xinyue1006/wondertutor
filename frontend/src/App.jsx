@@ -8,6 +8,7 @@ import { useAuth } from './context/AuthContext'
 
 import Home from './pages/Home'
 import Privacy from './pages/Privacy'
+const Help = lazy(() => import('./pages/Help'))
 import Login from './pages/auth/Login'
 import AdminLogin from './pages/auth/AdminLogin'
 import Signup from './pages/auth/Signup'
@@ -54,6 +55,7 @@ export default function App() {
       <Route element={<PublicLayout />}>
         <Route path="/" element={<Home />} />
         <Route path="/privacy" element={<Privacy />} />
+        <Route path="/faq" element={<Help />} />
         <Route path="/login" element={<GuestOnly><Login /></GuestOnly>} />
         <Route path="/signup" element={<GuestOnly><Signup /></GuestOnly>} />
         <Route path="/forgot-password" element={<GuestOnly><ForgotPassword /></GuestOnly>} />
@@ -74,6 +76,7 @@ export default function App() {
           <Route path="payments/return" element={<PaymentReturn />} />
           <Route path="payments/:id/receipt" element={<Receipt />} />
           <Route path="complaints" element={<Complaints />} />
+          <Route path="help" element={<Help />} />
           <Route path="profile" element={<Profile />} />
           <Route path="favourites" element={<SavedTutors />} />
           <Route path="children/:id/progress" element={<ChildProgress />} />

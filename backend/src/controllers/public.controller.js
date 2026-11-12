@@ -3,6 +3,13 @@ import { prisma } from '../config/prisma.js'
 import { SUBJECTS, SUBJECT_LEVELS, LOCATIONS } from '../data/catalog.js'
 import { tutorInclude, toTutorCard } from '../services/tutor.service.js'
 import { STATES, placesInfo, searchPlaces } from '../services/places.service.js'
+import { FAQ, FAQ_VERSION } from '../services/assistant/faq.js'
+
+// The same approved answers power both Help and the assistant; internal source notes stay server-side.
+export function faqData(req, res) {
+  res.set('Cache-Control', 'public, max-age=300')
+  res.json({ version: FAQ_VERSION, entries: FAQ.map(({ id, topic, answer }) => ({ id, topic, answer })) })
+}
 
 // GET /public/home: data for the landing page (no login needed). Only public facts:
 // the top-rated active tutors (same card shape as the browse page) plus the dropdown lists.

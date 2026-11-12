@@ -94,6 +94,7 @@ export default function MyChildren() {
     <div>
       <PageTitle icon="user" title="My Children" subtitle="Manage your children's profiles so we can match them with the right tutors." />
       <ErrorBox className="mb-4">{!editing && error}</ErrorBox>
+      {loadError && <div className="mb-4"><LoadError message={loadError} onRetry={load} /></div>}
 
       {kids.length === 0 && (
         <div className="card mb-4"><EmptyState icon="user" title="No children added yet" action={<button onClick={() => openForm('new')} className="btn-primary mt-2"><Icon name="plus" className="h-4 w-4" /> Add Child</button>}>
@@ -141,7 +142,7 @@ export default function MyChildren() {
         )}
       </div>
 
-      <Modal open={!!editing} onClose={closeForm} title={editing === 'new' ? 'Add a child' : 'Edit child'}>
+      <Modal open={!!editing} onClose={() => { if (!busy) closeForm() }} title={editing === 'new' ? 'Add a child' : 'Edit child'}>
         <form onSubmit={save} className="space-y-4">
           <ErrorBox>{error}</ErrorBox>
           <PhotoPicker value={form.photoUrl} name={form.name || 'Child'} onChange={(url) => setForm({ ...form, photoUrl: url })} />
@@ -165,12 +166,12 @@ export default function MyChildren() {
           <label className="block"><span className="mb-1.5 block text-sm font-bold text-navy">Learning preferences &amp; notes <span className="font-normal text-slate-500">(Optional)</span></span>
             <textarea rows={3} maxLength={500} className="input resize-none" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="e.g. Struggles with problem sums. Preparing for UPSR-style exams." />
             <span className="block text-right text-xs text-slate-400">{form.notes.length}/500</span></label>
-          <div className="flex justify-end gap-3"><button type="button" onClick={closeForm} className="btn-outline">Cancel</button><button disabled={busy} className="btn-primary px-6">{busy ? 'Saving…' : 'Save'}</button></div>
+          <div className="flex justify-end gap-3"><button type="button" disabled={busy} onClick={closeForm} className="btn-outline">Cancel</button><button disabled={busy} className="btn-primary px-6">{busy ? 'Saving…' : 'Save'}</button></div>
         </form>
       </Modal>
 
-      <Modal open={!!removing} onClose={() => setRemoving(null)} title={`Remove ${removing?.name}?`}
-        footer={<><button onClick={() => setRemoving(null)} className="btn-outline">Cancel</button><button disabled={removeBusy} onClick={remove} className="btn bg-red-600 text-white hover:bg-red-700">{removeBusy ? 'Removing…' : 'Remove'}</button></>}>
+      <Modal open={!!removing} onClose={() => { if (!removeBusy) setRemoving(null) }} title={`Remove ${removing?.name}?`}
+        footer={<><button disabled={removeBusy} onClick={() => setRemoving(null)} className="btn-outline">Cancel</button><button disabled={removeBusy} onClick={remove} className="btn bg-red-600 text-white hover:bg-red-700">{removeBusy ? 'Removing…' : 'Remove'}</button></>}>
         <p className="text-sm text-slate-600">This removes {removing?.name}'s profile. It cannot be undone.</p>
         <ErrorBox className="mt-3">{removing && error}</ErrorBox>
       </Modal>

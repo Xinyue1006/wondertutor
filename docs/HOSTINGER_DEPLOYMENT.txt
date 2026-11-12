@@ -60,9 +60,11 @@ HOSTINGER MANAGED NODE APP
    Do not ship .env, node_modules from Windows, .git, logs or local test reports.
 5. Keep schema migration as a controlled release step:
      npm --prefix backend run db:deploy
-   The current root npm run build ALSO applies migrations. Do not use that command
-   casually against production: take a backup and inspect migrations first. A
-   future release pipeline should separate build, migration and activation.
+   Root npm run build now installs locked dependencies and builds without changing
+   the database. After taking a verified backup and inspecting the SQL, apply
+   migrations explicitly with npm run db:deploy, then activate the new release.
+   Never reset or seed a production database. Rehearse restoration in an isolated
+   database before a real release; backup creation alone does not prove recovery.
 6. Start with npm start from the repository root. Let Hostinger supply PORT; do not
    expose MySQL publicly. hPanel's exact entry-file requirement must be confirmed.
 7. Reload direct SPA URLs such as /parent/bookings. Check /api errors still return

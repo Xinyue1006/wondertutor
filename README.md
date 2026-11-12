@@ -250,6 +250,13 @@ Each one switches on only when its keys are filled in. Without keys the app stil
 
 Restart both servers after changing `.env` files.
 
+## Production release commands
+
+`npm run build` installs locked frontend/backend dependencies and builds the web app. It does not migrate or seed a database.
+After reviewing migration SQL and verifying a database backup/restore, use `npm run db:deploy` as an explicit release step, then `npm start`.
+The review-moderation migration adds review visibility/audit fields and an optional review link on complaints; teammates must apply it before starting the updated application.
+See [deployment guidance](docs/HOSTINGER_DEPLOYMENT.txt), [acceptance review](docs/ACCEPTANCE_REVIEW_2026-11-11.md) and [current ERD/class diagrams](docs/CURRENT_DATA_MODEL.md). Local test results do not verify Hostinger, live bank payments or client acceptance.
+
 ## Still to configure later
 - Payment gateway sandbox (Billplz / ToyyibPay / Stripe test mode). The pay dialog currently simulates the gateway.
 

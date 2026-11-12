@@ -3,10 +3,18 @@
 // Every entry was checked against the CODE that enforces it (source = file/function) on the review date. When the
 // project documents (CLAUDE.md, reports) say more than the code does, the answer sticks to what the code does and the
 // gap is recorded in OPEN_POLICY_QUESTIONS for the project owner. Bump FAQ_VERSION whenever an answer changes.
-export const FAQ_VERSION = '2026-11-09.1'
+export const FAQ_VERSION = '2026-11-11.1'
 const REVIEWED = '2026-11-09'
 
 export const FAQ = [
+  {
+    id: 'faq.review-moderation',
+    topic: 'Reviews, inappropriate content and reporting',
+    keywords: ['review', 'report review', 'abuse', 'offensive', 'profanity', 'spam', 'ulasan', 'kasar', '举报', '评价', '辱骂'],
+    answer: 'Parents can review their own completed lessons once each. Honest criticism and low ratings are welcome. Public comments are checked for common abusive words, threats, contact details, links and repeated spam; these checks are limited and can make mistakes. Use a private complaint to quote or report abuse. On a tutor profile, choose Report this review to send a private report to administrators and track it in My Complaints. Reporting does not automatically hide content. An administrator investigates, records a reason and can hide or restore the review. Hidden reviews do not count in public ratings, and the author is notified.',
+    source: 'backend/src/controllers/parent/reviews.controller.js; backend/src/controllers/admin/reviews.controller.js',
+    reviewed: '2026-11-11',
+  },
   {
     id: 'faq.trial-lesson',
     topic: 'Trial lessons',

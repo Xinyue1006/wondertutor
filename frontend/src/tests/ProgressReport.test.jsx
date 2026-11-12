@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { vi } from 'vitest'
@@ -30,6 +30,37 @@ const renderPage = () => render(<MemoryRouter initialEntries={['/parent/children
 beforeEach(() => { vi.clearAllMocks(); api.get.mockResolvedValue({ data: report() }) })
 
 describe('progress report', () => {
+  test('late filter responses cannot replace the current report and exports wait for fresh results', async () => {
+    let older, newer
+    api.get.mockResolvedValueOnce({ data: report() })
+      .mockImplementationOnce(() => new Promise((resolve) => { older = resolve }))
+      .mockImplementationOnce(() => new Promise((resolve) => { newer = resolve }))
+    renderPage()
+    await screen.findByRole('heading', { name: 'Learning Progress Report' })
+    await userEvent.selectOptions(screen.getByLabelText('Subject'), 'English')
+    expect(screen.getByRole('button', { name: 'Download CSV' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Print / Save as PDF' })).toBeDisabled()
+    await userEvent.selectOptions(screen.getByLabelText('Subject'), 'Mathematics')
+    await act(async () => newer({ data: report({ totals: { ...report().totals, hours: 7 } }) }))
+    expect(screen.getByText('Hours of tuition').previousSibling).toHaveTextContent('7')
+    await act(async () => older({ data: report({ totals: { ...report().totals, hours: 99 } }) }))
+    expect(screen.getByText('Hours of tuition').previousSibling).toHaveTextContent('7')
+    expect(screen.getByRole('button', { name: 'Download CSV' })).not.toBeDisabled()
+  })
+
+  test('failed report updates keep export disabled until a valid report is loaded', async () => {
+    api.get.mockResolvedValueOnce({ data: report() }).mockRejectedValueOnce(new Error('Connection failed'))
+    renderPage()
+    await screen.findByRole('heading', { name: 'Learning Progress Report' })
+    await userEvent.selectOptions(screen.getByLabelText('Subject'), 'English')
+    await screen.findByText('Connection failed')
+    expect(screen.getByRole('button', { name: 'Download CSV' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Print / Save as PDF' })).toBeDisabled()
+    api.get.mockResolvedValue({ data: report() })
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Download CSV' })).not.toBeDisabled())
+  })
+
   test('shows the totals, the subjects and every lesson with the tutor’s homework', async () => {
     renderPage()
     expect(await screen.findByRole('heading', { name: 'Learning Progress Report' })).toBeInTheDocument()

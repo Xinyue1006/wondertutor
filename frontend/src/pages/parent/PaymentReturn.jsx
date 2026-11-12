@@ -28,14 +28,16 @@ export default function PaymentReturn() {
 
   const ok = result?.outcome === 'SUCCESS'
   const waiting = result?.outcome === 'WAITING'
-  const tone = ok ? 'bg-ok' : waiting ? 'bg-accent-600' : 'bg-red-500'
+  const refunded = ['REFUNDED', 'PARTIALLY_REFUNDED'].includes(result?.outcome)
+  const received = refunded || ['LATE', 'RECORDED'].includes(result?.outcome)
+  const tone = ok ? 'bg-ok' : waiting || received ? 'bg-accent-600' : 'bg-red-500'
   return (
     <div className="mx-auto max-w-md py-12">
       <div className="card flex flex-col items-center gap-3 p-8 text-center" role="status">
         <span className={`flex h-16 w-16 items-center justify-center rounded-full text-white ${tone}`}>
-          <Icon name={ok ? 'check' : waiting ? 'clock' : 'x'} className="h-9 w-9" strokeWidth={3} />
+          <Icon name={ok ? 'check' : waiting || received ? 'clock' : 'x'} className="h-9 w-9" strokeWidth={3} />
         </span>
-        <h1 className="text-2xl font-extrabold text-navy">{ok ? 'Payment successful' : waiting ? 'Payment pending' : result?.outcome === 'LATE' ? 'Payment received' : 'Payment not completed'}</h1>
+        <h1 className="text-2xl font-extrabold text-navy">{ok ? 'Payment successful' : waiting ? 'Payment pending' : refunded ? 'Refund recorded' : result?.outcome === 'RECORDED' ? 'Payment recorded' : received ? 'Payment received' : 'Payment not completed'}</h1>
         <p className="text-sm text-slate-600">{error || result.message}</p>
         <div className="mt-2 flex gap-3">
           <Link to="/parent/payments" className="btn-primary px-6">Go to Payments</Link>

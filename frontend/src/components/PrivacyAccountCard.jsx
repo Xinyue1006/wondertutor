@@ -81,7 +81,7 @@ export default function PrivacyAccountCard({ emailReminders, privacyAcceptedAt, 
 
       <div className="rounded-xl border border-red-100 bg-red-50/50 p-4">
         <div className="font-semibold text-red-800">Delete my account</div>
-        <p className="text-sm text-slate-700">Removes your personal details for good. This cannot be undone.</p>
+        <p className="text-sm text-slate-700">Removes your account profile details. Lesson, payment and case records are retained as explained below. This cannot be undone.</p>
         <button type="button" onClick={() => setDeleting(true)} className="btn-danger mt-2 min-h-10 px-4 text-sm">Delete my account…</button>
       </div>
 
@@ -156,7 +156,7 @@ function DeleteAccountModal({ email, onClose, onDeleted }) {
               </ul>
             </div>
             <div className="rounded-xl bg-brand-25 p-3">
-              <div className="font-bold text-navy">Will stay, without your name</div>
+              <div className="font-bold text-navy">Records that will stay</div>
               <ul className="mt-1 list-disc space-y-0.5 pl-4">
                 <li>Lesson and payment records (the centre needs them for its accounts)</li>
                 <li>Reviews you wrote</li>
@@ -164,6 +164,7 @@ function DeleteAccountModal({ email, onClose, onDeleted }) {
               </ul>
             </div>
           </div>
+          <p>Your profile is anonymised, but names or other details written in reviews, complaints, lesson notes or evidence files may remain. Contact the centre about sensitive information in retained records.</p>
           <p>We will send a confirmation email. You can sign up again with the same email later.</p>
           <ErrorBox>{error}</ErrorBox>
           <label className="block font-semibold text-navy">Type your email to confirm: <span className="font-normal text-slate-600">{email}</span>

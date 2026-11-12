@@ -69,8 +69,16 @@ export async function respondReschedule({ booking, requestId, byUserId, accept }
 
   if (accept) {
     if (!RESCHEDULABLE.includes(booking.status)) throw new AppError(400, 'This lesson can no longer be rescheduled')
+    if (booking.startAt <= new Date()) throw new AppError(400, 'This lesson has already started and cannot be rescheduled')
     // The new time was free when asked; check again in case something was booked since
     await prisma.$transaction(async (tx) => {
+      // Serialise ALL reservations for the tutor/child, not only answers to the
+      // same request. Otherwise two separate lessons could move into one slot.
+      await tx.$queryRaw`SELECT id FROM TutorProfile WHERE id = ${booking.tutorId} FOR UPDATE`
+      await tx.$queryRaw`SELECT id FROM Child WHERE id = ${booking.childId} FOR UPDATE`
+      const current = await tx.booking.findUnique({ where: { id: booking.id } })
+      if (!current || current.status !== booking.status || current.startAt.getTime() !== booking.startAt.getTime() ||
+          current.endAt.getTime() !== booking.endAt.getTime() || current.startAt <= new Date()) throw stale()
       await answerPending(tx, request.id, 'APPROVED')
       await assertNewTimeOk(booking, request.newStartAt, request.newEndAt, tx)
       const { count } = await tx.booking.updateMany({

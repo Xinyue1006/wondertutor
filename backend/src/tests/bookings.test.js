@@ -131,6 +131,26 @@ describe('ownership', () => {
 })
 
 describe('counter offers and cancelling', () => {
+  test('competing counter offers cannot reserve the same tutor slot concurrently', async () => {
+    const t = await makeTutor()
+    const families = await Promise.all([makeParent(), makeParent()])
+    const offers = await Promise.all(families.map((p) => makeBooking({ parent: p.parent, child: p.child, tutor: t.tutor, date: monday, start: '17:00', status: 'COUNTER_OFFERED', extra: { counterPrice: 55 } })))
+    const replies = await Promise.all(offers.map((b, i) => api(families[i].token).post(`/parent/bookings/${b.id}/accept-counter`)))
+    expect(replies.map((r) => r.status).sort()).toEqual([200, 409])
+    expect(await prisma.booking.count({ where: { tutorId: t.tutor.id, status: 'AWAITING_PAYMENT' } })).toBe(1)
+    expect(await prisma.booking.count({ where: { tutorId: t.tutor.id, status: 'COUNTER_OFFERED' } })).toBe(1)
+  })
+
+  test('a counter offer cannot be accepted after the tutor is deactivated', async () => {
+    const t = await makeTutor()
+    const p = await makeParent()
+    const b = await makeBooking({ parent: p.parent, child: p.child, tutor: t.tutor, date: monday, start: '17:00', status: 'COUNTER_OFFERED', extra: { counterPrice: 55 } })
+    await prisma.user.update({ where: { id: t.user.id }, data: { status: 'DEACTIVATED' } })
+    const result = await api(p.token).post(`/parent/bookings/${b.id}/accept-counter`)
+    expect(result.status).toBe(409)
+    expect((await prisma.booking.findUnique({ where: { id: b.id } })).status).toBe('COUNTER_OFFERED')
+  })
+
   test('accepting a counter offer moves to AWAITING_PAYMENT at the tutor price', async () => {
     const b = await makeBooking({ parent: parentA.parent, child: parentA.child, tutor: tutor.tutor, date: wednesday, start: '17:00', status: 'COUNTER_OFFERED', price: 45, extra: { counterPrice: 55 } })
     const res = await api(parentA.token).post(`/parent/bookings/${b.id}/accept-counter`)

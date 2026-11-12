@@ -88,6 +88,29 @@ describe('the signature', () => {
 })
 
 describe('checkout with Billplz', () => {
+  test('an old paid bill does not claim a cancelled lesson is still confirmed', async () => {
+    const { booking, checkout: c } = await startPayment()
+    markPaid(c.gatewayRef)
+    expect((await api(parent.token).post('/parent/payments/return', redirectBody(c.gatewayRef, true))).outcome).toBe('SUCCESS')
+    expect((await api(parent.token).post(`/parent/bookings/${booking.id}/cancel`, { reason: 'Plans changed' })).status).toBe(200)
+    const revisited = await api(parent.token).post('/parent/payments/return', redirectBody(c.gatewayRef, true))
+    expect(revisited.outcome).toBe('RECORDED')
+    expect(revisited.message).toContain('no longer confirmed')
+    expect((await prisma.booking.findUnique({ where: { id: booking.id } })).status).toBe('CANCELLED')
+  })
+
+  test.each(['REFUNDED', 'PARTIALLY_REFUNDED'])('returning to an old bill preserves its %s outcome', async (status) => {
+    const { checkout: c } = await startPayment()
+    markPaid(c.gatewayRef)
+    expect((await api(parent.token).post('/parent/payments/return', redirectBody(c.gatewayRef, true))).outcome).toBe('SUCCESS')
+    await prisma.payment.update({ where: { id: c.paymentId }, data: { status } })
+    const revisited = await api(parent.token).post('/parent/payments/return', redirectBody(c.gatewayRef, true))
+    expect(revisited.status).toBe(200)
+    expect(revisited.outcome).toBe(status)
+    expect(revisited.message).toMatch(/recorded as .*refunded/)
+    expect(revisited.message).not.toMatch(/not been charged|lesson is confirmed/i)
+  })
+
   test('a bank payment arriving after API cancellation is retained and refunded exactly once', async () => {
     const { booking, checkout: c } = await startPayment()
     expect((await api(parent.token).post(`/parent/bookings/${booking.id}/cancel`)).status).toBe(200)

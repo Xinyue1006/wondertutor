@@ -44,7 +44,7 @@ export default function AdminComplaints() {
         <div className="space-y-3">
           {data.complaints.map((c) => (
             <article key={c.id} className="card flex flex-wrap items-center gap-4 p-5">
-              <div className="min-w-[260px] flex-1">
+              <div className="min-w-0 flex-1 basis-[260px] break-words">
                 <div className="flex flex-wrap items-center gap-3"><h2 className="text-lg font-extrabold text-navy">{c.category}</h2><ComplaintPill status={c.status} /></div>
                 <div className="mt-0.5 text-xs text-slate-500">
                   From {c.filedBy.name} ({c.filedBy.email}) · {fmtShortDate(c.createdAt)}
@@ -58,20 +58,21 @@ export default function AdminComplaints() {
         </div>
       )}
 
-      <ReviewModal complaint={sel} onClose={() => setSel(null)} onDone={() => { setSel(null); load(); setReportVersion((v) => v + 1) }} />
+      <ReviewModal complaint={sel} onClose={() => setSel(null)} onReviewChanged={load} onDone={() => { setSel(null); load(); setReportVersion((v) => v + 1) }} />
     </div>
   )
 }
 
-function ReviewModal({ complaint: c, onClose, onDone }) {
+function ReviewModal({ complaint: c, onClose, onDone, onReviewChanged }) {
   const [response, setResponse] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [inv, setInv] = useState(null) // what the Admin needs to investigate: booking, payment, attendance, history
+  const [review, setReview] = useState(null)
   const loadInvestigation = useCallback(() => {
-    if (c) api.get(`/admin/complaints/${c.id}`).then((r) => setInv(r.data.investigation)).catch((e) => setError(errorMessage(e)))
+    if (c) api.get(`/admin/complaints/${c.id}`).then((r) => { setInv(r.data.investigation); if (r.data.complaint?.review) setReview(r.data.complaint.review) }).catch((e) => setError(errorMessage(e)))
   }, [c])
-  useEffect(() => { setResponse(c?.adminResponse || ''); setError(''); setInv(null); loadInvestigation() }, [c, loadInvestigation])
+  useEffect(() => { setResponse(c?.adminResponse || ''); setReview(c?.review || null); setError(''); setInv(null); loadInvestigation() }, [c, loadInvestigation])
   if (!c) return null
   const closed = ['RESOLVED', 'DISMISSED'].includes(c.status)
 
@@ -99,6 +100,7 @@ function ReviewModal({ complaint: c, onClose, onDone }) {
           <p className="text-slate-700">{c.description}</p>
         </div>
         <Investigation inv={inv} />
+        {review && <ReviewModeration review={review} onRefresh={loadInvestigation} onChanged={(updated) => { setReview((previous) => ({ ...previous, ...updated })); onReviewChanged() }} />}
         {c.against && !closed && <WarnUser userId={c.against.id} name={c.against.name} complaintId={c.id} onDone={loadInvestigation} />}
         <ErrorBox>{error}</ErrorBox>
         <label className="block text-sm font-bold text-navy">Response to the parent {closed ? '' : <span className="font-normal text-slate-500">(required to resolve or dismiss)</span>}
@@ -114,6 +116,34 @@ function ReviewModal({ complaint: c, onClose, onDone }) {
       </div>
     </Modal>
   )
+}
+
+function ReviewModeration({ review, onChanged, onRefresh }) {
+  const [reason, setReason] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  async function moderate() {
+    setError('')
+    if (reason.trim().length < 3) return setError('Explain the moderation decision (at least 3 characters).')
+    setBusy(true)
+    try {
+      const result = await api.patch(`/admin/reviews/${review.id}/moderation`, { isHidden: !review.isHidden, expectedHidden: review.isHidden, reason: reason.trim() })
+      onChanged(result.data.review)
+      setReason('')
+    } catch (err) { setError(errorMessage(err)) } finally { setBusy(false) }
+  }
+  return <section aria-label="Review moderation" className="space-y-2 rounded-xl border border-brand-100 p-3 text-sm">
+    <h3 className="font-bold text-navy">Reported review · {review.rating}/5 stars</h3>
+    <p className="break-words whitespace-pre-wrap text-slate-700">{review.comment || 'No written comment.'}</p>
+    {review.photoUrl && <a href={review.photoUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center font-semibold text-brand-600 underline">View review photo</a>}
+    <p className="text-slate-600">{review.isHidden ? 'Hidden from public profiles and rating totals.' : 'Visible on the tutor profile.'} Honest negative feedback is allowed. Hide content for a policy violation, not because of a low rating.</p>
+    {review.moderationReason && <p className="text-xs text-slate-500">Previous decision: {review.moderationReason}</p>}
+    <label className="block font-semibold text-navy">Reason for this decision<textarea rows={2} maxLength={500} className="input mt-1" value={reason} onChange={(e) => setReason(e.target.value)} /></label>
+    <ErrorBox>{error}</ErrorBox>
+    {error && <button onClick={onRefresh} className="min-h-10 font-semibold text-brand-600 underline">Refresh review</button>}
+    <button disabled={busy} onClick={moderate} className={review.isHidden ? 'btn-outline' : 'btn-danger'}>{busy ? 'Saving…' : review.isHidden ? 'Restore review' : 'Hide review'}</button>
+    <p className="text-xs text-slate-500">The author is notified. This does not close the complaint; write your response and resolve or dismiss it separately.</p>
+  </section>
 }
 
 // The facts around a complaint: the lesson, whether it was paid, whether the tutor checked in, and the account's record

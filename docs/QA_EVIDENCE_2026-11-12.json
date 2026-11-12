@@ -1,0 +1,1018 @@
+{
+  "pageChecks": {
+    "results": [
+      {
+        "role": "public",
+        "path": "/",
+        "width": 1440,
+        "client": 1440,
+        "scroll": 1425,
+        "text": 2718,
+        "headings": [
+          "Find the right tutor for your child."
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "public",
+        "path": "/faq",
+        "width": 1440,
+        "client": 1440,
+        "scroll": 1425,
+        "text": 1501,
+        "headings": [
+          "Help & FAQs"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "public",
+        "path": "/login",
+        "width": 1440,
+        "client": 1440,
+        "scroll": 1425,
+        "text": 505,
+        "headings": [
+          "Learn Today,Brighter Tomorrow."
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "public",
+        "path": "/admin/login",
+        "width": 1440,
+        "client": 1440,
+        "scroll": 1425,
+        "text": 176,
+        "headings": [],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "public",
+        "path": "/signup",
+        "width": 1440,
+        "client": 1440,
+        "scroll": 1425,
+        "text": 1099,
+        "headings": [
+          "Join WonderTutor "
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "public",
+        "path": "/forgot-password",
+        "width": 1440,
+        "client": 1440,
+        "scroll": 1425,
+        "text": 619,
+        "headings": [
+          "Forgot your password?"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "public",
+        "path": "/missing-page",
+        "width": 1440,
+        "client": 1440,
+        "scroll": 1425,
+        "text": 158,
+        "headings": [
+          "Page not found"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "public",
+        "path": "/",
+        "width": 375,
+        "client": 375,
+        "scroll": 360,
+        "text": 2608,
+        "headings": [
+          "Find the right tutor for your child."
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "public",
+        "path": "/faq",
+        "width": 375,
+        "client": 375,
+        "scroll": 360,
+        "text": 1443,
+        "headings": [
+          "Help & FAQs"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "public",
+        "path": "/login",
+        "width": 375,
+        "client": 375,
+        "scroll": 360,
+        "text": 345,
+        "headings": [
+          "Learn Today,Brighter Tomorrow."
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "public",
+        "path": "/admin/login",
+        "width": 375,
+        "client": 375,
+        "scroll": 360,
+        "text": 176,
+        "headings": [],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "public",
+        "path": "/signup",
+        "width": 375,
+        "client": 375,
+        "scroll": 360,
+        "text": 1041,
+        "headings": [
+          "Join WonderTutor "
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "public",
+        "path": "/forgot-password",
+        "width": 375,
+        "client": 375,
+        "scroll": 360,
+        "text": 561,
+        "headings": [
+          "Forgot your password?"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "public",
+        "path": "/missing-page",
+        "width": 375,
+        "client": 375,
+        "scroll": 360,
+        "text": 158,
+        "headings": [
+          "Page not found"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "public",
+        "path": "/",
+        "width": 320,
+        "client": 320,
+        "scroll": 305,
+        "text": 2605,
+        "headings": [
+          "Find the right tutor for your child."
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "public",
+        "path": "/faq",
+        "width": 320,
+        "client": 320,
+        "scroll": 305,
+        "text": 1443,
+        "headings": [
+          "Help & FAQs"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "public",
+        "path": "/login",
+        "width": 320,
+        "client": 320,
+        "scroll": 305,
+        "text": 345,
+        "headings": [
+          "Learn Today,Brighter Tomorrow."
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "public",
+        "path": "/admin/login",
+        "width": 320,
+        "client": 320,
+        "scroll": 305,
+        "text": 176,
+        "headings": [],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "public",
+        "path": "/signup",
+        "width": 320,
+        "client": 320,
+        "scroll": 305,
+        "text": 1041,
+        "headings": [
+          "Join WonderTutor "
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "public",
+        "path": "/forgot-password",
+        "width": 320,
+        "client": 320,
+        "scroll": 305,
+        "text": 561,
+        "headings": [
+          "Forgot your password?"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "public",
+        "path": "/missing-page",
+        "width": 320,
+        "client": 320,
+        "scroll": 305,
+        "text": 158,
+        "headings": [
+          "Page not found"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent",
+        "width": 1440,
+        "client": 1440,
+        "scroll": 1425,
+        "text": 1941,
+        "headings": [
+          "Good morning, QA Parent Updated! 👋"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/children",
+        "width": 1440,
+        "client": 1440,
+        "scroll": 1425,
+        "text": 1003,
+        "headings": [
+          "My Children"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/find-tutor",
+        "width": 1440,
+        "client": 1440,
+        "scroll": 1425,
+        "text": 1763,
+        "headings": [
+          "Find the Right Tutor for Your Child"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/find-tutor/match",
+        "width": 1440,
+        "client": 1440,
+        "scroll": 1425,
+        "text": 1373,
+        "headings": [
+          "Find the Right Tutor for Your Child"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/find-tutor/results",
+        "width": 1440,
+        "client": 1440,
+        "scroll": 1425,
+        "text": 631,
+        "headings": [],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/favourites",
+        "width": 1440,
+        "client": 1440,
+        "scroll": 1425,
+        "text": 663,
+        "headings": [
+          "Saved Tutors"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/tutors/4520",
+        "width": 1440,
+        "client": 1440,
+        "scroll": 1425,
+        "text": 2319,
+        "headings": [
+          "Lim Mei Ling "
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/tutors/4520/book",
+        "width": 1440,
+        "client": 1440,
+        "scroll": 1425,
+        "text": 1828,
+        "headings": [
+          "Book a Lesson"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/bookings",
+        "width": 1440,
+        "client": 1440,
+        "scroll": 1425,
+        "text": 2845,
+        "headings": [
+          "My Bookings"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/payments",
+        "width": 1440,
+        "client": 1440,
+        "scroll": 1425,
+        "text": 1229,
+        "headings": [
+          "Payments"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/complaints",
+        "width": 1440,
+        "client": 1440,
+        "scroll": 1425,
+        "text": 822,
+        "headings": [
+          "My Complaints"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/profile",
+        "width": 1440,
+        "client": 1440,
+        "scroll": 1425,
+        "text": 1385,
+        "headings": [
+          "My Profile"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/children/6140/progress",
+        "width": 1440,
+        "client": 1440,
+        "scroll": 1425,
+        "text": 1649,
+        "headings": [
+          "Aina's Learning Progress"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/children/6140/report",
+        "width": 1440,
+        "client": 1440,
+        "scroll": 1425,
+        "text": 1676,
+        "headings": [
+          "Learning Progress Report"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/help",
+        "width": 1440,
+        "client": 1440,
+        "scroll": 1425,
+        "text": 1580,
+        "headings": [
+          "Help & FAQs"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent",
+        "width": 375,
+        "client": 375,
+        "scroll": 360,
+        "text": 1860,
+        "headings": [
+          "Good morning, QA Parent Updated! 👋"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/children",
+        "width": 375,
+        "client": 375,
+        "scroll": 360,
+        "text": 978,
+        "headings": [
+          "My Children"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/find-tutor",
+        "width": 375,
+        "client": 375,
+        "scroll": 360,
+        "text": 1738,
+        "headings": [
+          "Find the Right Tutor for Your Child"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/find-tutor/match",
+        "width": 375,
+        "client": 375,
+        "scroll": 360,
+        "text": 1348,
+        "headings": [
+          "Find the Right Tutor for Your Child"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/find-tutor/results",
+        "width": 375,
+        "client": 375,
+        "scroll": 360,
+        "text": 606,
+        "headings": [],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/favourites",
+        "width": 375,
+        "client": 375,
+        "scroll": 360,
+        "text": 638,
+        "headings": [
+          "Saved Tutors"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/tutors/4520",
+        "width": 375,
+        "client": 375,
+        "scroll": 360,
+        "text": 2294,
+        "headings": [
+          "Lim Mei Ling "
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/tutors/4520/book",
+        "width": 375,
+        "client": 375,
+        "scroll": 360,
+        "text": 1803,
+        "headings": [
+          "Book a Lesson"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/bookings",
+        "width": 375,
+        "client": 375,
+        "scroll": 360,
+        "text": 2820,
+        "headings": [
+          "My Bookings"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/payments",
+        "width": 375,
+        "client": 375,
+        "scroll": 360,
+        "text": 1171,
+        "headings": [
+          "Payments"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/complaints",
+        "width": 375,
+        "client": 375,
+        "scroll": 360,
+        "text": 797,
+        "headings": [
+          "My Complaints"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/profile",
+        "width": 375,
+        "client": 375,
+        "scroll": 360,
+        "text": 1360,
+        "headings": [
+          "My Profile"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/children/6140/progress",
+        "width": 375,
+        "client": 375,
+        "scroll": 360,
+        "text": 1624,
+        "headings": [
+          "Aina's Learning Progress"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/children/6140/report",
+        "width": 375,
+        "client": 375,
+        "scroll": 360,
+        "text": 1651,
+        "headings": [
+          "Learning Progress Report"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/help",
+        "width": 375,
+        "client": 375,
+        "scroll": 360,
+        "text": 1555,
+        "headings": [
+          "Help & FAQs"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent",
+        "width": 320,
+        "client": 320,
+        "scroll": 305,
+        "text": 1860,
+        "headings": [
+          "Good morning, QA Parent Updated! 👋"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/children",
+        "width": 320,
+        "client": 320,
+        "scroll": 305,
+        "text": 978,
+        "headings": [
+          "My Children"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/find-tutor",
+        "width": 320,
+        "client": 320,
+        "scroll": 305,
+        "text": 1738,
+        "headings": [
+          "Find the Right Tutor for Your Child"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/find-tutor/match",
+        "width": 320,
+        "client": 320,
+        "scroll": 305,
+        "text": 1348,
+        "headings": [
+          "Find the Right Tutor for Your Child"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/find-tutor/results",
+        "width": 320,
+        "client": 320,
+        "scroll": 305,
+        "text": 606,
+        "headings": [],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/favourites",
+        "width": 320,
+        "client": 320,
+        "scroll": 305,
+        "text": 638,
+        "headings": [
+          "Saved Tutors"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/tutors/4520",
+        "width": 320,
+        "client": 320,
+        "scroll": 305,
+        "text": 2294,
+        "headings": [
+          "Lim Mei Ling "
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/tutors/4520/book",
+        "width": 320,
+        "client": 320,
+        "scroll": 305,
+        "text": 1803,
+        "headings": [
+          "Book a Lesson"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/bookings",
+        "width": 320,
+        "client": 320,
+        "scroll": 305,
+        "text": 2820,
+        "headings": [
+          "My Bookings"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/payments",
+        "width": 320,
+        "client": 320,
+        "scroll": 305,
+        "text": 1171,
+        "headings": [
+          "Payments"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/complaints",
+        "width": 320,
+        "client": 320,
+        "scroll": 305,
+        "text": 797,
+        "headings": [
+          "My Complaints"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/profile",
+        "width": 320,
+        "client": 320,
+        "scroll": 305,
+        "text": 1360,
+        "headings": [
+          "My Profile"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/children/6140/progress",
+        "width": 320,
+        "client": 320,
+        "scroll": 305,
+        "text": 1624,
+        "headings": [
+          "Aina's Learning Progress"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/children/6140/report",
+        "width": 320,
+        "client": 320,
+        "scroll": 305,
+        "text": 1651,
+        "headings": [
+          "Learning Progress Report"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "parent",
+        "path": "/parent/help",
+        "width": 320,
+        "client": 320,
+        "scroll": 305,
+        "text": 1555,
+        "headings": [
+          "Help & FAQs"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "admin",
+        "path": "/admin",
+        "width": 1440,
+        "client": 1440,
+        "scroll": 1425,
+        "text": 540,
+        "headings": [
+          "Admin Dashboard"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "admin",
+        "path": "/admin/users",
+        "width": 1440,
+        "client": 1440,
+        "scroll": 1425,
+        "text": 1101,
+        "headings": [
+          "User Management"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "admin",
+        "path": "/admin/complaints",
+        "width": 1440,
+        "client": 1440,
+        "scroll": 1425,
+        "text": 1302,
+        "headings": [
+          "Complaints & Reports"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "admin",
+        "path": "/admin",
+        "width": 375,
+        "client": 375,
+        "scroll": 360,
+        "text": 523,
+        "headings": [
+          "Admin Dashboard"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "admin",
+        "path": "/admin/users",
+        "width": 375,
+        "client": 375,
+        "scroll": 360,
+        "text": 1084,
+        "headings": [
+          "User Management"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "admin",
+        "path": "/admin/complaints",
+        "width": 375,
+        "client": 375,
+        "scroll": 360,
+        "text": 1285,
+        "headings": [
+          "Complaints & Reports"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "admin",
+        "path": "/admin",
+        "width": 320,
+        "client": 320,
+        "scroll": 305,
+        "text": 523,
+        "headings": [
+          "Admin Dashboard"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "admin",
+        "path": "/admin/users",
+        "width": 320,
+        "client": 320,
+        "scroll": 305,
+        "text": 1084,
+        "headings": [
+          "User Management"
+        ],
+        "alerts": [],
+        "pass": true
+      },
+      {
+        "role": "admin",
+        "path": "/admin/complaints",
+        "width": 320,
+        "client": 320,
+        "scroll": 305,
+        "text": 1285,
+        "headings": [
+          "Complaints & Reports"
+        ],
+        "alerts": [],
+        "pass": true
+      }
+    ],
+    "errors": []
+  },
+  "journeys": [
+    {
+      "name": "Child add edit and delete",
+      "pass": true
+    },
+    {
+      "name": "Profile save survives refresh",
+      "pass": true
+    },
+    {
+      "name": "Search grade subject dependency and clear",
+      "pass": true
+    },
+    {
+      "name": "Different-date multiple-slot booking",
+      "pass": true
+    },
+    {
+      "name": "Simulated payment completes through UI",
+      "pass": true
+    },
+    {
+      "name": "Review abuse rejected and negative feedback accepted",
+      "pass": true
+    },
+    {
+      "name": "Public review reported privately",
+      "pass": true
+    },
+    {
+      "name": "Admin hides and restores reported review",
+      "pass": true,
+      "retest": "Verified in a separate mobile run, entering a required reason for every moderation action."
+    },
+    {
+      "name": "Admin complaint CSV exports",
+      "pass": true
+    }
+  ],
+  "restore": {
+    "source": "wondertutor_test",
+    "temporaryRestore": "wondertutor_restore_1794412765300_test",
+    "tables": 26,
+    "rows": 75,
+    "bytes": 44691,
+    "allTableCountsMatch": true,
+    "scope": "Synthetic local test data only; does not certify Hostinger recovery or off-host encrypted backups."
+  }
+}

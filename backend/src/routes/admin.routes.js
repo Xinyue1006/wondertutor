@@ -4,6 +4,7 @@ import { validateIdParams } from '../middleware/params.js'
 import { requireAuth, requireRole } from '../middleware/auth.js'
 import * as users from '../controllers/admin/users.controller.js'
 import * as complaints from '../controllers/admin/complaints.controller.js'
+import { moderateReview } from '../controllers/admin/reviews.controller.js'
 
 const router = validateIdParams(Router()) // every :id in these URLs must be a positive whole number
 router.use(requireAuth, requireRole('ADMIN'))
@@ -24,6 +25,7 @@ router.get('/complaints/report', complaints.complaintsReport)
 router.get('/complaints/export', complaints.exportComplaints)
 router.get('/complaints/:id', complaints.getComplaint)
 router.patch('/complaints/:id', complaints.updateComplaint)
+router.patch('/reviews/:id/moderation', moderateReview)
 
 // [YH] booking oversight / finance / system settings go here
 

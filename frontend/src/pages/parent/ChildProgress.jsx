@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import api, { errorMessage } from '../../api/client'
 import Avatar from '../../components/ui/Avatar'
@@ -14,20 +14,26 @@ export default function ChildProgress() {
   const { id } = useParams()
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
+  const [loadedId, setLoadedId] = useState(null)
+  const request = useRef(0)
 
   const load = () => {
+    const current = ++request.current
     setError('')
-    api.get(`/parent/children/${id}/progress`).then((r) => setData(r.data)).catch((e) => setError(errorMessage(e)))
+    api.get(`/parent/children/${id}/progress`)
+      .then((r) => { if (current === request.current) { setData(r.data); setLoadedId(id) } })
+      .catch((e) => { if (current === request.current) setError(errorMessage(e)) })
   }
-  useEffect(load, [id])
+  useEffect(() => { load(); return () => { ++request.current } }, [id])
 
-  if (error && !data) return (
+  const currentData = loadedId === id ? data : null
+  if (error && !currentData) return (
     <div>
       <Link to="/parent/children" className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-navy hover:text-brand-600"><Icon name="arrow-left" className="h-4 w-4" /> My Children</Link>
       <LoadError message={error} onRetry={load} />
     </div>
   )
-  if (!data) return <Spinner />
+  if (!currentData) return <Spinner />
   const { child, stats, subjects, nextLesson, timeline } = data
 
   const tile = (icon, label, value, hint) => (

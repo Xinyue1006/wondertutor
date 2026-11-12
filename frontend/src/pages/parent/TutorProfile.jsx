@@ -4,7 +4,7 @@ import api, { errorMessage } from '../../api/client'
 import { useMatching } from '../../assistant/MatchingContext'
 import Avatar from '../../components/ui/Avatar'
 import Icon from '../../components/ui/Icon'
-import { ErrorBox, ModePills, SelectBox, Spinner, Stars, VerifiedTick } from '../../components/ui/Common'
+import { ErrorBox, Modal, ModePills, SelectBox, Spinner, Stars, VerifiedTick } from '../../components/ui/Common'
 import { dateLabel, dayMonth, fmtShortDate, hhmmLabel, weekdayName } from '../../lib/format'
 import { gradeLabel } from '../../lib/education'
 import { checkRinggit } from '../../lib/validation'
@@ -205,14 +205,23 @@ function Reviews({ tutor, reference }) {
   const [list, setList] = useState([])
   const [more, setMore] = useState(false)
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [retry, setRetry] = useState(0)
+  const [report, setReport] = useState(null)
+  const [reported, setReported] = useState(() => new Set())
 
   useEffect(() => {
+    let cancelled = false
     setError('')
+    setLoading(true)
+    if (page === 1) setList([])
     api.get(`/parent/tutors/${tutor.id}/reviews`, { params: { sort, page } }).then((r) => {
+      if (cancelled) return
       setList((prev) => (page === 1 ? r.data.reviews : [...prev, ...r.data.reviews]))
       setMore(r.data.hasMore)
-    }).catch((e) => setError(errorMessage(e)))
-  }, [tutor.id, sort, page])
+    }).catch((e) => { if (!cancelled) setError(errorMessage(e)) }).finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [tutor.id, sort, page, retry])
 
   const total = tutor.ratingDistribution.reduce((s, d) => s + d.count, 0) || 1
 
@@ -243,8 +252,9 @@ function Reviews({ tutor, reference }) {
         </div>
       </div>
       <ul className="divide-y divide-slate-100 rounded-xl border border-slate-100">
-        {error && <li role="alert" className="p-4 text-sm text-red-700">Reviews could not be loaded: {error}</li>}
-        {list.length === 0 && !error && <li className="p-6 text-center text-sm text-slate-500">No reviews yet.</li>}
+        {error && <li role="alert" className="p-4 text-sm text-red-700">Reviews could not be loaded: {error} <button onClick={() => setRetry((n) => n + 1)} className="min-h-10 font-semibold underline">Retry</button></li>}
+        {loading && <li role="status" className="p-4 text-sm text-slate-500">Loading reviews…</li>}
+        {list.length === 0 && !error && !loading && <li className="p-6 text-center text-sm text-slate-500">No reviews yet.</li>}
         {list.map((r) => (
           <li key={r.id} className="flex gap-3 p-4">
             <Avatar name={r.parentName} className="h-11 w-11" text="text-base" />
@@ -253,23 +263,47 @@ function Reviews({ tutor, reference }) {
                 <div><span className="font-bold text-navy">{r.parentName}</span> <span className="ml-1 text-xs text-slate-500">Parent of {r.parentOf}</span></div>
                 <div className="flex items-center gap-2 text-xs text-slate-400"><Stars value={r.rating} size="h-3.5 w-3.5" /> {fmtShortDate(r.createdAt)}</div>
               </div>
-              {r.comment && <p className="mt-1 text-sm text-slate-600">{r.comment}</p>}
+              {r.comment && <p className="mt-1 break-words whitespace-pre-wrap text-sm text-slate-600">{r.comment}</p>}
               {r.photoUrl && (
                 <a href={r.photoUrl} target="_blank" rel="noreferrer" className="mt-2 inline-block">
                   <img src={r.photoUrl} alt={`Photo shared by ${r.parentName}`} loading="lazy" className="h-20 w-20 rounded-lg object-cover" />
                 </a>
               )}
+              <button onClick={() => setReport(r)} disabled={reported.has(r.id)} className="mt-2 block min-h-10 text-xs font-semibold text-slate-500 underline disabled:opacity-60">{reported.has(r.id) ? 'Reported — track in My Complaints' : 'Report this review'}</button>
             </div>
           </li>
         ))}
       </ul>
       {more && (
         <div className="mt-4 text-center">
-          <button onClick={() => setPage((p) => p + 1)} className="btn-outline px-6 py-1.5 text-xs">Load More Reviews <Icon name="down" className="h-3.5 w-3.5" /></button>
+          <button disabled={loading || !!error} onClick={() => setPage((p) => p + 1)} className="btn-outline px-6 py-1.5 text-xs">Load More Reviews <Icon name="down" className="h-3.5 w-3.5" /></button>
         </div>
       )}
+      {reported.size > 0 && <p role="status" className="mt-3 text-sm text-slate-600">Your report was sent for administrator review. Track it in <Link to="/parent/complaints" className="font-semibold text-brand-600 underline">My Complaints</Link>.</p>}
+      {report && <ReportReview review={report} onClose={() => setReport(null)} onDone={() => { setReported((previous) => new Set(previous).add(report.id)); setReport(null) }} />}
     </section>
   )
+}
+
+const REPORT_REASONS = ['Abusive or discriminatory content', 'Personal information', 'Spam or advertising', 'Misleading or unrelated content', 'Other']
+function ReportReview({ review, onClose, onDone }) {
+  const [reason, setReason] = useState(REPORT_REASONS[0])
+  const [details, setDetails] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  async function submit() {
+    setBusy(true); setError('')
+    try {
+      await api.post(`/parent/reviews/${review.id}/report`, { reason, details: details || undefined })
+      onDone()
+    } catch (err) { setError(errorMessage(err)) } finally { setBusy(false) }
+  }
+  return <Modal open onClose={onClose} title="Report this review" footer={<><button disabled={busy} onClick={onClose} className="btn-outline">Cancel</button><button disabled={busy} onClick={submit} className="btn-primary">{busy ? 'Sending…' : 'Send report'}</button></>}>
+    <p className="mb-3 text-sm text-slate-600">Reports are private. An administrator will investigate; a report does not automatically remove a review. Please do not report a review simply because you disagree with its rating.</p>
+    <label className="block text-sm font-semibold text-navy">Reason<select className="input mt-1" value={reason} onChange={(e) => setReason(e.target.value)}>{REPORT_REASONS.map((item) => <option key={item}>{item}</option>)}</select></label>
+    <label className="mt-3 block text-sm font-semibold text-navy">Details (optional)<textarea rows={3} maxLength={500} className="input mt-1" value={details} onChange={(e) => setDetails(e.target.value)} /></label>
+    <ErrorBox className="mt-3">{error}</ErrorBox>
+  </Modal>
 }
 
 // Right-hand "Book a Lesson" panel. "Continue Booking" carries the choices to the full booking page.

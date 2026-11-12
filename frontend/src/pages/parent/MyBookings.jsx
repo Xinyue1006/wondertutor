@@ -99,9 +99,9 @@ export default function MyBookings() {
       <PageTitle
         icon="calendar" title="My Bookings" subtitle="View and manage your tutor lessons and booking requests."
         right={
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid max-w-full grid-cols-3 gap-2 sm:gap-3">
             {[['calendar', counts.upcoming, 'Upcoming', 'bg-brand-50', 'bg-brand-100 text-brand-500'], ['clock', counts.pending, 'Pending', 'bg-accent-50', 'bg-accent-100 text-accent-600'], ['check', counts.finished, 'Completed', 'bg-ok-50', 'bg-ok text-white']].map(([icon, n, l, bg, tone]) => (
-              <div key={l} className={`flex items-center gap-3 rounded-xl px-4 py-2.5 ${bg}`}>
+              <div key={l} className={`flex min-w-0 flex-col items-center gap-1 rounded-xl px-2 py-2.5 text-center sm:flex-row sm:gap-3 sm:px-4 sm:text-left ${bg}`}>
                 <span className={`flex h-10 w-10 items-center justify-center rounded-full ${tone}`}><Icon name={icon} className="h-5 w-5" /></span>
                 <span><span className="block text-2xl font-extrabold leading-6 text-navy">{n}</span><span className="text-xs text-slate-600">{l}</span></span>
               </div>))}
@@ -344,7 +344,7 @@ function CompletedRow({ b, onDetail, onReview }) {
       <div className="space-y-2">
         <StatusPill status="COMPLETED" />
         {b.review ? (
-          <div className="rounded-xl bg-brand-25 px-4 py-3"><div className="text-sm font-bold text-navy">Your review</div><Stars value={b.review.rating} size="h-5 w-5" /></div>
+          <div className="rounded-xl bg-brand-25 px-4 py-3"><div className="text-sm font-bold text-navy">Your review</div><Stars value={b.review.rating} size="h-5 w-5" />{b.review.isHidden && <p className="mt-1 text-xs text-slate-600">Hidden from the public profile by an administrator. {b.review.moderationReason}</p>}</div>
         ) : (
           <div className="flex items-center gap-3 rounded-xl bg-accent-50 px-4 py-3">
             <Icon name="star" fill className="h-8 w-8 text-accent" />
@@ -419,13 +419,16 @@ function ReviewModal({ booking, onClose, onDone }) {
       footer={<><button onClick={onClose} className="btn-outline">Cancel</button><button disabled={busy || uploading} onClick={submit} className="btn-primary">{busy ? 'Submitting…' : 'Submit Review'}</button></>}>
       <ErrorBox className="mb-3">{error}</ErrorBox>
       <p className="text-sm text-slate-500">How was {booking.child.name}'s {booking.subject} lesson? Your review is public on the tutor's profile.</p>
+      <p className="mt-2 text-xs text-slate-600">Honest criticism and low ratings are welcome. Avoid abusive language, advertising and personal contact details. Report safety concerns or quote abusive messages in a private complaint.</p>
       <div className="my-4 flex justify-center gap-1">
         {[1, 2, 3, 4, 5].map((i) => (
           <button key={i} onClick={() => setRating(i)} aria-label={`${i} star${i > 1 ? 's' : ''}`}>
             <Icon name="star" fill className={`h-10 w-10 transition ${i <= rating ? 'text-accent' : 'text-slate-200 hover:text-accent/60'}`} strokeWidth={1.5} />
           </button>))}
       </div>
-      <textarea rows={4} maxLength={500} className="input resize-none" placeholder="Tell other parents about the lesson (optional)" value={comment} onChange={(e) => setComment(e.target.value)} />
+      <label className="block text-sm font-semibold text-navy">Your comments (optional)
+        <textarea rows={4} maxLength={500} className="input mt-1 resize-none" placeholder="Tell other parents about the lesson (optional)" value={comment} onChange={(e) => setComment(e.target.value)} />
+      </label>
       <div className="text-right text-xs text-slate-400">{comment.length}/500</div>
       {/* Optional photo, e.g. of the child's work after the lesson */}
       <div className="mt-2 flex items-center gap-3">
