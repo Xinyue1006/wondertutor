@@ -22,7 +22,7 @@ const otherParty = (booking, userId) => (userId === booking.parent.userId ? book
 const linkFor = (booking, userId) => (userId === booking.parent.userId ? `/parent/bookings?booking=${booking.id}` : '/tutor/bookings')
 
 async function assertNewTimeOk(booking, startAt, endAt, db = prisma) {
-  await assertSlotBookable({ tutorId: booking.tutorId, startAt, endAt, ignoreBookingId: booking.id }, db)
+  await assertSlotBookable({ tutorId: booking.tutorId, startAt, endAt, ignoreBookingId: booking.id, teachingMode: booking.teachingMode }, db)
   await assertChildFree({ childId: booking.childId, startAt, endAt, ignoreBookingId: booking.id }, db)
 }
 

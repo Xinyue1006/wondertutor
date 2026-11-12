@@ -1,5 +1,5 @@
 import {
-  DAYS, HOURS, addDays, addHours, applyLockChanges, quickAddDetails, cellKey, modeChoices, modeOf, rangesToModes, sameModes, setCellModes, shownMode, cellsToRanges, clearHours, dateOfDay, eventToRange, hourEnd, isPastHour, keepPast, keepsLocked, malaysiaLabel, momentIsPast,
+  DAYS, HOURS, addDays, addHours, applyLockChanges, bookingMode, quickAddDetails, cellKey, modeChoices, modeOf, rangesToModes, sameModes, setCellModes, shownMode, cellsToRanges, clearHours, dateOfDay, eventToRange, hourEnd, isPastHour, keepPast, keepsLocked, malaysiaLabel, momentIsPast,
   moveRange, nowInMalaysia, pastCells, rangeToEvent, rangesToCells, removeRange, sameCells, shortDate, weekLabel, weekStartOf,
 } from '../lib/availability'
 
@@ -250,6 +250,17 @@ describe('teaching mode per hour', () => {
     expect(shownMode('BOTH', { online: false, physical: true })).toBe('PHYSICAL')
     expect(shownMode('BOTH', { online: true, physical: true })).toBe('BOTH')
     expect(shownMode('ONLINE', { online: true, physical: false })).toBe('ONLINE')
+  })
+})
+
+describe('the mode of a booking', () => {
+  test('an hour set to one mode decides it, BOTH hours leave the choice to the parent', () => {
+    expect(bookingMode([{ mode: 'BOTH' }, { mode: 'ONLINE' }], 'PHYSICAL')).toEqual({ fixed: 'ONLINE', conflict: false, mode: 'ONLINE' })
+    expect(bookingMode([{ mode: 'BOTH' }, {}], 'PHYSICAL')).toEqual({ fixed: null, conflict: false, mode: 'PHYSICAL' })
+  })
+
+  test('online-only and physical-only hours cannot go in one request', () => {
+    expect(bookingMode([{ mode: 'ONLINE' }, { mode: 'PHYSICAL' }], 'ONLINE').conflict).toBe(true)
   })
 })
 

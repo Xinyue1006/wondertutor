@@ -70,6 +70,13 @@ export function shownMode(mode, offers) {
   return mode === 'BOTH' && choices.length === 1 ? choices[0] : mode
 }
 
+// The mode a booking of these hours must use: an hour set to one mode decides it. Hours fixed to two different
+// modes cannot go in one request.
+export function bookingMode(slots, picked) {
+  const fixed = [...new Set(slots.map((s) => s.mode).filter((m) => m && m !== 'BOTH'))]
+  return { fixed: fixed[0] ?? null, conflict: fixed.length > 1, mode: fixed[0] ?? picked }
+}
+
 // "Mon, Wed · 17:00–21:00 · Online", Monday first whatever order the days were ticked in
 export const quickAddDetails = ({ days, from, to, mode }) =>
   `${DAYS.filter((d) => days.includes(d.value)).map((d) => d.short).join(', ')} · ${from}–${to} · ${MODE_LABELS[mode]}`

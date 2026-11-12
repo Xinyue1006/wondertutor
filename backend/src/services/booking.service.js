@@ -2,6 +2,7 @@
 import { prisma } from '../config/prisma.js'
 import { AppError } from '../utils/AppError.js'
 import { addDays, fromMinutes, mytParts, mytToDate, toMinutes } from '../utils/time.js'
+import { effectiveSlots, effectiveSlotsForDate, slotAllows } from './availability.service.js'
 
 // A tutor's slot is blocked only once a booking is waiting for payment or paid.
 // Plain PENDING requests don't block it — the tutor may still reject or counter them.
@@ -16,7 +17,7 @@ function cellsForDay(availability, dow) {
   const cells = []
   for (const slot of availability.filter((a) => a.dayOfWeek === dow)) {
     for (let m = toMinutes(slot.startTime); m + LESSON_MINUTES <= toMinutes(slot.endTime); m += LESSON_MINUTES)
-      cells.push({ start: fromMinutes(m), end: fromMinutes(m + LESSON_MINUTES) })
+      cells.push({ start: fromMinutes(m), end: fromMinutes(m + LESSON_MINUTES), mode: slot.mode })
   }
   return cells.sort((a, b) => a.start.localeCompare(b.start))
 }
@@ -25,8 +26,9 @@ const overlaps = (aStart, aEnd, bStart, bEnd) => aStart < bEnd && bStart < aEnd
 
 // 7 days starting at `fromDate` (YYYY-MM-DD) with every lesson cell and whether it can still be booked
 export async function getTutorSlots(tutorId, fromDate, days = 7) {
-  const [availability, blocking, exceptions] = await Promise.all([
-    prisma.availabilitySlot.findMany({ where: { tutorId } }),
+  const dates = Array.from({ length: days }, (_, i) => addDays(fromDate, i))
+  const [hours, blocking] = await Promise.all([
+    effectiveSlots([tutorId], dates), // date change, then week, then usual hours
     prisma.booking.findMany({
       where: {
         tutorId,
@@ -35,15 +37,11 @@ export async function getTutorSlots(tutorId, fromDate, days = 7) {
       },
       select: { startAt: true, endAt: true },
     }),
-    prisma.availabilityException.findMany({ where: { tutorId, date: { gte: fromDate, lt: addDays(fromDate, days) } } }),
   ])
   const now = new Date()
-  return Array.from({ length: days }, (_, i) => {
-    const date = addDays(fromDate, i)
+  return dates.map((date) => {
     const dow = mytParts(mytToDate(date, '12:00')).dow
-    const override = exceptions.find(e => e.date === date)
-    const hours = override ? override.ranges.map(r => ({ ...r, dayOfWeek: dow })) : availability
-    const slots = cellsForDay(hours, dow).map((c) => {
+    const slots = cellsForDay(hours.get(tutorId).get(date), dow).map((c) => {
       const s = mytToDate(date, c.start)
       const e = mytToDate(date, c.end)
       const taken = s <= now || blocking.some((b) => overlaps(s, e, b.startAt, b.endAt))
@@ -55,16 +53,17 @@ export async function getTutorSlots(tutorId, fromDate, days = 7) {
 
 // Throws unless the requested hour is inside the tutor's availability and not taken
 // ignoreBookingId: when an existing booking is being moved, it must not clash with itself
-export async function assertSlotBookable({ tutorId, startAt, endAt, ignoreBookingId }, db = prisma) {
+// teachingMode: the hour must allow it (an hour set to online only cannot hold a physical lesson)
+export async function assertSlotBookable({ tutorId, startAt, endAt, ignoreBookingId, teachingMode }, db = prisma) {
   if (startAt <= new Date()) throw new AppError(400, 'Please choose a time in the future')
-  const { date, time, dow } = mytParts(startAt)
-  const override = await db.availabilityException.findUnique({ where: { tutorId_date: { tutorId, date } } })
-  const availability = override ? override.ranges : await db.availabilitySlot.findMany({ where: { tutorId, dayOfWeek: dow } })
+  const { date, time } = mytParts(startAt)
+  const availability = await effectiveSlotsForDate(tutorId, date, db)
   const end = mytParts(endAt)
-  const inside = availability.some(
+  const inside = availability.find(
     (a) => toMinutes(a.startTime) <= toMinutes(time) && toMinutes(a.endTime) >= toMinutes(end.time) && end.date === date,
   )
   if (!inside) throw new AppError(400, 'The tutor is not available at that time')
+  if (teachingMode && !slotAllows(inside.mode, teachingMode)) throw new AppError(400, `This hour is for ${inside.mode.toLowerCase()} lessons only`)
   const clash = await db.booking.findFirst({
     where: { tutorId, status: { in: SLOT_BLOCKING }, startAt: { lt: endAt }, endAt: { gt: startAt }, ...(ignoreBookingId && { id: { not: ignoreBookingId } }) },
   })

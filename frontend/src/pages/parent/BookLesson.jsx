@@ -8,6 +8,7 @@ import Robot from '../../components/ui/Robot'
 import { ErrorBox, LoadError, Modal, PageTitle, SelectBox, Spinner, VerifiedTick } from '../../components/ui/Common'
 import { addDaysYmd, dateLabel, dayMonth, hhmmLabel, mondayOfYmd, todayYmd, weekdayName } from '../../lib/format'
 import { gradeLabel } from '../../lib/education'
+import { bookingMode } from '../../lib/availability'
 import { childSubjects } from '../../lib/subjects'
 import { checkRinggit, checkText } from '../../lib/validation'
 
@@ -74,17 +75,19 @@ export default function BookLesson() {
       : current.length < 12 ? [...current, slot] : current)
   }
   const teachesChild = !child || tutor.grades.includes(gradeLabel(child.educationLevel, child.grade))
+  const lesson = bookingMode(selectedSlots, mode) // an hour set to one mode decides the mode
 
   async function send() {
     setError('')
     if (!child) return setError('Please choose a child (add one under My Children first).')
     if (!selectedSlots.length) return setError('Please select an available time on the calendar.')
+    if (lesson.conflict) return setError('Some of these hours are online only and some physical only. Send them as separate requests.')
     const problem = checkRinggit(price, 'Proposed price') || checkText(msg, { label: 'Message', max: 200 })
     if (problem) return setError(problem)
     setBusy(true)
     try {
       await api.post('/parent/bookings', {
-        tutorId: tutor.id, childId: child.id, slots: selectedSlots.map(s => ({ date: s.date, startTime: s.start })), teachingMode: mode,
+        tutorId: tutor.id, childId: child.id, slots: selectedSlots.map(s => ({ date: s.date, startTime: s.start })), teachingMode: lesson.mode,
         proposedPrice: Number(price), subject, messageToTutor: msg || undefined,
       })
       setDone(true)
@@ -138,7 +141,7 @@ export default function BookLesson() {
                         const selected = selectedSlots.some(s => s.date === d.date && s.start === start)
                         return <td key={d.date} className="rounded bg-slate-50 p-0">
                           {slot && <button type="button" aria-label={d.date + ' ' + start} aria-pressed={selected} disabled={slot.status !== 'available' || (!selected && selectedSlots.length >= 12)}
-                            onClick={() => toggleSlot({ date: d.date, start })}
+                            onClick={() => toggleSlot({ date: d.date, start, mode: slot.mode })}
                             className={'h-8 w-full rounded px-1 font-semibold transition disabled:cursor-not-allowed ' + (selected ? 'bg-navy text-white' : slot.status === 'available' ? 'bg-brand-500 text-white hover:bg-brand-600' : 'bg-slate-300 text-white')}>
                             {hhmmLabel(start).replace(' AM', '').replace(' PM', '')} - {hhmmLabel(end).replace(' AM', '').replace(' PM', '')}
                           </button>}
@@ -184,7 +187,7 @@ export default function BookLesson() {
                 <span className="mb-1 block text-sm font-bold text-navy">Teaching Mode</span>
                 <div className="grid grid-cols-2 gap-2">
                   {[['ONLINE', 'Online', 'monitor', tutor.offersOnline], ['PHYSICAL', 'Physical', 'home', tutor.offersPhysical]].map(([v, l, icon, ok]) => (
-                    <button key={v} type="button" disabled={!ok} onClick={() => setMode(v)} className={`flex h-10 items-center justify-center gap-2 rounded-lg border text-sm font-semibold disabled:opacity-40 ${mode === v ? 'border-brand-500 bg-brand-50 text-brand-500' : 'border-slate-200 text-navy'}`}>
+                    <button key={v} type="button" disabled={!ok || (lesson.fixed && lesson.fixed !== v)} onClick={() => setMode(v)} className={`flex h-10 items-center justify-center gap-2 rounded-lg border text-sm font-semibold disabled:opacity-40 ${lesson.mode === v ? 'border-brand-500 bg-brand-50 text-brand-500' : 'border-slate-200 text-navy'}`}>
                       <Icon name={icon} className="h-4 w-4" /> {l}
                     </button>))}
                 </div>

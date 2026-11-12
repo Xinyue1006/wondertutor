@@ -42,12 +42,46 @@ const usualSlots = async (tutorId, db = prisma) => normaliseSlots(await db.avail
 const weekOverride = (tutorId, weekStart, db = prisma) =>
   db.availabilityWeek.findUnique({ where: { tutorId_weekStart: { tutorId, weekStart: toDbDate(weekStart) } }, include: { slots: true } })
 
-// The one place the rule lives: a date uses its week's override if there is one, otherwise the usual hours of that weekday
-export async function effectiveSlotsForDate(tutorId, dateString, db = prisma) {
-  const override = await weekOverride(tutorId, weekStartOf(dateString), db)
-  const slots = override ? override.slots : await db.availabilitySlot.findMany({ where: { tutorId } })
-  const { dow } = mytParts(mytToDate(dateString, '12:00'))
-  return normaliseSlots(slots.filter((s) => s.dayOfWeek === dow))
+const dayOfDate = (date) => mytParts(mytToDate(date, '12:00')).dow
+
+// The one place the rule lives, for every tutor and date asked: an exact-date change wins, then that week's hours,
+// then the usual hours of that weekday. A date or week saved with no hours stays closed. A date change has no mode of
+// its own, so its hours are BOTH (the profile still limits the mode). Returns Map(tutorId -> Map(date -> slots)).
+export async function effectiveSlots(tutorIds, dates, db = prisma) {
+  const weekStarts = [...new Set(dates.map(weekStartOf))]
+  const [exceptions, weeks, usual] = await Promise.all([
+    db.availabilityException.findMany({ where: { tutorId: { in: tutorIds }, date: { in: dates } } }),
+    db.availabilityWeek.findMany({ where: { tutorId: { in: tutorIds }, weekStart: { in: weekStarts.map(toDbDate) } }, include: { slots: true } }),
+    db.availabilitySlot.findMany({ where: { tutorId: { in: tutorIds } } }),
+  ])
+  const result = new Map(tutorIds.map((tutorId) => [tutorId, new Map()]))
+  for (const tutorId of tutorIds) {
+    for (const date of dates) {
+      const dow = dayOfDate(date)
+      const exception = exceptions.find((e) => e.tutorId === tutorId && e.date === date)
+      const week = weeks.find((w) => w.tutorId === tutorId && fromDbDate(w.weekStart) === weekStartOf(date))
+      const slots = exception
+        ? exception.ranges.map((r) => ({ dayOfWeek: dow, startTime: r.startTime, endTime: r.endTime, mode: 'BOTH' }))
+        : (week ? week.slots : usual.filter((s) => s.tutorId === tutorId)).filter((s) => s.dayOfWeek === dow)
+      result.get(tutorId).set(date, normaliseSlots(slots))
+    }
+  }
+  return result
+}
+
+export async function effectiveSlotsForDate(tutorId, date, db = prisma) {
+  return (await effectiveSlots([tutorId], [date], db)).get(tutorId).get(date)
+}
+
+// Same lock as booking, counter-offer acceptance and date changes, so a save and a booking for one tutor never interleave
+const lockTutor = (tx, tutorId) => tx.$queryRaw`SELECT id FROM TutorProfile WHERE id = ${tutorId} FOR UPDATE`
+
+// A date with its own change is ruled by that change, so weekly and usual hours cannot drop a lesson on it
+async function ruledByWeekOrUsual(hours, tutorId, db) {
+  if (!hours.length) return hours
+  const dated = await db.availabilityException.findMany({ where: { tutorId, date: { in: [...new Set(hours.map((h) => h.date))] } }, select: { date: true } })
+  const skip = new Set(dated.map((d) => d.date))
+  return hours.filter((h) => !skip.has(h.date))
 }
 
 // Upcoming bookings that hold their hour, as a Malaysia date and whole hour. `week` limits them to that one week.
@@ -170,7 +204,9 @@ export async function saveWeek(tutorId, weekStart, slots) {
   await assertModesOffered(tutorId, slots)
   const merged = normaliseSlots(slots)
   await prisma.$transaction(async (tx) => {
-    assertNoneDropped((await bookedHours(tutorId, { week: weekStart }, tx)).filter((h) => !covers(merged, h)))
+    await lockTutor(tx, tutorId)
+    const held = await ruledByWeekOrUsual(await bookedHours(tutorId, { week: weekStart }, tx), tutorId, tx)
+    assertNoneDropped(held.filter((h) => !covers(merged, h)))
     await writeWeek(tutorId, weekStart, merged, tx)
   })
   return getWeekView(tutorId, weekStart)
@@ -179,8 +215,10 @@ export async function saveWeek(tutorId, weekStart, slots) {
 export async function resetWeek(tutorId, weekStart) {
   assertEditableWeek(weekStart)
   await prisma.$transaction(async (tx) => {
+    await lockTutor(tx, tutorId)
     const usual = await usualSlots(tutorId, tx)
-    assertNoneDropped((await bookedHours(tutorId, { week: weekStart }, tx)).filter((h) => !covers(usual, h)))
+    const held = await ruledByWeekOrUsual(await bookedHours(tutorId, { week: weekStart }, tx), tutorId, tx)
+    assertNoneDropped(held.filter((h) => !covers(usual, h)))
     await tx.availabilityWeek.deleteMany({ where: { tutorId, weekStart: toDbDate(weekStart) } })
   })
   return getWeekView(tutorId, weekStart)
@@ -202,7 +240,8 @@ export async function copyWeek(tutorId, fromWeekStart, toWeekStarts) {
     else {
       seen.add(weekStart)
       const dropped = await prisma.$transaction(async (tx) => {
-        const lost = (await bookedHours(tutorId, { week: weekStart }, tx)).filter((h) => !covers(source, h))
+        await lockTutor(tx, tutorId)
+        const lost = (await ruledByWeekOrUsual(await bookedHours(tutorId, { week: weekStart }, tx), tutorId, tx)).filter((h) => !covers(source, h))
         if (!lost.length) await writeWeek(tutorId, weekStart, source, tx)
         return lost
       })
@@ -218,8 +257,9 @@ export async function saveUsual(tutorId, slots, viewWeek) {
   await assertModesOffered(tutorId, slots)
   const merged = normaliseSlots(slots)
   await prisma.$transaction(async (tx) => {
+    await lockTutor(tx, tutorId)
     const overridden = new Set(await changedWeeks(tutorId, tx))
-    const depending = (await bookedHours(tutorId, {}, tx)).filter((h) => !overridden.has(weekStartOf(h.date)))
+    const depending = (await ruledByWeekOrUsual(await bookedHours(tutorId, {}, tx), tutorId, tx)).filter((h) => !overridden.has(weekStartOf(h.date)))
     assertNoneDropped(depending.filter((h) => !covers(merged, h)))
     await tx.availabilitySlot.deleteMany({ where: { tutorId } })
     if (merged.length) await tx.availabilitySlot.createMany({ data: merged.map((s) => ({ ...s, tutorId })) })

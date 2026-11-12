@@ -94,7 +94,7 @@ export async function createBooking(req, res) {
     for (const slot of slots) {
       const startAt = mytToDate(slot.date, slot.startTime)
       const endAt = new Date(startAt.getTime() + 3600000)
-      await assertSlotBookable({ tutorId: tutor.id, startAt, endAt }, tx)
+      await assertSlotBookable({ tutorId: tutor.id, startAt, endAt, teachingMode: data.teachingMode }, tx)
       await assertChildFree({ childId: child.id, startAt, endAt }, tx)
       created.push(await tx.booking.create({
         data: {
@@ -160,7 +160,7 @@ export async function acceptCounter(req, res) {
     await tx.$queryRaw`SELECT id FROM Child WHERE id = ${b.childId} FOR UPDATE`
     const tutor = await tx.tutorProfile.findFirst({ where: { id: b.tutorId, user: { status: 'ACTIVE' } } })
     if (!tutor) throw new AppError(409, 'This tutor is no longer available. Please choose another tutor.')
-    await assertSlotBookable({ tutorId: b.tutorId, startAt: b.startAt, endAt: b.endAt }, tx)
+    await assertSlotBookable({ tutorId: b.tutorId, startAt: b.startAt, endAt: b.endAt, teachingMode: b.teachingMode }, tx)
     await assertChildFree({ childId: b.childId, startAt: b.startAt, endAt: b.endAt, ignoreBookingId: b.id }, tx)
     const changed = await tx.booking.updateMany({
       where: { id: b.id, status: b.status, counterPrice: b.counterPrice, startAt: b.startAt, endAt: b.endAt },

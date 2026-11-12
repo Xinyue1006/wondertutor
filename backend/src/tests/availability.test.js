@@ -760,3 +760,116 @@ describe('parent booking calendar', () => {
     expect(offered).toEqual([[TUESDAY, '09:00', '10:00', 'available'], [TUESDAY, '10:00', '11:00', 'available']])
   })
 })
+
+describe('one availability rule for parents: date change, then week, then usual hours', () => {
+  const usual = [slot(1, '16:00', '18:00')]
+  const monday = (n) => week(n)
+  const setDate = (token, date, ranges) => api(token).put('/tutor/availability/exceptions', { date, ranges })
+  const hoursOn = async (parentToken, tutor, date) =>
+    (await api(parentToken).get(`/parent/tutors/${tutor.id}/slots?from=${date}`)).days[0].slots.map((c) => `${c.start} ${c.mode}`)
+  const request = (tutor, child, date, startTime, teachingMode) =>
+    ({ tutorId: tutor.id, childId: child.id, teachingMode, proposedPrice: 45, slots: [{ date, startTime }] })
+  const search = (token, query) => api(token).get(`/parent/tutors?subject=Mathematics&level=PRIMARY&${query}`)
+  const found = (res, tutor) => res.tutors.some((t) => t.id === tutor.id)
+
+  test('the parent calendar follows the order, with each hour\'s mode', async () => {
+    const { tutor, token } = await makeTutor({ availability: usual })
+    const { token: parentToken } = await makeParent()
+    await putWeek(token, monday(2), [slot(1, '09:00', '10:00', 'ONLINE')])
+    expect(await hoursOn(parentToken, tutor, monday(2))).toEqual(['09:00 ONLINE'])
+    expect(await hoursOn(parentToken, tutor, monday(3))).toEqual(['16:00 BOTH', '17:00 BOTH'])
+    expect((await setDate(token, monday(2), [{ startTime: '11:00', endTime: '12:00' }])).status).toBe(200)
+    expect(await hoursOn(parentToken, tutor, monday(2))).toEqual(['11:00 BOTH'])
+  })
+
+  test('a closed date and a closed week stay closed', async () => {
+    const { tutor, token } = await makeTutor({ availability: usual })
+    const { token: parentToken } = await makeParent()
+    await putWeek(token, monday(2), [slot(1, '09:00', '10:00')])
+    await setDate(token, monday(2), [])
+    expect(await hoursOn(parentToken, tutor, monday(2))).toEqual([])
+    await putWeek(token, monday(3), [])
+    expect(await hoursOn(parentToken, tutor, monday(3))).toEqual([])
+  })
+
+  test('booking follows the order and the hour\'s mode', async () => {
+    const { tutor, token } = await makeTutor({ availability: usual })
+    const { token: parentToken, child } = await makeParent()
+    await putWeek(token, monday(2), [slot(1, '09:00', '10:00', 'ONLINE')])
+    const book = (date, time, mode) => api(parentToken).post('/parent/bookings', request(tutor, child, date, time, mode))
+    expect((await book(monday(2), '16:00', 'ONLINE')).status).toBe(400) // the week closed it
+    const wrongMode = await book(monday(2), '09:00', 'PHYSICAL')
+    expect(wrongMode.status).toBe(400)
+    expect(wrongMode.message).toBe('This hour is for online lessons only')
+    expect((await book(monday(2), '09:00', 'ONLINE')).status).toBe(201)
+    await setDate(token, monday(3), [{ startTime: '10:00', endTime: '11:00' }])
+    expect((await book(monday(3), '16:00', 'PHYSICAL')).status).toBe(400) // the date change closed it
+    expect((await book(monday(3), '10:00', 'PHYSICAL')).status).toBe(201)
+  })
+
+  test('accepting a counter-offer checks the hour again, including its mode', async () => {
+    const { tutor, token } = await makeTutor({ availability: usual })
+    const { parent, child, token: parentToken } = await makeParent()
+    const b = await makeBooking({ parent, child, tutor, date: monday(2), start: '16:00', status: 'COUNTER_OFFERED', extra: { counterPrice: 55, teachingMode: 'PHYSICAL' } })
+    await putWeek(token, monday(2), [slot(1, '16:00', '18:00', 'ONLINE')])
+    const res = await api(parentToken).post(`/parent/bookings/${b.id}/accept-counter`)
+    expect(res.status).toBe(400)
+    expect(res.message).toBe('This hour is for online lessons only')
+  })
+
+  test('a lesson can only be moved to an hour that allows its mode', async () => {
+    const { tutor, token } = await makeTutor({ availability: usual })
+    const { parent, child, token: parentToken } = await makeParent()
+    const b = await makeBooking({ parent, child, tutor, date: monday(2), start: '16:00', status: 'CONFIRMED', extra: { teachingMode: 'PHYSICAL' } })
+    await putWeek(token, monday(3), [slot(1, '09:00', '10:00', 'ONLINE'), slot(1, '10:00', '11:00', 'BOTH')])
+    const move = (startTime) => api(parentToken).post(`/parent/bookings/${b.id}/reschedule`, { date: monday(3), startTime, reason: 'Clash with school' })
+    const refused = await move('09:00')
+    expect(refused.status).toBe(400)
+    expect(refused.message).toBe('This hour is for online lessons only')
+    expect((await move('10:00')).status).toBe(201)
+  })
+
+  test('search by date and time follows the order and the mode', async () => {
+    // A Saturday evening far ahead, so other tutors in this file do not fill the page of results
+    const { tutor, token } = await makeTutor({ availability: [slot(6, '20:00', '21:00')] })
+    const { token: parentToken } = await makeParent()
+    const saturday = addDays(week(6), 5)
+    await putWeek(token, week(6), [slot(6, '21:00', '22:00', 'ONLINE')])
+    const at = (time, mode = '') => search(parentToken, `pageSize=30&date=${saturday}&time=${time}${mode && `&mode=${mode}`}`)
+    expect(found(await at('20:00'), tutor)).toBe(false) // the usual hour, closed by the week
+    expect(found(await at('21:00'), tutor)).toBe(true)
+    expect(found(await at('21:00', 'ONLINE'), tutor)).toBe(true)
+    expect(found(await at('21:00', 'PHYSICAL'), tutor)).toBe(false)
+  })
+
+  test('the day filter counts the next weeks under the same rule and mode', async () => {
+    const { tutor, token } = await makeTutor({ availability: [] })
+    const { token: parentToken } = await makeParent()
+    const onThursday = (mode = '') => search(parentToken, `pageSize=30&days=4${mode && `&mode=${mode}`}`)
+    expect(found(await onThursday(), tutor)).toBe(false)
+    await putWeek(token, monday(1), [slot(4, '09:00', '10:00', 'ONLINE')])
+    expect(found(await onThursday(), tutor)).toBe(true)
+    expect(found(await onThursday('ONLINE'), tutor)).toBe(true)
+    expect(found(await onThursday('PHYSICAL'), tutor)).toBe(false)
+  })
+
+  test('a lesson on a date with its own change does not lock the week or usual hours', async () => {
+    const { tutor, token } = await makeTutor({ availability: [] })
+    await setDate(token, monday(1), [{ startTime: '09:00', endTime: '10:00' }])
+    const { parent, child } = await makeParent()
+    await makeBooking({ parent, child, tutor, date: monday(1), start: '09:00', status: 'CONFIRMED' })
+    expect((await putWeek(token, monday(1), [slot(2, '09:00', '10:00')])).status).toBe(200)
+    expect((await put(token, [])).status).toBe(200)
+  })
+
+  test('removing a date change falls back to that week\'s hours, then the usual hours', async () => {
+    const { tutor, token } = await makeTutor({ availability: [] })
+    await setDate(token, monday(1), [{ startTime: '09:00', endTime: '10:00' }])
+    const { parent, child } = await makeParent()
+    await makeBooking({ parent, child, tutor, date: monday(1), start: '09:00', status: 'CONFIRMED' })
+    const remove = () => api(token).del(`/tutor/availability/exceptions/${monday(1)}`)
+    expect((await remove()).status).toBe(409) // no week or usual hour covers the lesson
+    await putWeek(token, monday(1), [slot(1, '09:00', '10:00')])
+    expect((await remove()).status).toBe(200)
+  })
+})

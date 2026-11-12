@@ -4,6 +4,7 @@ import { AppError } from '../../utils/AppError.js'
 import { hhmm, ymd } from '../../utils/validators.js'
 import { mytParts, mytToDate, toMinutes } from '../../utils/time.js'
 import { CHILD_BLOCKING } from '../../services/booking.service.js'
+import { effectiveSlotsForDate, slotAllows } from '../../services/availability.service.js'
 
 const range = z.object({ startTime: hhmm(), endTime: hhmm() })
 const schema = z.object({ date: ymd(), ranges: z.array(range).max(24) }).superRefine((data, ctx) => {
@@ -35,13 +36,14 @@ export async function remove(req,res) {
   const date = ymd().parse(req.params.date)
   await prisma.$transaction(async tx => {
     await tx.$queryRaw`SELECT id FROM TutorProfile WHERE id = ${req.tutor.id} FOR UPDATE`
-    const hours = await tx.availabilitySlot.findMany({ where: { tutorId: req.tutor.id, dayOfWeek: mytParts(mytToDate(date,'12:00')).dow } })
+    // Deleted first, so the date falls back to that week's hours, then the usual hours; a conflict rolls it back
+    await tx.availabilityException.deleteMany({ where: { tutorId: req.tutor.id, date } })
+    const hours = await effectiveSlotsForDate(req.tutor.id, date, tx)
     const start = mytToDate(date,'00:00')
     const end = new Date(start.getTime()+86400000)
     const lessons = await tx.booking.findMany({ where: { tutorId: req.tutor.id, status: { in: CHILD_BLOCKING }, startAt: { lt: end }, endAt: { gt: start } } })
-    if (lessons.some(b => !hours.some(r => mytToDate(date,r.startTime) <= b.startAt && mytToDate(date,r.endTime) >= b.endAt)))
+    if (lessons.some(b => !hours.some(r => mytToDate(date,r.startTime) <= b.startAt && mytToDate(date,r.endTime) >= b.endAt && slotAllows(r.mode, b.teachingMode))))
       throw new AppError(409, 'The weekly schedule conflicts with an existing lesson or request.')
-    await tx.availabilityException.deleteMany({ where: { tutorId: req.tutor.id, date } })
   })
   res.json({ ok: true })
 }

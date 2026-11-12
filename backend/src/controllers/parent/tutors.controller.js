@@ -5,6 +5,7 @@ import { CHARACTERISTICS, LANGUAGES, LOCATIONS, MAX_CHILD_SUBJECTS, MAX_GRADE, S
 import { rankTutors, distanceKm } from '../../services/matching.service.js'
 import { tutorInclude, toTutorCard, toTutorProfile } from '../../services/tutor.service.js'
 import { SLOT_BLOCKING, getTutorSlots } from '../../services/booking.service.js'
+import { effectiveSlots, slotAllows } from '../../services/availability.service.js'
 import { addDays, mondayOf, mytParts, mytToDate, toMinutes, todayMyt } from '../../utils/time.js'
 import { preferencesToCriteria } from '../../utils/preferences.js'
 import { hhmm, ymd } from '../../utils/validators.js'
@@ -63,23 +64,29 @@ export async function activeTutors(subject, level) {
 
 // Which of these tutors are free for a 1-hour lesson at date+time? (date & time filter on the search bar)
 // One query for the clashing bookings of all candidates, instead of one query per tutor.
-async function freeAt(tutors, date, time) {
+async function freeAt(tutors, date, time, mode) {
   const start = mytToDate(date, time)
   const end = new Date(start.getTime() + 3600000)
   if (start <= new Date()) return new Set()
-  const { dow } = mytParts(start)
-  const overrides = await prisma.availabilityException.findMany({ where: { tutorId: { in: tutors.map(t => t.id) }, date } })
-  const covering = tutors.filter(t => {
-    const override = overrides.find(e => e.tutorId === t.id)
-    const hours = override ? override.ranges : t.availability.filter(a => a.dayOfWeek === dow)
-    return hours.some(a => toMinutes(a.startTime) <= toMinutes(time) && toMinutes(a.endTime) >= toMinutes(time) + 60)
-  })
+  const hours = await effectiveSlots(tutors.map((t) => t.id), [date]) // date change, then week, then usual hours
+  const covering = tutors.filter((t) => hours.get(t.id).get(date).some((a) =>
+    toMinutes(a.startTime) <= toMinutes(time) && toMinutes(a.endTime) >= toMinutes(time) + 60 && (!mode || slotAllows(a.mode, mode))))
   const busy = await prisma.booking.findMany({
     where: { tutorId: { in: covering.map((t) => t.id) }, status: { in: SLOT_BLOCKING }, startAt: { lt: end }, endAt: { gt: start } },
     select: { tutorId: true },
   })
   const busyIds = new Set(busy.map((b) => b.tutorId))
   return new Set(covering.filter((t) => !busyIds.has(t.id)).map((t) => t.id))
+}
+
+// "Available on Mondays" has no date, so it means any of the next 4 Mondays, under the same rule and in the chosen mode
+const DAY_FILTER_WEEKS = 4
+async function openOnDays(tutors, days, mode) {
+  const today = todayMyt()
+  const dates = Array.from({ length: DAY_FILTER_WEEKS * 7 }, (_, i) => addDays(today, i))
+    .filter((d) => days.includes(mytParts(mytToDate(d, '12:00')).dow))
+  const hours = await effectiveSlots(tutors.map((t) => t.id), dates)
+  return new Set(tutors.filter((t) => dates.some((d) => hours.get(t.id).get(d).some((a) => !mode || slotAllows(a.mode, mode)))).map((t) => t.id))
 }
 
 // GET /parent/tutors: browse + filter + sort + page
@@ -123,7 +130,6 @@ export async function browseTutors(req, res) {
     if (q.minRating != null && tutor.ratingAvg < q.minRating) return false
     if (q.mode === 'ONLINE' && !tutor.offersOnline) return false
     if (q.mode === 'PHYSICAL' && !tutor.offersPhysical) return false
-    if (explicitDays.length && !explicitDays.some((d) => tutor.availability.some((a) => a.dayOfWeek === d))) return false
     if (explicitStyles.length && !explicitStyles.some((c) => (tutor.characteristics || []).includes(c))) return false
     if (q.maxDistance != null && loc && tutor.offersPhysical && !tutor.offersOnline) {
       const km = distanceKm(loc.lat, loc.lng, tutor.latitude, tutor.longitude)
@@ -132,8 +138,13 @@ export async function browseTutors(req, res) {
     return true
   })
 
+  if (explicitDays.length) {
+    const open = await openOnDays(ranked.map((r) => r.tutor), explicitDays, q.mode)
+    ranked = ranked.filter(({ tutor }) => open.has(tutor.id))
+  }
+
   if (q.date && q.time) {
-    const free = await freeAt(ranked.map((r) => r.tutor), q.date, q.time)
+    const free = await freeAt(ranked.map((r) => r.tutor), q.date, q.time, q.mode)
     ranked = ranked.filter(({ tutor }) => free.has(tutor.id))
   }
 
