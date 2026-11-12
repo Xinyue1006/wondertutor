@@ -22,12 +22,12 @@ export async function sessionView(tutorId, id) {
   const [b, settings] = await Promise.all([booking(prisma, tutorId, id), getSettings()])
   if (!['CONFIRMED', 'COMPLETED', 'DISPUTED'].includes(b.status)) throw new AppError(409, 'This lesson is not confirmed.')
   const a = b.attendance
-  return { id, subject: b.subject, student: b.child.name, status: b.status, startAt: b.startAt, endAt: b.endAt,
+  return { id, publicId: b.publicId, subject: b.subject, student: b.child.name, status: b.status, startAt: b.startAt, endAt: b.endAt,
     mode: b.teachingMode, address: b.location, latitude: b.latitude, longitude: b.longitude,
     radius: settings.GPS_RADIUS_METRES, serverTime: new Date(),
     attendance: a && { checkInAt: a.checkInAt, checkOutAt: a.checkOutAt, distance: a.checkInDistance,
       photo: mediaLink(a.checkInPhotoUrl, 'wondertutor/attendance/' + id) },
-    report: b.summary && { content: b.summary.content, progressNote: b.summary.progressNote, recommendations: b.summary.recommendations },
+    report: b.summary && { content: b.summary.content, progressNote: b.summary.progressNote, homework: b.summary.homework, recommendations: b.summary.recommendations },
   }
 }
 
@@ -77,7 +77,7 @@ export async function updateSession(tutorId, id, input) {
     }
     if (!b.attendance.checkOutAt) throw new AppError(409, 'Check out before submitting the report.')
     if (b.summary) throw new AppError(409, 'This lesson already has a report.')
-    await db.sessionSummary.create({ data: { bookingId: id, content: input.content, progressNote: input.progressNote, recommendations: input.recommendations || null } })
+    await db.sessionSummary.create({ data: { bookingId: id, content: input.content, progressNote: input.progressNote, homework: input.homework || null, recommendations: input.recommendations || null } })
     await db.booking.update({ where: { id }, data: { status: 'COMPLETED' } })
     await db.notification.create({ data: { userId: b.parent.userId, type: 'LESSON_COMPLETED', title: 'Lesson report ready',
       message: 'Your tutor has submitted the ' + b.subject + ' lesson report.', link: '/parent/bookings?booking=' + publicReference(b) } })

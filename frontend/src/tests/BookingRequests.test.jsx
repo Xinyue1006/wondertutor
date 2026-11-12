@@ -61,3 +61,10 @@ test('a changed booking can be refreshed before another response is submitted', 
   expect(screen.getByRole('button', { name: 'Add class link' })).toBeEnabled()
   await waitFor(() => expect(api.get).toHaveBeenCalledTimes(2))
 })
+
+test('the tutor opens a confirmed session using its public booking ID', async () => {
+  const publicId = '43baea58-27c9-4665-9fa2-12c49eb3a982'
+  api.get.mockResolvedValue({ data: { bookings: [{ ...b, publicId, status: 'CONFIRMED' }] } })
+  render(<MemoryRouter initialEntries={['/tutor/bookings?booking=' + publicId]}><BookingRequests /></MemoryRouter>)
+  expect(await screen.findByRole('link', { name: 'Open session' })).toHaveAttribute('href', '/tutor/bookings/' + publicId + '/session')
+})

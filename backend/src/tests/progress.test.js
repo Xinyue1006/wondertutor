@@ -15,7 +15,7 @@ beforeAll(async () => {
     makeBooking({ parent: parent.parent, child: parent.child, tutor: tutor.tutor, date: addDays(nextDate(MONDAY), -7 * n), start, status: 'COMPLETED', extra })
   const a = await past(2, '16:00', { teachingMode: 'PHYSICAL', location: 'Kepong' })
   const b = await past(1, '16:00', { teachingMode: 'PHYSICAL', location: 'Kepong' })
-  await past(1, '18:00') // online, no attendance (out of scope)
+  await past(1, '18:00') // legacy online lesson without a tracking record
   await prisma.attendance.create({ data: { bookingId: a.id, checkInAt: a.startAt, checkOutAt: a.endAt, checkInPhotoUrl: `https://res.cloudinary.com/demo/image/authenticated/v1/wondertutor/attendance/${a.id}/photo.jpg` } })
   await prisma.sessionSummary.create({ data: { bookingId: a.id, content: 'Fractions: adding unlike denominators', progressNote: 'Getting faster' } })
   await prisma.sessionSummary.create({ data: { bookingId: b.id, content: 'Word problems' } })
@@ -25,10 +25,10 @@ beforeAll(async () => {
 afterAll(stopServer)
 
 describe('learning progress', () => {
-  test('totals, per-subject breakdown, attendance (physical lessons only) and the next lesson', async () => {
+  test('totals, per-subject breakdown, recorded attendance and the next lesson', async () => {
     const r = await api(parent.token).get(`/parent/children/${parent.child.id}/progress`)
     expect(r.status).toBe(200)
-    expect(r.stats).toMatchObject({ completedLessons: 3, totalHours: 3, physicalLessons: 2, checkedInLessons: 1, summariesReceived: 2 })
+    expect(r.stats).toMatchObject({ completedLessons: 3, totalHours: 3, physicalLessons: 2, attendanceTrackedLessons: 2, checkedInLessons: 1, summariesReceived: 2 })
     expect(r.subjects).toEqual([expect.objectContaining({ subject: 'Mathematics', lessons: 3, hours: 3, tutors: ['Test Tutor'] })])
     expect(r.nextLesson).toMatchObject({ subject: 'Mathematics', tutorName: 'Test Tutor' })
   })

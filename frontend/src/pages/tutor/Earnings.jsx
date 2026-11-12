@@ -40,7 +40,16 @@ function BankCard({ data, refresh }) {
       setMode('')
       setNote(details ? 'Bank details saved.' : 'Bank account removed.')
       await refresh()
-    } catch (err) { setError(errorMessage(err)) } finally { setBusy(false) }
+    } catch (err) {
+      setError(errorMessage(err))
+      if (err.response?.status === 409) {
+        // Do not replay bank changes against a newly selected account. Re-read
+        // the destination and require a fresh form and confirmation instead.
+        await refresh()
+        setMode('')
+        setNote('Review the latest bank account, then start again if you still want to change it.')
+      }
+    } finally { setBusy(false) }
   }
   async function sendCode() {
     setBusy(true)

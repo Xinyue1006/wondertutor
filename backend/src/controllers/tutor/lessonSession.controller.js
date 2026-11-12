@@ -7,7 +7,7 @@ const requiredText = z.string().trim().min(1, 'Complete both report fields.').ma
 const action = z.discriminatedUnion('action', [
   z.object({ action: z.literal('check-in'), coords: coords.optional(), photo: photo.optional() }).strict(),
   z.object({ action: z.literal('check-out') }).strict(),
-  z.object({ action: z.literal('report'), content: requiredText, progressNote: requiredText, recommendations: z.string().trim().max(5000).optional() }).strict(),
+  z.object({ action: z.literal('report'), content: requiredText, progressNote: requiredText, homework: z.string().trim().max(5000).optional(), recommendations: z.string().trim().max(5000).optional() }).strict(),
 ])
 
 export async function get(req, res) {

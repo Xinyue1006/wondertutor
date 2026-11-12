@@ -1,6 +1,7 @@
 import { childPhotoFields, mediaLink } from './privateMedia.js'
 // Shapes a Booking (with relations) for the Parent Portal.
 import { toTutorCard } from './tutor.service.js'
+import { toSummaryDto } from './progress.service.js'
 
 export const bookingInclude = {
   tutor: { include: { user: { select: { fullName: true, profilePhotoUrl: true, status: true } }, subjects: true, availability: true } },
@@ -53,7 +54,7 @@ export function toBookingDto(b) {
     attendance: b.attendance && {
       checkInAt: b.attendance.checkInAt, checkOutAt: b.attendance.checkOutAt, checkInPhotoUrl: mediaLink(b.attendance.checkInPhotoUrl, 'wondertutor/attendance/' + b.id),
     },
-    summary: b.summary && { content: b.summary.content, progressNote: b.summary.progressNote },
+    summary: b.summary && toSummaryDto(b.summary),
     // Latest reschedule request (if any) and which side asked, so the page knows whether to show Accept/Decline or Withdraw
     reschedule: b.reschedules?.[0] && {
       id: b.reschedules[0].id,

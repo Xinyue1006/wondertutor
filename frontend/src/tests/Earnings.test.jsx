@@ -32,3 +32,21 @@ test('bank details are masked and replacement asks for confirmation', async () =
   await waitFor(() => expect(screen.queryByLabelText('Account number')).toBeNull())
   expect(api.put).not.toHaveBeenCalled()
 })
+
+test('a bank conflict refreshes the destination and requires a fresh confirmation form', async () => {
+  const latest = { ...bank, id: 5, bankName: 'New Bank', lastFour: '4321' }
+  api.get.mockResolvedValueOnce({ data: view }).mockResolvedValue({ data: { ...view, bank: latest } })
+  api.put.mockRejectedValueOnce(Object.assign(new Error('Bank details changed. Refresh and try again.'), { response: { status: 409 } }))
+  render(<MemoryRouter><Earnings /></MemoryRouter>)
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit account' }))
+  fireEvent.change(screen.getByLabelText('Account number'), { target: { value: '1234567890' } })
+  fireEvent.change(screen.getByLabelText('Confirm your password'), { target: { value: 'SyntheticPassword' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Save account' }))
+  expect(await screen.findByText('Review the latest bank account, then start again if you still want to change it.')).toBeInTheDocument()
+  expect(screen.queryByLabelText('Confirm your password')).not.toBeInTheDocument()
+  expect(api.put).toHaveBeenCalledTimes(1)
+  expect(screen.getByText('Pay to New Bank ••4321')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Edit account' }))
+  expect(screen.getByLabelText('Confirm your password')).toHaveValue('')
+  expect(screen.getByLabelText('Bank', { exact: true })).toHaveValue('New Bank')
+})

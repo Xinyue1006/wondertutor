@@ -9,6 +9,7 @@ import { gradeLabel } from '../lib/education'
 import { canAddToCalendar, googleCalendarUrl } from '../lib/calendar'
 import { downloadFile } from '../lib/download'
 import { recordRef } from '../lib/recordRef'
+import LessonNotes from './LessonNotes'
 
 function Row({ icon, label, children }) {
   return (
@@ -95,7 +96,7 @@ export default function LessonDetails({ booking: b, onClose, footer, onChanged }
       {/* Attendance + summary are recorded by the tutor; parents only see them */}
       {b.attendance?.checkInAt && (
         <div className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50/60 p-3 text-sm">
-          <div className="mb-1 flex items-center gap-2 font-bold text-emerald-800"><Icon name="check-circle" className="h-4 w-4" /> Attendance verified</div>
+          <div className="mb-1 flex items-center gap-2 font-bold text-emerald-800"><Icon name="check-circle" className="h-4 w-4" /> Tutor attendance record</div>
           <div className="text-slate-600">
             Checked in {fmtTime(b.attendance.checkInAt)}{b.attendance.checkOutAt && <> · Checked out {fmtTime(b.attendance.checkOutAt)}</>}
           </div>
@@ -105,8 +106,7 @@ export default function LessonDetails({ booking: b, onClose, footer, onChanged }
       {b.summary && (
         <div className="mt-3 rounded-xl border border-brand-100 bg-brand-25 p-3 text-sm">
           <div className="mb-1 flex items-center gap-2 font-bold text-navy"><Icon name="file" className="h-4 w-4 text-brand-500" /> Session summary</div>
-          <p className="text-slate-600">{b.summary.content}</p>
-          {b.summary.progressNote && <p className="mt-1 text-slate-500"><b className="text-navy">Progress:</b> {b.summary.progressNote}</p>}
+          <LessonNotes summary={b.summary} />
         </div>
       )}
       {b.review && (

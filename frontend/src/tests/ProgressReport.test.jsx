@@ -100,7 +100,7 @@ describe('progress report', () => {
     expect(rows).toHaveLength(3) // header + 2 lessons
     expect(rows[0]).toContain('Homework / follow-up')
     expect(rows[1].includes('Page 12, 1-10')).toBe(true)
-    expect(rows[2][5]).toBe('Not tracked (online)')
+    expect(rows[2][5]).toBe('No attendance record')
     expect(name).toBe('progress-report-Sarah-Tan.csv')
   })
 
@@ -115,5 +115,16 @@ describe('progress report', () => {
     api.get.mockRejectedValue(Object.assign(new Error('x'), { response: { status: 404, data: { message: 'Child not found' } } }))
     renderPage()
     expect(await screen.findByText('Child not found')).toBeInTheDocument()
+  })
+
+  test('online attendance is counted and exported using the tracked-lesson denominator', async () => {
+    const online = { ...report().lessons[1], attended: true }
+    api.get.mockResolvedValue({ data: report({ lessons: [online], totals: { ...report().totals, lessons: 1, physicalLessons: 0, attendanceTrackedLessons: 1, checkedIn: 1 } }) })
+    renderPage()
+    await screen.findByRole('heading', { name: 'Learning Progress Report' })
+    expect(screen.getByText('Tutor check-ins').previousSibling).toHaveTextContent('1 of 1')
+    expect(screen.getByText(/Online, checked in/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Download CSV' }))
+    expect(saveCsv.mock.calls[0][0][1][5]).toBe('Checked in')
   })
 })

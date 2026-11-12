@@ -66,7 +66,7 @@ describe('the progress report', () => {
     expect(r.child.name).toBe('Sarah')
     expect(r.parentName).toBe('Test Parent')
     expect(r.lessons.map((l) => l.startAt.slice(0, 10))).toEqual(['2026-06-01', '2026-03-20', '2026-03-02', '2026-01-12'])
-    expect(r.totals).toMatchObject({ lessons: 4, hours: 4, tutors: 1, summaries: 3, homeworkSet: 2, physicalLessons: 3, checkedIn: 1, averageRating: 4 })
+    expect(r.totals).toMatchObject({ lessons: 4, hours: 4, tutors: 1, summaries: 3, homeworkSet: 2, physicalLessons: 3, attendanceTrackedLessons: 3, checkedIn: 1, averageRating: 4 })
     expect(r.subjects).toEqual([
       { subject: 'Mathematics', lessons: 3, hours: 3, tutors: expect.any(Array) },
       { subject: 'English', lessons: 1, hours: 1, tutors: expect.any(Array) },
@@ -74,10 +74,10 @@ describe('the progress report', () => {
     expect(r.subjectsAvailable).toEqual(['English', 'Mathematics'])
   })
 
-  test('shows the tutor’s notes per lesson, and attendance only for physical lessons', async () => {
+  test('shows tutor notes and preserves unknown attendance on legacy online lessons', async () => {
     const r = await report()
     const online = r.lessons.find((l) => l.subject === 'English')
-    expect(online.attended).toBeNull() // online lessons have no attendance record
+    expect(online.attended).toBeNull() // this legacy online lesson has no tracking record
     expect(online.summary.homework).toBe('Read chapter 4')
     const jan = r.lessons.find((l) => l.startAt.startsWith('2026-01-12'))
     expect([jan.attended, jan.summary.topics, jan.summary.homework]).toEqual([true, 'Fractions', 'Page 3'])

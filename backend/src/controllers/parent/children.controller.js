@@ -6,7 +6,7 @@ import { LANGUAGES, MAX_GRADE } from '../../data/catalog.js'
 import { currentSchoolYear } from '../../services/progression.service.js'
 import { checkSubjectsFitLevel, cleanSubjects, subjectColumns, subjectFields, subjectsOf } from '../../utils/childSubjects.js'
 import { imageUrl, optionalText, personName, ymd } from '../../utils/validators.js'
-import { buildChildReport, toSummaryDto } from '../../services/progress.service.js'
+import { attendanceTracked, buildChildReport, toSummaryDto } from '../../services/progress.service.js'
 
 const childSchema = z
   .object({
@@ -94,7 +94,8 @@ export async function deleteChild(req, res) {
 
 // GET /parent/children/:id/progress : the child's learning journey, built from completed lessons.
 // Attendance (check-in photo, times) and session summaries are written by the Tutor Portal; parents only read them.
-// Online lessons have no attendance tracking (project scope), so the attendance figure only counts physical lessons.
+// Both lesson modes now record check-in/out. Legacy online lessons without a
+// tracking record stay outside the attendance denominator.
 export async function childProgress(req, res) {
   const child = await ownChild(req)
   const tutorSelect = { include: { user: { select: { fullName: true, profilePhotoUrl: true } } } }
@@ -120,7 +121,7 @@ export async function childProgress(req, res) {
     s.tutors.add(b.tutor.user.fullName)
   }
   const physical = lessons.filter((b) => b.teachingMode === 'PHYSICAL')
-  const checkedIn = physical.filter((b) => b.attendance?.checkInAt)
+  const checkedIn = lessons.filter((b) => b.attendance?.checkInAt)
 
   res.json({
     child: toChildDto(child),
@@ -128,6 +129,7 @@ export async function childProgress(req, res) {
       completedLessons: lessons.length,
       totalHours: Math.round(lessons.reduce((t, b) => t + hours(b), 0) * 10) / 10,
       physicalLessons: physical.length,
+      attendanceTrackedLessons: lessons.filter(attendanceTracked).length,
       checkedInLessons: checkedIn.length,
       summariesReceived: lessons.filter((b) => b.summary).length,
       firstLessonAt: lessons.length ? lessons[lessons.length - 1].startAt : null,

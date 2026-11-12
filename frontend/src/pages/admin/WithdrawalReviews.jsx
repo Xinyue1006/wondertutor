@@ -24,7 +24,7 @@ function Request({ w, refresh }) {
     {w.status === 'ESCALATED' && <p className="text-sm font-semibold">Bank details changed after this request. Verify the original account with the tutor before approving.</p>}
     {action ? <form onSubmit={review} className="space-y-2">
       {action === 'REJECTED' ? <label className="block">Reason for rejection<textarea required maxLength={191} className="input text-base" value={reason} onChange={e => setReason(e.target.value)} /></label> :
-        <p>Approve {money(w.amount)} for the account ending {w.bank.lastFour}?</p>}
+        <p>Record approval of {money(w.amount)} for the account ending {w.bank.lastFour}? This records the decision and deducts the amount from the tutor’s available earnings. It does not transfer money to the bank automatically.</p>}
       <div className="flex flex-wrap gap-2"><button className="btn-primary min-h-11" disabled={busy || (action === 'REJECTED' && !reason.trim())}>Confirm decision</button><button type="button" disabled={busy} className="btn-outline min-h-11" onClick={() => setAction('')}>Cancel</button></div>
     </form> : <div className="flex flex-wrap gap-2"><button className="btn-primary min-h-11" onClick={() => setAction('APPROVED')}>Approve</button><button className="btn-outline min-h-11" onClick={() => setAction('REJECTED')}>Reject</button></div>}
     {error && <ErrorBox>{error}</ErrorBox>}
@@ -39,6 +39,7 @@ export default function WithdrawalReviews() {
     .catch(err => setError(errorMessage(err))), [])
   useEffect(() => { load() }, [load])
   return <div className="min-w-0 space-y-3"><PageTitle title="Withdrawal requests" subtitle="Review tutors’ requests to withdraw their earnings." sparkle={false} />
+    <p className="card p-4 text-sm text-slate-600">Approval records your decision; bank transfers are handled separately. Verify the destination and follow the manual payout process before approving. Only the last four account digits are displayed here.</p>
     {error ? <LoadError message={error} onRetry={load} /> : !rows ? <Spinner /> : rows.length ? rows.map(w => <Request key={w.id + '-' + w.status} w={w} refresh={load} />) : <p className="card p-5">No withdrawal requests are waiting for review.</p>}
   </div>
 }

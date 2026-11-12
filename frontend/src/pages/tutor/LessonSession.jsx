@@ -5,6 +5,7 @@ import { uploadImage, uploadError } from '../../components/PhotoPicker'
 import TutorPageHeader from '../../components/TutorPageHeader'
 import { ErrorBox, LoadError, SectionCard, Spinner } from '../../components/ui/Common'
 import { fmtDate, fmtTime, fmtTimeRange } from '../../lib/format'
+import { matchesRecordRef, recordRef } from '../../lib/recordRef'
 
 function readLocation() {
   return new Promise((resolve, reject) => {
@@ -28,10 +29,12 @@ function SessionForm({ session: s, setSession }) {
   const [photo, setPhoto] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [needsRefresh, setNeedsRefresh] = useState(false)
   const [now, setNow] = useState(() => Date.parse(s.serverTime))
   const [content, setContent] = useState('')
   const [progress, setProgress] = useState('')
   const [plan, setPlan] = useState('')
+  const [homework, setHomework] = useState('')
   useEffect(() => {
     const started = performance.now()
     const tick = () => setNow(Date.parse(s.serverTime) + performance.now() - started)
@@ -41,7 +44,7 @@ function SessionForm({ session: s, setSession }) {
     return () => { clearInterval(timer); window.removeEventListener('focus', tick) }
   }, [s.serverTime])
   const physical = s.mode === 'PHYSICAL'
-  const active = s.status === 'CONFIRMED'
+  const active = s.status === 'CONFIRMED' && !needsRefresh
   const ended = now >= Date.parse(s.endAt)
   const started = now >= Date.parse(s.startAt)
   const attendance = s.attendance
@@ -50,12 +53,15 @@ function SessionForm({ session: s, setSession }) {
   const entry = active && started && !ended && !attendance?.checkInAt
   const exit = active && ended && attendance?.checkInAt && !attendance.checkOutAt
   const reportReady = active && attendance?.checkOutAt && !s.report
-  const path = '/tutor/bookings/' + s.id + '/session'
+  const path = '/tutor/bookings/' + recordRef(s) + '/session'
 
   async function run(task) {
     setBusy(true)
     setError('')
-    try { await task() } catch (err) { setError(errorMessage(err)) }
+    try { await task() } catch (err) {
+      setError(errorMessage(err))
+      setNeedsRefresh((current) => current || err.response?.status === 409)
+    }
     finally { setBusy(false) }
   }
   async function locate() {
@@ -81,9 +87,14 @@ function SessionForm({ session: s, setSession }) {
     try { setPhoto(await uploadImage(file, 'attendance', s.id)) } catch (e) { throw new Error(uploadError(e)) }
   }
   return <div className="min-w-0 space-y-4">
-    <Link to={'/tutor/bookings?booking=' + s.id} className="btn-outline min-h-11">Back to my bookings</Link>
+    <Link to={'/tutor/bookings?booking=' + recordRef(s)} className="btn-outline min-h-11">Back to my bookings</Link>
     <TutorPageHeader title={s.subject + ' · ' + s.student} subtitle={fmtDate(s.startAt) + ' · ' + fmtTimeRange(s.startAt, s.endAt) + ' (Malaysia time) · ' + (physical ? s.address || 'Physical lesson' : 'Online lesson')} />
     {error && <div role="alert"><ErrorBox>{error}</ErrorBox></div>}
+    {needsRefresh && <button className="btn-outline min-h-11" disabled={busy} onClick={() => run(async () => {
+      const { data } = await api.get(path)
+      setSession(data)
+      setNeedsRefresh(false)
+    })}>Refresh session</button>}
     <div className="grid min-w-0 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
       <div className="min-w-0 space-y-4">
         <SectionCard title="Check in" icon="calendar">
@@ -114,11 +125,11 @@ function SessionForm({ session: s, setSession }) {
           </>}
         </SectionCard>
         <SectionCard title="Session summary and progress report" icon="file">
-          {s.report ? <dl className="space-y-3">{[['What was covered', s.report.content], ['Student progress', s.report.progressNote], ['Plan for next session', s.report.recommendations]].filter(([,v]) => v).map(([k,v]) =>
+          {s.report ? <dl className="space-y-3">{[['What was covered', s.report.content], ['Student progress', s.report.progressNote], ['Homework / follow-up', s.report.homework], ['Plan for next session', s.report.recommendations]].filter(([,v]) => v).map(([k,v]) =>
             <div key={k}><dt className="font-bold">{k}</dt><dd className="whitespace-pre-wrap break-words">{v}</dd></div>)}</dl> :
-            <form onSubmit={e => { e.preventDefault(); run(() => send({ action: 'report', content, progressNote: progress, recommendations: plan })) }}>
+            <form onSubmit={e => { e.preventDefault(); run(() => send({ action: 'report', content, progressNote: progress, recommendations: plan, ...(homework.trim() && { homework: homework.trim() }) })) }}>
               <fieldset disabled={!reportReady || busy} className="min-w-0 space-y-3">
-                {[[ 'What was covered', content, setContent, true ], [ 'Student progress', progress, setProgress, true ], [ 'Plan for next session (optional)', plan, setPlan, false ]].map(([label, value, setter, required]) =>
+                {[[ 'What was covered', content, setContent, true ], [ 'Student progress', progress, setProgress, true ], [ 'Homework / follow-up (optional)', homework, setHomework, false ], [ 'Plan for next session (optional)', plan, setPlan, false ]].map(([label, value, setter, required]) =>
                   <label key={label} className="block text-sm font-semibold">{label}<textarea className="input mt-1 min-h-20 w-full text-base" maxLength={5000} required={required} value={value} onChange={e => setter(e.target.value)} /></label>)}
                 <button disabled={!content.trim() || !progress.trim()} className="btn-primary min-h-11 w-full sm:w-auto">Submit report and complete session</button>
               </fieldset>
@@ -143,11 +154,13 @@ export default function LessonSession() {
   const [attempt, setAttempt] = useState(0)
   useEffect(() => {
     const controller = new AbortController()
+    setError('')
+    setSession(null)
     api.get('/tutor/bookings/' + id + '/session', { signal: controller.signal })
       .then(({ data }) => { if (!controller.signal.aborted) setSession(data) })
       .catch(e => { if (!controller.signal.aborted) setError(errorMessage(e)) })
     return () => controller.abort()
   }, [id, attempt])
   if (error) return <LoadError message={error} onRetry={() => { setError(''); setAttempt(n => n + 1) }} />
-  return session && String(session.id) === id ? <SessionForm key={id} session={session} setSession={setSession} /> : <Spinner />
+  return matchesRecordRef(session, id) ? <SessionForm key={id} session={session} setSession={setSession} /> : <Spinner />
 }

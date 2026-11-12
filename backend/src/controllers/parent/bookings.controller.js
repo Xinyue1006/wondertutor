@@ -71,7 +71,7 @@ const reload = (id) => prisma.booking.findUnique({ where: { id }, include: booki
 // at the same moment (double click, two tabs) are handled one after the other, so only the first one is created.
 async function lockPaymentAndCountOpenRefunds(tx, paymentId) {
   await tx.$queryRaw`SELECT id FROM Payment WHERE id = ${paymentId} FOR UPDATE`
-  return tx.refund.count({ where: { paymentId, status: { in: ['PENDING', 'APPROVED'] } } })
+  return tx.refund.count({ where: { paymentId, status: { in: ['PENDING', 'APPROVED', 'ESCALATED'] } } })
 }
 
 // POST /parent/bookings: send a booking request (PENDING)
@@ -238,7 +238,7 @@ export async function requestRefund(req, res) {
   if (b.status === 'CONFIRMED' && b.startAt > new Date())
     throw new AppError(400, 'This lesson has not started yet. To get your money back, cancel the booking instead.')
   const alreadyAsked = () => new AppError(409, 'A refund request for this lesson is already being handled')
-  if (b.payment.refunds.some((r) => r.status === 'PENDING' || r.status === 'APPROVED')) throw alreadyAsked()
+  if (b.payment.refunds.some((r) => ['PENDING', 'APPROVED', 'ESCALATED'].includes(r.status))) throw alreadyAsked()
 
   const disputing = attendanceDispute && b.status === 'COMPLETED'
   await prisma.$transaction(async (tx) => {

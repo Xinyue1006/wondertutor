@@ -11,9 +11,9 @@ const time = '2026-11-13T06:00:00.000Z'
 const data = { id: 3, mode: 'PHYSICAL', radius: 150, latitude: 3, longitude: 101, address: 'Lesson address',
   student: 'Example student', subject: 'Mathematics', status: 'CONFIRMED', serverTime: time,
   startAt: '2026-11-13T05:45:00Z', endAt: '2026-11-13T06:45:00Z' }
-function show(session) {
+function show(session, reference = String(session.id)) {
   api.get.mockResolvedValue({ data: session })
-  render(<MemoryRouter initialEntries={['/tutor/bookings/3/session']}><Routes><Route path="/tutor/bookings/:id/session" element={<LessonSession />} /></Routes></MemoryRouter>)
+  render(<MemoryRouter initialEntries={['/tutor/bookings/' + reference + '/session']}><Routes><Route path="/tutor/bookings/:id/session" element={<LessonSession />} /></Routes></MemoryRouter>)
 }
 beforeEach(() => { vi.resetAllMocks(); vi.spyOn(window, 'scrollTo').mockImplementation(() => {}) })
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals() })
@@ -50,4 +50,38 @@ test('both report fields are required after checkout', async () => {
   fireEvent.change(screen.getByLabelText('Student progress'), { target: { value: 'Can simplify fractions.' } })
   expect(button).toBeEnabled()
   expect(screen.queryByText('Check my location')).toBeNull()
+})
+
+test('an owned UUID session loads, retains the public link, and submits homework with the report', async () => {
+  const publicId = 'e15970e1-b3e5-4883-8b5e-4cdd93e9f7ac'
+  const session = { ...data, publicId, mode: 'ONLINE', attendance: { checkInAt: time, checkOutAt: time } }
+  const report = { content: 'Fractions', progressNote: 'Can simplify fractions.', homework: 'Practise questions 1 to 5.' }
+  api.post.mockResolvedValue({ data: { ...session, status: 'COMPLETED', report } })
+  show(session, publicId)
+  expect(await screen.findByRole('link', { name: 'Back to my bookings' })).toHaveAttribute('href', '/tutor/bookings?booking=' + publicId)
+  fireEvent.change(screen.getByLabelText('What was covered'), { target: { value: report.content } })
+  fireEvent.change(screen.getByLabelText('Student progress'), { target: { value: report.progressNote } })
+  fireEvent.change(screen.getByLabelText('Homework / follow-up (optional)'), { target: { value: report.homework } })
+  fireEvent.click(screen.getByRole('button', { name: 'Submit report and complete session' }))
+  await waitFor(() => expect(api.post).toHaveBeenCalledWith('/tutor/bookings/' + publicId + '/session', { action: 'report', ...report, recommendations: '' }))
+  expect(await screen.findByText(report.homework)).toBeInTheDocument()
+})
+
+test('an online check-in conflict can refresh the current attendance without replaying the action', async () => {
+  show({ ...data, mode: 'ONLINE' })
+  const checkIn = await screen.findByRole('button', { name: 'Check in', exact: true })
+  expect(checkIn).toBeEnabled()
+  api.post.mockRejectedValueOnce(Object.assign(new Error('You have already checked in.'), { response: { status: 409 } }))
+  api.get.mockRejectedValueOnce(new Error('The connection failed while refreshing.'))
+    .mockResolvedValue({ data: { ...data, mode: 'ONLINE', attendance: { checkInAt: time } } })
+  fireEvent.click(checkIn)
+  expect(await screen.findByRole('button', { name: 'Refresh session' })).toBeEnabled()
+  expect(checkIn).toBeDisabled()
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh session' }))
+  expect(await screen.findByText('The connection failed while refreshing.')).toBeInTheDocument()
+  expect(checkIn).toBeDisabled()
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh session' }))
+  expect(await screen.findByText(/Checked in at/)).toBeInTheDocument()
+  expect(api.post).toHaveBeenCalledTimes(1)
+  expect(api.post).toHaveBeenCalledWith('/tutor/bookings/3/session', { action: 'check-in' })
 })

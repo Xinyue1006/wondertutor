@@ -68,7 +68,7 @@ export default function ProgressReport() {
       const s = l.summary
       rows.push([
         fmtDate(l.startAt), fmtTimeRange(l.startAt, l.endAt), l.subject, l.tutor, l.teachingMode === 'ONLINE' ? 'Online' : 'Physical',
-        l.attended === null ? 'Not tracked (online)' : l.attended ? 'Checked in' : 'No check-in',
+        l.attended === null ? 'No attendance record' : l.attended ? 'Checked in' : 'No check-in',
         s?.topics, s?.content, s?.progressNote, s?.homework, s?.recommendations,
       ])
     }
@@ -140,7 +140,7 @@ export default function ProgressReport() {
                 {stat('Tutors', totals.tutors)}
                 {stat('Tutor summaries', `${totals.summaries} of ${totals.lessons}`)}
                 {stat('With homework', totals.homeworkSet)}
-                {stat('Check-ins (physical)', totals.physicalLessons ? `${totals.checkedIn} of ${totals.physicalLessons}` : '—')}
+                {stat('Tutor check-ins', (totals.attendanceTrackedLessons ?? totals.physicalLessons) ? `${totals.checkedIn} of ${totals.attendanceTrackedLessons ?? totals.physicalLessons}` : '—')}
                 {stat('Your average rating', totals.averageRating ?? '—')}
               </div>
             </section>
@@ -165,7 +165,7 @@ export default function ProgressReport() {
                     <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
                       <b className="text-navy">{l.subject}</b>
                       <span className="text-sm text-slate-600">{fmtDateLong(l.startAt)}, {fmtTimeRange(l.startAt, l.endAt)}</span>
-                      <span className="text-sm text-slate-600">with {l.tutor} · {l.teachingMode === 'ONLINE' ? 'Online' : l.attended ? 'Physical, checked in' : 'Physical, no check-in recorded'}</span>
+                      <span className="text-sm text-slate-600">with {l.tutor} · {l.teachingMode === 'ONLINE' ? 'Online' : 'Physical'}, {l.attended === null ? 'attendance not recorded' : l.attended ? 'checked in' : 'no check-in recorded'}</span>
                     </div>
                     <LessonNotes summary={l.summary} />
                   </li>

@@ -12,6 +12,11 @@ export const toSummaryDto = (s) => ({
   recommendations: s.recommendations,
 })
 
+// Historical online lessons may predate attendance tracking. Keep those unknown
+// rather than labelling them absent; all actual check-in records count by mode.
+export const attendanceTracked = b => b.teachingMode === 'PHYSICAL' || Boolean(b.attendance)
+export const recordedAttendance = b => attendanceTracked(b) ? Boolean(b.attendance?.checkInAt) : null
+
 // child: an already ownership-checked Child row. q: { from?, to?, subject? } with YYYY-MM-DD dates (Malaysian days,
 // both ends included). Returns the report body without the page-only fields (child DTO, parent name, generatedAt).
 export async function buildChildReport(child, q = {}, db = prisma) {
@@ -47,7 +52,8 @@ export async function buildChildReport(child, q = {}, db = prisma) {
       summaries: lessons.filter((b) => b.summary).length,
       homeworkSet: lessons.filter((b) => b.summary?.homework).length,
       physicalLessons: physical.length,
-      checkedIn: physical.filter((b) => b.attendance?.checkInAt).length,
+      attendanceTrackedLessons: lessons.filter(attendanceTracked).length,
+      checkedIn: lessons.filter((b) => b.attendance?.checkInAt).length,
       averageRating: rated.length ? round1(rated.reduce((t, b) => t + b.review.rating, 0) / rated.length) : null,
     },
     subjects: Object.values(bySubject)
@@ -62,7 +68,7 @@ export async function buildChildReport(child, q = {}, db = prisma) {
       endAt: b.endAt,
       teachingMode: b.teachingMode,
       tutor: b.tutor.user.fullName,
-      attended: b.teachingMode === 'PHYSICAL' ? Boolean(b.attendance?.checkInAt) : null, // online lessons have no attendance record
+      attended: recordedAttendance(b),
       summary: b.summary && toSummaryDto(b.summary),
     })),
   }
