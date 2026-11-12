@@ -13,6 +13,8 @@
 import { prisma } from '../config/prisma.js'
 import { notify, notifyWithEmail } from './notification.service.js'
 import { promoteChildren } from './progression.service.js'
+import { publicReference } from '../utils/publicIds.js'
+import { cleanupExpiredSessions } from './session.service.js'
 
 export const PAYMENT_DEADLINE_MINUTES = 60
 export const REMINDER_HOURS = 24
@@ -30,7 +32,7 @@ async function expire(booking, reason, parentMessage) {
   })
   if (!count) return false
   await prisma.payment.updateMany({ where: { bookingId: booking.id, status: 'PENDING' }, data: { status: 'FAILED' } })
-  await notify(booking.parent.userId, { type: 'BOOKING_EXPIRED', title: 'Booking expired', message: parentMessage, link: `/parent/bookings?booking=${booking.id}` })
+  await notify(booking.parent.userId, { type: 'BOOKING_EXPIRED', title: 'Booking expired', message: parentMessage, link: `/parent/bookings?booking=${publicReference(booking)}` })
   await notify(booking.tutor.userId, { type: 'BOOKING_EXPIRED', title: 'Booking expired', message: `The ${booking.subject} booking on ${when(booking.startAt)} expired: ${reason.replace(/^Expired: /, '')}.`, link: '/tutor/bookings' })
   return true
 }
@@ -62,9 +64,9 @@ export async function sendLessonReminders(now = new Date()) {
   })
   let sent = 0
   for (const b of lessons) {
-    const link = `/parent/bookings?booking=${b.id}`
+    const link = `/parent/bookings?booking=${publicReference(b)}`
     // One reminder per lesson: the notification itself is the record that it was sent
-    const already = await prisma.notification.findFirst({ where: { userId: b.parent.userId, type: 'LESSON_REMINDER', link } })
+    const already = await prisma.notification.findFirst({ where: { userId: b.parent.userId, type: 'LESSON_REMINDER', link: { in: [link, `/parent/bookings?booking=${b.id}`] } } })
     if (already) continue
     const how = b.teachingMode === 'ONLINE' ? 'online (the meeting link is in My Bookings)' : `at ${b.location || 'the agreed location'}`
     await remind(b.parent.user, { type: 'LESSON_REMINDER', title: 'Lesson reminder', message: `${b.child.name}'s ${b.subject} lesson is on ${when(b.startAt)}, ${how}.`, link })
@@ -92,8 +94,8 @@ export async function sendPaymentReminders(now = new Date()) {
   })
   let sent = 0
   for (const b of unpaid) {
-    const link = `/parent/payments?booking=${b.id}`
-    const already = await prisma.notification.findFirst({ where: { userId: b.parent.userId, type: 'PAYMENT_REMINDER', link } })
+    const link = `/parent/payments?booking=${publicReference(b)}`
+    const already = await prisma.notification.findFirst({ where: { userId: b.parent.userId, type: 'PAYMENT_REMINDER', link: { in: [link, `/parent/payments?booking=${b.id}`] } } })
     if (already) continue
     const payBy = when(new Date(b.startAt.getTime() - PAYMENT_DEADLINE_MINUTES * 60_000))
     await remind(b.parent.user, {
@@ -109,6 +111,7 @@ export async function sendPaymentReminders(now = new Date()) {
 
 // One finite pass, shared by the local timer and the Hostinger cron entry point.
 export async function runHousekeeping(now = new Date()) {
+  await cleanupExpiredSessions(now)
   const { expired } = await expireStaleBookings(now)
   const { sent } = await sendLessonReminders(now)
   const { sent: paymentReminders } = await sendPaymentReminders(now)

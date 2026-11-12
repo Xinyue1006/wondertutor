@@ -1,5 +1,5 @@
-import { createContext, useContext, useEffect, useState } from 'react'
-import api from '../api/client'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import api, { clearCsrfToken, errorMessage, isCurrentSessionRequest, setCsrfToken } from '../api/client'
 
 const AuthContext = createContext(null)
 
@@ -9,6 +9,9 @@ const AUTH_CALL = /\/auth\/(login|google|register|verify-otp|resend-otp|forgot-p
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [sessionError, setSessionError] = useState('')
+  const userRef = useRef(null)
+  const request = useRef(0)
   // Why the user was sent back to Log In (expired session, deactivated account); shown once on the login page
   const [notice, setNotice] = useState('')
 
@@ -19,11 +22,12 @@ export function AuthProvider({ children }) {
     const id = api.interceptors.response.use(undefined, (err) => {
       const status = err?.response?.status
       const message = err?.response?.data?.message || ''
-      const hadSession = Boolean(err?.config?.headers?.Authorization)
       const ended = status === 401 || (status === 403 && /deactivated/i.test(message))
-      if (hadSession && ended && !AUTH_CALL.test(err.config.url || '')) {
-        clearToken()
+      if (userRef.current && ended && isCurrentSessionRequest(err.config) && err.config?.url !== '/auth/me' && !AUTH_CALL.test(err.config?.url || '')) {
+        clearCsrfToken()
+        userRef.current = null
         setUser(null)
+        setSessionError('')
         setNotice(status === 401 ? 'Your session has expired. Please log in again.' : message)
       }
       return Promise.reject(err)
@@ -31,31 +35,51 @@ export function AuthProvider({ children }) {
     return () => api.interceptors.response.eject(id)
   }, [])
 
-  // On first load, if a token exists, fetch the current user
-  useEffect(() => {
-    const token = localStorage.getItem('wt_token') || sessionStorage.getItem('wt_token')
-    if (!token) return setLoading(false)
-    api.get('/auth/me')
-      .then((res) => setUser(res.data.user))
-      .catch(() => clearToken())
-      .finally(() => setLoading(false))
+  // Cookies are intentionally unreadable, so ask the server on every reload.
+  // A temporary outage is not evidence that the person has been logged out.
+  const refreshSession = useCallback(async () => {
+    const current = ++request.current
+    setLoading(true)
+    setSessionError('')
+    try {
+      const res = await api.get('/auth/me')
+      if (current !== request.current) return
+      userRef.current = res.data.user
+      setUser(res.data.user)
+      if (res.data.csrfToken) setCsrfToken(res.data.csrfToken)
+    } catch (err) {
+      if (current !== request.current) return
+      if (err.response?.status === 401 || (err.response?.status === 403 && /deactivated/i.test(err.response.data?.message || ''))) {
+        userRef.current = null
+        setUser(null)
+        clearCsrfToken()
+        if (err.response.status === 403) setNotice(err.response.data.message)
+      } else setSessionError(errorMessage(err))
+    } finally {
+      if (current === request.current) setLoading(false)
+    }
   }, [])
 
-  function saveSession(token, user, remember) {
-    clearToken()
-    ;(remember ? localStorage : sessionStorage).setItem('wt_token', token)
-    setUser(user)
-  }
+  useEffect(() => {
+    // Remove credentials left by versions of the app predating cookie sessions.
+    try { localStorage.removeItem('wt_token'); sessionStorage.removeItem('wt_token') } catch { /* Storage may be disabled; cookies still work. */ }
+    refreshSession()
+    return () => { ++request.current }
+  }, [refreshSession])
 
-  function clearToken() {
-    localStorage.removeItem('wt_token')
-    sessionStorage.removeItem('wt_token')
+  function saveSession(user, csrfToken) {
+    ++request.current
+    userRef.current = user
+    setUser(user)
+    setSessionError('')
+    setLoading(false)
+    if (csrfToken) setCsrfToken(csrfToken)
   }
 
   async function login(email, password, remember, recaptchaToken, portal) {
     setNotice('')
-    const res = await api.post('/auth/login', { email, password, recaptchaToken: recaptchaToken || undefined, ...(portal === 'ADMIN' && { portal }) })
-    saveSession(res.data.token, res.data.user, remember)
+    const res = await api.post('/auth/login', { email, password, remember: Boolean(remember), recaptchaToken: recaptchaToken || undefined, ...(portal === 'ADMIN' && { portal }) })
+    saveSession(res.data.user, res.data.csrfToken)
     return res.data.user
   }
 
@@ -63,18 +87,22 @@ export function AuthProvider({ children }) {
   async function googleLogin(credential, role, acceptedPrivacy = false) {
     setNotice('')
     const res = await api.post('/auth/google', { credential, role, ...(acceptedPrivacy && { acceptedPrivacy: true }) })
-    saveSession(res.data.token, res.data.user, true)
+    saveSession(res.data.user, res.data.csrfToken)
     return res.data.user
   }
 
-  function logout(message) {
-    clearToken()
+  async function logout(message) {
+    await api.post('/auth/logout')
+    ++request.current
+    userRef.current = null
     setUser(null)
+    setSessionError('')
+    setLoading(false)
     setNotice(typeof message === 'string' ? message : '')
   }
 
   return (
-    <AuthContext.Provider value={{ user, setUser, loading, login, googleLogin, logout, saveSession, notice }}>
+    <AuthContext.Provider value={{ user, setUser, loading, sessionError, refreshSession, login, googleLogin, logout, saveSession, notice }}>
       {children}
     </AuthContext.Provider>
   )

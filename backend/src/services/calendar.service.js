@@ -1,5 +1,6 @@
 // "Add to calendar": a confirmed lesson as an iCalendar (.ics) file, which Apple Calendar, Outlook and Google Calendar
 // all open. Written by hand (RFC 5545) because it is a small, fixed format and needs no extra library.
+import { publicReference } from '../utils/publicIds.js'
 //
 // Everything here is a plain function of its input (no database, no clock unless passed in), so it is easy to test.
 
@@ -51,7 +52,7 @@ export function lessonLocation(b) {
 }
 
 export function eventLines(b, { baseUrl }) {
-  const bookingUrl = `${baseUrl}/parent/bookings?booking=${b.id}`
+  const bookingUrl = `${baseUrl}/parent/bookings?booking=${publicReference(b)}`
   return [
     'BEGIN:VEVENT',
     `UID:booking-${b.id}@wondertutor`,

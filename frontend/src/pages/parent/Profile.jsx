@@ -162,7 +162,7 @@ export default function Profile() {
     try {
       await api.post('/parent/profile/password', { currentPassword: pw.currentPassword, newPassword: pw.newPassword })
       setPw({ currentPassword: '', newPassword: '', confirm: '' })
-      logout('Your password was changed. Please log in with your new password.')
+      await logout('Your password was changed. Please log in with your new password.')
     } catch (err) {
       setPwError(errorMessage(err))
     } finally {

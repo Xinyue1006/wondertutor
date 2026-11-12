@@ -1,21 +1,13 @@
 {
   "info": {
     "name": "WonderTutor API",
-    "description": "Run \"1. Auth > Login (parent)\" and \"Login (admin)\" first: they save the tokens used by every other request.\nSeed accounts: parent@wondertutor.local / Parent1234, admin@wondertutor.local / Admin1234.\nTip: run \"npm run dev:respond -- <bookingId> accept\" in the backend folder to answer a booking as the tutor.",
+    "description": "Authentication uses the Postman cookie jar, not bearer tokens. Run \"1. Auth > Get CSRF token\" first, then the login for the role being tested. Login updates the CSRF variable and the cookie jar stores the HttpOnly session cookie. One cookie jar has one active account: log in as Parent before Parent requests and as Admin before Admin requests. Do not run both logins first and expect separate role sessions. Fetch CSRF again after clearing cookies or logging out.\nUse a disposable local/staging database only; several collection requests change or delete records. Seed demo accounts exist only after explicitly seeding that disposable database.\nSee docs/SAFER_SESSIONS_2026-11-12.md for the cookie/CSRF contract.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     {
       "key": "baseUrl",
       "value": "http://localhost:5000/api"
-    },
-    {
-      "key": "parentToken",
-      "value": ""
-    },
-    {
-      "key": "adminToken",
-      "value": ""
     },
     {
       "key": "bookingId",
@@ -40,12 +32,49 @@
     {
       "key": "userId",
       "value": ""
+    },
+    {
+      "key": "csrfToken",
+      "value": ""
     }
   ],
   "item": [
     {
       "name": "1. Auth",
       "item": [
+        {
+          "name": "Get CSRF token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/csrf",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "csrf"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
         {
           "name": "Health check",
           "event": [
@@ -87,8 +116,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "const json = pm.response.json();",
-                  "if (json.token) pm.collectionVariables.set('parentToken', String(json.token));"
+                  "const json = pm.response.json();"
                 ]
               }
             }
@@ -103,7 +131,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"parent@wondertutor.local\",\n  \"password\": \"Parent1234\"\n}"
+              "raw": "{\n  \"email\": \"parent@wondertutor.local\",\n  \"password\": \"Parent1234\",\n  \"remember\": false\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/auth/login",
@@ -126,8 +154,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "const json = pm.response.json();",
-                  "if (json.token) pm.collectionVariables.set('adminToken', String(json.token));"
+                  "const json = pm.response.json();"
                 ]
               }
             }
@@ -142,7 +169,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"admin@wondertutor.local\",\n  \"password\": \"Admin1234\"\n}"
+              "raw": "{\n  \"email\": \"admin@wondertutor.local\",\n  \"password\": \"Admin1234\",\n  \"remember\": false,\n  \"portal\": \"ADMIN\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/auth/login",
@@ -179,7 +206,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"parent@wondertutor.local\",\n  \"password\": \"wrong\"\n}"
+              "raw": "{\n  \"email\": \"parent@wondertutor.local\",\n  \"password\": \"wrong\",\n  \"remember\": false\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/auth/login",
@@ -214,16 +241,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/auth/me",
               "host": [
@@ -259,7 +276,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"role\": \"PARENT\",\n  \"fullName\": \"Miki Lim\",\n  \"email\": \"postman@example.com\",\n  \"phone\": \"+60123456789\",\n  \"password\": \"Parent1234\",\n  \"address\": \"Kepong, Kuala Lumpur\",\n  \"children\": [\n    {\n      \"name\": \"Sarah\",\n      \"educationLevel\": \"PRIMARY\",\n      \"grade\": 5,\n      \"subject\": \"Mathematics\",\n      \"notes\": \"Wants to be faster at word problems\"\n    }\n  ],\n  \"preferences\": {\n    \"mode\": \"PHYSICAL\",\n    \"gender\": \"ANY\",\n    \"characteristics\": [\n      \"Structured\"\n    ],\n    \"days\": [\n      1,\n      6\n    ],\n    \"timePreset\": \"EVENING\",\n    \"budgetMax\": 60\n  }\n}"
+              "raw": "{\n  \"role\": \"PARENT\",\n  \"fullName\": \"Miki Lim\",\n  \"email\": \"postman@example.com\",\n  \"phone\": \"+60123456789\",\n  \"password\": \"Parent1234\",\n  \"address\": \"Kepong, Kuala Lumpur\",\n  \"children\": [\n    {\n      \"name\": \"Sarah\",\n      \"educationLevel\": \"PRIMARY\",\n      \"grade\": 5,\n      \"subject\": \"Mathematics\",\n      \"notes\": \"Wants to be faster at word problems\"\n    }\n  ],\n  \"preferences\": {\n    \"mode\": \"PHYSICAL\",\n    \"gender\": \"ANY\",\n    \"characteristics\": [\n      \"Structured\"\n    ],\n    \"days\": [\n      1,\n      6\n    ],\n    \"timePreset\": \"EVENING\",\n    \"budgetMax\": 60\n  },\n  \"acceptedPrivacy\": true\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/auth/register",
@@ -272,6 +289,43 @@
               ]
             }
           }
+        },
+        {
+          "name": "Log out current session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -299,16 +353,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/parent/dashboard",
               "host": [
@@ -342,16 +386,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/parent/children",
               "host": [
@@ -387,16 +421,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Postman Child\",\n  \"educationLevel\": \"PRIMARY\",\n  \"grade\": 3,\n  \"subject\": \"English\",\n  \"notes\": \"Created from Postman\"\n}"
@@ -434,16 +458,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Postman Child\",\n  \"educationLevel\": \"PRIMARY\",\n  \"grade\": 4,\n  \"subject\": \"English\"\n}"
@@ -482,16 +496,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"X\",\n  \"educationLevel\": \"KINDERGARTEN\",\n  \"grade\": 5\n}"
@@ -529,16 +533,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/parent/children/{{childId}}",
               "host": [
@@ -573,16 +567,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/parent/profile",
               "host": [
@@ -616,16 +600,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"fullName\": \"Miki Lim\",\n  \"phone\": \"+60123456780\",\n  \"address\": \"Kepong, Kuala Lumpur\",\n  \"preferences\": {\n    \"mode\": \"PHYSICAL\",\n    \"gender\": \"ANY\",\n    \"characteristics\": [\n      \"Structured\"\n    ],\n    \"days\": [\n      1,\n      6\n    ],\n    \"timePreset\": \"EVENING\",\n    \"budgetMax\": 60\n  }\n}"
@@ -668,16 +642,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/parent/catalog",
               "host": [
@@ -711,16 +675,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/parent/tutors?subject=Mathematics&level=PRIMARY&grade=5&location=Kepong, Kuala Lumpur&sort=recommended",
               "host": [
@@ -776,16 +730,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/parent/tutors?subject=Mathematics&level=PRIMARY&grade=5&mode=ONLINE&minPrice=40&maxPrice=60&minRating=4.5",
               "host": [
@@ -849,16 +793,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/parent/tutors?level=PRIMARY",
               "host": [
@@ -898,16 +832,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/parent/tutors/{{tutorId}}",
               "host": [
@@ -942,16 +866,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/parent/tutors/{{tutorId}}/reviews?sort=recent&page=1",
               "host": [
@@ -997,16 +911,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/parent/tutors/{{tutorId}}/slots",
               "host": [
@@ -1042,16 +946,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/parent/favourites/{{tutorId}}",
               "host": [
@@ -1086,16 +980,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"source\": \"WIZARD\",\n  \"criteria\": {\n    \"subject\": \"Mathematics\",\n    \"level\": \"PRIMARY\",\n    \"grade\": 5,\n    \"days\": [\n      1,\n      2,\n      5\n    ],\n    \"timeStart\": \"18:00\",\n    \"timeEnd\": \"20:00\",\n    \"mode\": \"PHYSICAL\",\n    \"location\": \"Kepong, Kuala Lumpur\",\n    \"budgetMax\": 80,\n    \"gender\": \"ANY\",\n    \"characteristics\": [\n      \"Structured\"\n    ]\n  }\n}"
@@ -1133,16 +1017,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/parent/matching/latest",
               "host": [
@@ -1182,16 +1056,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/parent/bookings",
               "host": [
@@ -1227,16 +1091,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"tutorId\": 2,\n  \"childId\": 1,\n  \"date\": \"2026-10-20\",\n  \"startTime\": \"14:00\",\n  \"teachingMode\": \"ONLINE\",\n  \"proposedPrice\": 55,\n  \"messageToTutor\": \"From Postman\"\n}"
@@ -1274,16 +1128,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/parent/bookings/{{bookingId}}",
               "host": [
@@ -1318,16 +1162,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/parent/bookings/{{bookingId}}/accept-counter",
               "host": [
@@ -1363,16 +1197,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/parent/bookings/{{bookingId}}/decline-counter",
               "host": [
@@ -1408,16 +1232,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"reason\": \"Changed plans\"\n}"
@@ -1457,16 +1271,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/parent/payments",
               "host": [
@@ -1502,16 +1306,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"bookingId\": 0\n}"
@@ -1550,16 +1344,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"bank\": \"Maybank2u\",\n  \"outcome\": \"SUCCESS\"\n}"
@@ -1599,16 +1383,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"reason\": \"The tutor left the lesson early.\"\n}"
@@ -1648,16 +1422,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"rating\": 5,\n  \"comment\": \"Great lesson\"\n}"
@@ -1702,16 +1466,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"category\": \"Lesson quality\",\n  \"description\": \"The lesson did not match what we agreed.\"\n}"
@@ -1749,16 +1503,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/parent/complaints",
               "host": [
@@ -1792,16 +1536,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/notifications",
               "host": [
@@ -1834,16 +1568,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/notifications/read-all",
               "host": [
@@ -1877,16 +1601,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/uploads/signature",
               "host": [
@@ -1925,16 +1639,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{adminToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/admin/dashboard",
               "host": [
@@ -1968,16 +1672,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{adminToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/admin/users",
               "host": [
@@ -2011,16 +1705,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{adminToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/admin/users?role=TUTOR&flagged=1",
               "host": [
@@ -2064,16 +1748,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/admin/users",
               "host": [
@@ -2107,16 +1781,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{adminToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/admin/users/{{userId}}",
               "host": [
@@ -2151,16 +1815,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{adminToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/admin/users/{{userId}}/deactivate",
               "host": [
@@ -2196,16 +1850,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{adminToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/admin/users/{{userId}}/reactivate",
               "host": [
@@ -2241,16 +1885,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{adminToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"status\": \"APPROVED\"\n}"
@@ -2292,16 +1926,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{adminToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/admin/complaints?status=OPEN",
               "host": [
@@ -2341,16 +1965,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{adminToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"status\": \"RESOLVED\",\n  \"adminResponse\": \"We spoke to the tutor and agreed a follow-up lesson.\"\n}"
@@ -2468,16 +2082,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/parent/tutors?subject=Mathematics&level=PRIMARY&grade=5&page=2&pageSize=9",
               "host": [
@@ -2533,16 +2137,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/parent/favourites",
               "host": [
@@ -2576,16 +2170,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/parent/children/{{childId}}/progress",
               "host": [
@@ -2621,16 +2205,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"date\": \"2026-10-22\",\n  \"startTime\": \"18:00\",\n  \"reason\": \"School event\"\n}"
@@ -2670,16 +2244,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "body": {
               "mode": "raw",
               "raw": "{}"
@@ -2721,16 +2285,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"reason\": \"The tutor never arrived.\",\n  \"attendanceDispute\": true\n}"
@@ -2770,16 +2324,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{adminToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/admin/complaints/report?from=2026-10-01&to=2026-10-31",
               "host": [
@@ -2824,16 +2368,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{adminToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/admin/complaints/export",
               "host": [
@@ -2870,16 +2404,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"tutorId\": 2,\n  \"childId\": 1,\n  \"date\": \"2026-10-20\",\n  \"startTime\": \"15:00\",\n  \"teachingMode\": \"ONLINE\",\n  \"proposedPrice\": 55,\n  \"messageToTutor\": \"From Postman\",\n  \"isTrial\": true\n}"
@@ -2917,16 +2441,6 @@
                 "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{parentToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"rating\": 5,\n  \"comment\": \"Great lesson\",\n  \"photoUrl\": \"https://res.cloudinary.com/demo/image/upload/sample.jpg\"\n}"
@@ -2949,12 +2463,7 @@
           "name": "Add one confirmed lesson to a calendar (.ics file)",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "application/json"
-              }
-            ],
+            "header": [],
             "url": {
               "raw": "{{baseUrl}}/parent/bookings/1/calendar.ics",
               "host": [
@@ -2973,12 +2482,7 @@
           "name": "Add all upcoming confirmed lessons to a calendar (.ics file)",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "application/json"
-              }
-            ],
+            "header": [],
             "url": {
               "raw": "{{baseUrl}}/parent/bookings/calendar.ics",
               "host": [
@@ -2997,10 +2501,6 @@
           "request": {
             "method": "PUT",
             "header": [
-              {
-                "key": "Authorization",
-                "value": "application/json"
-              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -3027,12 +2527,7 @@
           "name": "Privacy: download my data (JSON)",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "application/json"
-              }
-            ],
+            "header": [],
             "url": {
               "raw": "{{baseUrl}}/parent/account/export",
               "host": [
@@ -3050,12 +2545,7 @@
           "name": "Privacy: what must be finished before I can delete my account",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "application/json"
-              }
-            ],
+            "header": [],
             "url": {
               "raw": "{{baseUrl}}/parent/account/deletion-check",
               "host": [
@@ -3074,10 +2564,6 @@
           "request": {
             "method": "POST",
             "header": [
-              {
-                "key": "Authorization",
-                "value": "application/json"
-              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -3146,6 +2632,34 @@
           }
         }
       ]
+    }
+  ],
+  "auth": {
+    "type": "noauth"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!['GET', 'HEAD', 'OPTIONS'].includes(pm.request.method)) {",
+          "  pm.request.headers.upsert({ key: 'X-CSRF-Token', value: pm.collectionVariables.get('csrfToken') || '' });",
+          "}"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "try {",
+          "  const body = pm.response.json();",
+          "  if (body.csrfToken) pm.collectionVariables.set('csrfToken', body.csrfToken);",
+          "} catch (_) { /* File downloads need no JSON handling. */ }"
+        ]
+      }
     }
   ]
 }

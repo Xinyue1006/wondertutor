@@ -10,6 +10,7 @@ import { GRADE_GROUPS, gradeLabel, parseGrade } from '../../lib/education'
 import { checkName, checkText } from '../../lib/validation'
 import SubjectPicker from '../../components/SubjectPicker'
 import { childSubjects, keepAllowed } from '../../lib/subjects'
+import { matchesRecordRef, recordRef } from '../../lib/recordRef'
 
 const blank = { name: '', grade: 'PRIMARY:1', subjects: [], preferredLanguage: '', goals: '', notes: '', photoUrl: null }
 
@@ -38,7 +39,7 @@ export default function MyChildren() {
     if (!kids) return
     if (params.get('add')) openForm('new')
     else if (params.get('edit')) {
-      const c = kids.find((k) => k.id === Number(params.get('edit')))
+      const c = kids.find((k) => matchesRecordRef(k, params.get('edit')))
       if (c) openForm(c)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -64,7 +65,7 @@ export default function MyChildren() {
     setBusy(true)
     try {
       if (editing === 'new') await api.post('/parent/children', body)
-      else await api.put(`/parent/children/${editing.id}`, body)
+      else await api.put(`/parent/children/${recordRef(editing)}`, body)
       await load(); await refreshChildren()
       closeForm()
     } catch (err) {
@@ -78,7 +79,7 @@ export default function MyChildren() {
     if (removeBusy) return
     setRemoveBusy(true)
     try {
-      await api.delete(`/parent/children/${removing.id}`)
+      await api.delete(`/parent/children/${recordRef(removing)}`)
       await load(); await refreshChildren()
       setRemoving(null)
     } catch (err) {
@@ -126,7 +127,7 @@ export default function MyChildren() {
             <div className="mt-2 text-xs text-slate-400">{c.bookingCount} booking{c.bookingCount === 1 ? '' : 's'}</div>
             <div className="mt-3 grid grid-cols-2 gap-2">
               <button onClick={() => { applyChild(c); navigate('/parent/find-tutor/match') }} className="btn-primary col-span-2"><Icon name="search" className="h-4 w-4" /> Find a Tutor</button>
-              <Link to={`/parent/children/${c.id}/progress`} className="btn-outline col-span-2"><Icon name="chart" className="h-4 w-4" /> View Learning Progress</Link>
+              <Link to={`/parent/children/${recordRef(c)}/progress`} className="btn-outline col-span-2"><Icon name="chart" className="h-4 w-4" /> View Learning Progress</Link>
               {/* A child with lessons keeps their profile: bookings, payments and progress refer to it */}
               <button onClick={() => openForm(c)} className={`btn-outline ${c.bookingCount ? 'col-span-2' : ''}`}><Icon name="edit" className="h-4 w-4" /> Edit</button>
               {!c.bookingCount && <button onClick={() => { setError(''); setRemoving(c) }} className="btn-danger"><Icon name="trash" className="h-4 w-4" /> Remove</button>}

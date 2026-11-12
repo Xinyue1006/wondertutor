@@ -14,6 +14,7 @@ import { parentPaymentSummary } from '../paymentSummary.service.js'
 import { distanceBand } from '../matching.service.js'
 import { addDays, mytParts, mytToDate } from '../../utils/time.js'
 import { subjectsOf } from '../../utils/childSubjects.js'
+import { publicReference } from '../../utils/publicIds.js'
 import { searchFaq } from './faq.js'
 import { toolArgs } from './schemas.js'
 import { refFor, resolveRef } from './session.js'
@@ -244,7 +245,7 @@ async function listBookings(ctx, args) {
       link: '/parent/bookings',
       bookings: rows.map((b, i) => ({
         ref: items[i].bookingRef, childName: b.child.name, tutorName: b.tutor.user.fullName, subject: b.subject, status: b.status,
-        date: items[i].date, time: items[i].time, mode: b.teachingMode, hourlyPrice: items[i].hourlyPrice, link: `/parent/bookings?booking=${b.id}`,
+        date: items[i].date, time: items[i].time, mode: b.teachingMode, hourlyPrice: items[i].hourlyPrice, link: `/parent/bookings?booking=${publicReference(b)}`,
       })),
     })
     for (const it of items) source(ctx, 'booking', it.bookingRef, `Booking ${it.date} ${it.subject}`, '/parent/bookings')
@@ -271,10 +272,10 @@ async function getLessonDetails(ctx, { bookingRef }) {
     type: 'lesson_detail', ref: refs.bookingRef, childName: b.child.name, tutorName: b.tutor.user.fullName, subject: b.subject, status: b.status,
     date: p.date, time: p.time, mode: b.teachingMode, checkIn,
     summary: sm ? { content: cut(sm.content, 1200), topics: cut(sm.topics, 400), homework: cut(sm.homework, 800), recommendations: cut(sm.recommendations, 800), progressNote: cut(sm.progressNote, 800) } : null,
-    link: `/parent/bookings?booking=${b.id}`,
+    link: `/parent/bookings?booking=${publicReference(b)}`,
   })
   evid(ctx, { kind: 'lesson', bookingRef: refs.bookingRef, childRef: refs.childRef, tutorRef: refs.tutorRef, subject: b.subject, status: b.status, date: p.date, time: p.time, mode: b.teachingMode, checkInTime: checkIn.checkInTime, checkOutTime: checkIn.checkOutTime, hasSummary: Boolean(sm) })
-  source(ctx, 'booking', refs.bookingRef, `Lesson ${p.date} ${b.subject}`, `/parent/bookings?booking=${b.id}`)
+  source(ctx, 'booking', refs.bookingRef, `Lesson ${p.date} ${b.subject}`, `/parent/bookings?booking=${publicReference(b)}`)
   return {
     ...refs, subject: b.subject, status: b.status, date: p.date, time: p.time, mode: b.teachingMode,
     attendance: b.teachingMode === 'PHYSICAL' ? checkIn : { recorded: null, note: 'Online lessons have no attendance tracking.' },
@@ -299,10 +300,10 @@ async function getLearningProgress(ctx, args) {
     totals: { lessons: r.totals.lessons, hours: r.totals.hours, summaries: r.totals.summaries, homeworkSet: r.totals.homeworkSet, physicalLessons: r.totals.physicalLessons, checkedIn: r.totals.checkedIn },
     subjects: r.subjects.map((x) => ({ subject: x.subject, lessons: x.lessons, hours: x.hours })),
     recentLessons: recent.map((l) => ({ date: myt(l.startAt).date, subject: l.subject, tutorName: l.tutor, homework: cut(l.summary?.homework, 800), summary: cut(l.summary?.content, 800) })),
-    link: `/parent/children/${child.id}/progress`,
+    link: `/parent/children/${publicReference(child)}/progress`,
   })
   evid(ctx, { kind: 'progress', childRef, period: { from: r.period.from ?? null, to: r.period.to ?? null, subject: r.period.subject ?? null }, lessons: r.totals.lessons, hours: r.totals.hours, summaries: r.totals.summaries, homeworkSet: r.totals.homeworkSet })
-  source(ctx, 'child', childRef, 'Learning progress', `/parent/children/${child.id}/progress`)
+  source(ctx, 'child', childRef, 'Learning progress', `/parent/children/${publicReference(child)}/progress`)
   return {
     childRef,
     period: { ...r.period, timezone: 'Asia/Kuala_Lumpur' },

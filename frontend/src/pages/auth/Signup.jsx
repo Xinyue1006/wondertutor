@@ -196,7 +196,7 @@ export default function Signup() {
     try {
       const res = await api.post('/auth/verify-otp', { email: form.email, code: otp })
       try { sessionStorage.removeItem(DRAFT_KEY) } catch { /* ignore */ }
-      saveSession(res.data.token, res.data.user, true)
+      saveSession(res.data.user, res.data.csrfToken)
       // A new tutor goes on to the profile setup (step 4, "Complete profile"); they may leave it and use the portal
       // straight away. A parent goes to their dashboard.
       navigate(res.data.user.role === 'TUTOR' ? '/tutor/setup' : afterLogin(res.data.user))

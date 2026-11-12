@@ -18,7 +18,11 @@ import { dashboard } from '../controllers/parent/dashboard.controller.js'
 import * as assistant from '../controllers/parent/assistant.controller.js'
 import { env } from '../config/env.js'
 
-const router = validateIdParams(Router()) // every :id in these URLs must be a positive whole number
+const router = validateIdParams(Router(), { publicIds: [
+  { prefix: '/children/', model: 'child', scope: (req) => ({ parentId: req.parent.id }), notFound: 'Child not found' },
+  { prefix: '/bookings/', model: 'booking', scope: (req) => ({ parentId: req.parent.id }), notFound: 'Booking not found' },
+  { prefix: '/payments/', model: 'payment', scope: (req) => ({ booking: { parentId: req.parent.id } }), notFound: 'Payment not found' },
+] })
 router.use(requireAuth, requireRole('PARENT'), loadParentProfile)
 
 router.get('/dashboard', dashboard)

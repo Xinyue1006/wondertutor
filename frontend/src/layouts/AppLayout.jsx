@@ -5,7 +5,7 @@ import Avatar from '../components/ui/Avatar'
 import Icon from '../components/ui/Icon'
 import { useClickOutside } from '../components/ui/Common'
 import { useAuth } from '../context/AuthContext'
-import api from '../api/client'
+import api, { errorMessage } from '../api/client'
 import { timeAgo } from '../lib/format'
 import { MatchingProvider } from '../assistant/MatchingContext'
 import AssistantWidget from '../assistant/AssistantWidget'
@@ -100,8 +100,7 @@ export default function AppLayout() {
 }
 
 function UserMenu() {
-  const { user, logout } = useAuth()
-  const navigate = useNavigate()
+  const { user } = useAuth()
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   useClickOutside(ref, useCallback(() => setOpen(false), []))
@@ -136,14 +135,36 @@ function UserMenu() {
               <Icon name="shield" className="h-4 w-4" /> My Complaints
             </Link>
           )}
-          <button
-            onClick={() => { logout(); navigate(user.role === 'ADMIN' ? '/admin/login' : '/login') }}
-            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-          >
-            <Icon name="logout" className="h-4 w-4" /> Log out
-          </button>
+          <LogoutButton icon className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-60" />
         </div>
       )}
+    </div>
+  )
+}
+
+function LogoutButton({ className, icon = false }) {
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  async function leave() {
+    if (busy) return
+    const destination = user.role === 'ADMIN' ? '/admin/login' : '/login'
+    setBusy(true)
+    setError('')
+    try {
+      await logout()
+      navigate(destination)
+    } catch (err) {
+      setError(`We couldn't log you out. ${errorMessage(err)}`)
+    } finally { setBusy(false) }
+  }
+  return (
+    <div>
+      <button type="button" onClick={leave} disabled={busy} className={className}>
+        {icon && <Icon name="logout" className="h-4 w-4" />} {busy ? 'Logging out…' : 'Log out'}
+      </button>
+      {error && <p role="alert" className="px-3 py-2 text-xs text-red-700">{error}</p>}
     </div>
   )
 }
@@ -271,8 +292,7 @@ const HELP = {
 }
 
 function AppFooter({ items }) {
-  const { user, logout } = useAuth()
-  const navigate = useNavigate()
+  const { user } = useAuth()
   const account = ACCOUNT_LINKS[user.role] || []
   const help = HELP[user.role]
   const link = 'inline-flex min-h-9 items-center text-slate-700 hover:text-brand-600 hover:underline'
@@ -295,7 +315,7 @@ function AppFooter({ items }) {
           <ul className="space-y-0.5">
             {account.map(([to, label]) => <li key={to}><Link to={to} className={link}>{label}</Link></li>)}
             <li>
-              <button type="button" onClick={() => { logout(); navigate(user.role === 'ADMIN' ? '/admin/login' : '/login') }} className={`${link} text-red-700 hover:text-red-800`}>Log out</button>
+              <LogoutButton className={`${link} text-red-700 hover:text-red-800 disabled:opacity-60`} />
             </li>
           </ul>
         </nav>

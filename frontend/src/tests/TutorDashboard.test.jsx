@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { vi } from 'vitest'
 
@@ -25,7 +25,7 @@ test('shows the tutor overview and links to teaching tools', async () => {
   expect(screen.getByText('7')).toBeInTheDocument()
   expect(screen.getByText('2 parent reviews')).toBeInTheDocument()
   expect(api.get).toHaveBeenCalledWith('/tutor/dashboard')
-  expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, left: 0, behavior: 'instant' })
+  await waitFor(() => expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, left: 0, behavior: 'instant' }))
   expect(screen.getByRole('link', { name: /Set teaching hours/ })).toHaveAttribute('href', '/tutor/availability')
   expect(screen.getByRole('link', { name: /Edit my profile/ })).toHaveAttribute('href', '/tutor/setup')
 })

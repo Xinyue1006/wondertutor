@@ -4,6 +4,8 @@ import { requireAuth } from '../middleware/auth.js'
 import { byIpAndEmail, rateLimit } from '../middleware/rateLimit.js'
 
 const router = Router()
+router.get('/csrf', auth.csrf)
+router.post('/logout', auth.logout)
 
 // Brute-force protection on everything that checks a password or a code, or sends an email
 const FIFTEEN_MIN = 15 * 60 * 1000

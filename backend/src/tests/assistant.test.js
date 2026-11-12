@@ -114,7 +114,7 @@ describe('upcoming lesson, grounded answer, provider payload privacy', () => {
     expect(res.text).toMatch(/RM55/)
     const card = res.cards.find((c) => c.type === 'booking_list')
     expect(card.bookings[0]).toMatchObject({ childName: 'Sarah', tutorName: 'Daniel Tan', status: 'CONFIRMED', hourlyPrice: 55 })
-    expect(card.bookings[0].link).toBe(`/parent/bookings?booking=${booking.id}`)
+    expect(card.bookings[0].link).toBe(`/parent/bookings?booking=${booking.publicId}`)
     expect(Object.values(res.entities)).toEqual(expect.arrayContaining(['Sarah', 'Daniel Tan']))
     expect(res.sources.length).toBeGreaterThan(0)
 

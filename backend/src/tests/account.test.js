@@ -1,9 +1,8 @@
 // Privacy and account controls (PDPA): consent at sign-up, reminder emails on/off, "download my data" and
 // "delete my account" (personal details go, lesson and payment records stay without a name).
 import { prisma } from '../config/prisma.js'
-import { signToken } from '../services/token.service.js'
 import { outbox } from '../services/email.service.js'
-import { MONDAY, api, apiBase, makeAdmin, makeBooking, makeParent, makeTutor, nextDate, resetDb, startServer, stopServer } from './helpers.js'
+import { testSession, authHeaders, MONDAY, api, apiBase, makeAdmin, makeBooking, makeParent, makeTutor, nextDate, resetDb, startServer, stopServer } from './helpers.js'
 
 let tutor, monday
 beforeAll(async () => {
@@ -53,7 +52,7 @@ describe('download my data', () => {
     await prisma.child.update({ where: { id: p.child.id }, data: { preferredLanguage: 'Mandarin', goals: 'Improve fractions' } })
     await makeBooking({ parent: p.parent, child: p.child, tutor: tutor.tutor, date: monday, start: '16:00', status: 'COMPLETED' })
     await makeBooking({ parent: other.parent, child: other.child, tutor: tutor.tutor, date: monday, start: '17:00', status: 'COMPLETED' })
-    const res = await fetch(`${apiBase()}/parent/account/export`, { headers: { Authorization: `Bearer ${p.token}` } })
+    const res = await fetch(`${apiBase()}/parent/account/export`, { headers: authHeaders(p.token) })
     expect(res.status).toBe(200)
     expect(res.headers.get('content-disposition')).toContain('wondertutor-my-data.json')
     const text = await res.text()
@@ -139,7 +138,7 @@ describe('delete my account', () => {
     const p = await makeParent()
     const oldEmail = p.user.email
     expect((await del(p)).status).toBe(200)
-    expect((await api(p.token).get('/parent/profile')).status).toBe(403) // the old login stops working at once
+    expect((await api(p.token).get('/parent/profile')).status).toBe(401) // the deleted account's credential binding invalidates its session
     expect((await api().post('/auth/login', { email: oldEmail, password: 'Test1234' })).status).toBe(401)
     const again = await api().post('/auth/register', { role: 'PARENT', fullName: 'Back Again', email: oldEmail, phone: '012-345 6789', password: 'Parent1234', acceptedPrivacy: true })
     expect(again.status).toBe(201)
@@ -148,7 +147,7 @@ describe('delete my account', () => {
   test('a Google-only account (no password) confirms with the email alone', async () => {
     const p = await makeParent()
     const googleUser = await prisma.user.update({ where: { id: p.user.id }, data: { passwordHash: null, googleId: 'g-123' } })
-    p.token = signToken(googleUser)
+    p.token = await testSession(googleUser)
     const res = await api(p.token).post('/parent/account/delete', { confirmEmail: p.user.email })
     expect(res.status).toBe(200)
   })

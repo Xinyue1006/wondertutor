@@ -14,6 +14,7 @@ import { MAX_GRADE, isSubjectAtLevel } from '../data/catalog.js'
 import { subjectColumns, subjectsOf } from '../utils/childSubjects.js'
 import { mytParts } from '../utils/time.js'
 import { notify } from './notification.service.js'
+import { publicReference } from '../utils/publicIds.js'
 
 const ORDER = ['KINDERGARTEN', 'PRIMARY', 'SECONDARY']
 export const currentSchoolYear = (now = new Date()) => Number(mytParts(now).date.slice(0, 4))
@@ -72,9 +73,9 @@ export async function promoteChildren(now = new Date()) {
         link: '/parent/children',
       })
     } else if (to.finished) {
-      const link = `/parent/children?child=${child.id}`
+      const link = `/parent/children?child=${publicReference(child)}`
       // Said once, not every January
-      const told = await prisma.notification.findFirst({ where: { userId: child.parent.userId, type: 'CHILD_FINISHED', link } })
+      const told = await prisma.notification.findFirst({ where: { userId: child.parent.userId, type: 'CHILD_FINISHED', link: { in: [link, `/parent/children?child=${child.id}`] } } })
       if (!told) {
         await notify(child.parent.userId, {
           type: 'CHILD_FINISHED',

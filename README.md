@@ -5,7 +5,7 @@ Intelligent Education Matching Web Platform — FYP (Tan Xin Yue & Yap Yan Hsi, 
 | Part | Tech |
 |---|---|
 | `frontend/` | React 19 + Vite + Tailwind CSS v4 + React Router + Axios |
-| `backend/` | Node.js + Express 5 + Prisma 6 + MySQL, JWT + bcrypt, email OTP, reCAPTCHA, Google OAuth |
+| `backend/` | Node.js + Express 5 + Prisma 6 + MySQL, database sessions + HttpOnly cookies + CSRF, bcrypt, email OTP, reCAPTCHA, Google OAuth |
 
 ## 1. Install once
 
@@ -197,12 +197,12 @@ backend/
     middleware/          # requireAuth, requireRole, loadParentProfile / loadTutorProfile, error handler
     routes/              # one file per module (auth, parent, tutor, admin), registered in routes/index.js
     controllers/         # request handlers: Zod validation + ownership, then a service (parent/, tutor/, admin/)
-    services/            # email, OTP, JWT, reCAPTCHA, matching, booking (slots + conflicts), notifications,
+    services/            # email, OTP, cookie sessions, reCAPTCHA, matching, booking (slots + conflicts), notifications,
                          # tutorSetup (setup draft, submit for verification, verification status)
     data/catalog.js      # subjects, Klang Valley locations (lat/lng), teaching styles
     tests/               # Jest unit tests
 frontend/src/
-  api/client.js          # axios with JWT attached
+  api/client.js          # axios with cookie credentials and memory-only CSRF proof
   context/AuthContext    # current user, login/logout
   layouts/               # PublicLayout, AppLayout (role-based nav)
   pages/auth|parent|tutor|admin

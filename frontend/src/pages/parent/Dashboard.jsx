@@ -11,6 +11,7 @@ import LessonDetails from '../../components/LessonDetails'
 import { fmtDate, fmtTimeRange, greeting, timeAgo } from '../../lib/format'
 import { gradeLabel } from '../../lib/education'
 import { childSubjects } from '../../lib/subjects'
+import { recordRef } from '../../lib/recordRef'
 import { DAY_SHORT, hhmmLabel } from '../../lib/format'
 
 const ACTIVITY_ICON = {
@@ -94,7 +95,7 @@ export default function ParentDashboard() {
                       {childSubjects(c).length > 0 && <div className="flex items-center gap-1.5 text-sm text-slate-500"><Icon name="book" className="h-3.5 w-3.5 shrink-0 text-brand-500" /> <span className="truncate">{childSubjects(c).slice(0, 2).join(', ')}{childSubjects(c).length > 2 ? ` +${childSubjects(c).length - 2}` : ''}</span></div>}
                     </div>
                   </div>
-                  <Link to={`/parent/children?edit=${c.id}`} className="btn-outline mt-3 w-full">View Profile <Icon name="arrow-right" className="h-4 w-4" /></Link>
+                  <Link to={`/parent/children?edit=${recordRef(c)}`} className="btn-outline mt-3 w-full">View Profile <Icon name="arrow-right" className="h-4 w-4" /></Link>
                 </div>
               ))}
               <Link to="/parent/children?add=1" className="flex flex-col items-center justify-center rounded-xl border border-dashed border-brand-200 bg-brand-50/60 p-4 text-center transition hover:bg-brand-50">

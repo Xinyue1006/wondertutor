@@ -14,7 +14,8 @@ beforeAll(async () => {
 afterAll(stopServer)
 
 const PHOTO = 'https://res.cloudinary.com/demo/image/upload/tutor.jpg'
-const docUrl = token => 'https://res.cloudinary.com/demo/image/authenticated/v1/wondertutor/qualifications/' + JSON.parse(Buffer.from(token.split('.')[1], 'base64url')).sub + '/cert.pdf'
+const tutorOwners = new Map()
+const docUrl = token => 'https://res.cloudinary.com/demo/image/authenticated/v1/wondertutor/qualifications/' + tutorOwners.get(token) + '/cert.pdf'
 let n = 0
 const email = () => `newtutor${Date.now()}${++n}@test.local`
 
@@ -27,9 +28,11 @@ async function signUpTutor() {
   expect(reg.status).toBe(201)
   const codeHash = await bcrypt.hash('123456', 4)
   await prisma.emailOtp.updateMany({ where: { email: address }, data: { codeHash } })
-  const verified = await api().post('/auth/verify-otp', { email: address, code: '123456' })
+  const client = api()
+  const verified = await client.post('/auth/verify-otp', { email: address, code: '123456' })
   expect(verified.status).toBe(200)
-  return { token: verified.token, user: verified.user }
+  tutorOwners.set(client.session, verified.user.id)
+  return { token: client.session, user: verified.user }
 }
 
 // Every step of the setup wizard, filled in

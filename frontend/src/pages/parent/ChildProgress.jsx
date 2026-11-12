@@ -7,6 +7,7 @@ import { EmptyState, LoadError, PageTitle, Spinner, Stars } from '../../componen
 import { gradeLabel } from '../../lib/education'
 import LessonNotes from '../../components/LessonNotes'
 import { fmtDate, fmtDateLong, fmtTime, fmtTimeRange } from '../../lib/format'
+import { recordRef } from '../../lib/recordRef'
 
 // A child's learning journey: totals, subjects, the next lesson, and every completed lesson with the
 // tutor's session summary, progress note and check-in record (written by the tutor, read-only here).
@@ -56,7 +57,7 @@ export default function ChildProgress() {
         title={`${child.name}'s Learning Progress`}
         subtitle={`${gradeLabel(child.educationLevel, child.grade)}${stats.firstLessonAt ? ` · learning with WonderTutor since ${fmtDate(stats.firstLessonAt)}` : ''}`}
         sparkle={false}
-        right={<Link to={`/parent/children/${id}/report`} className="btn-primary px-5"><Icon name="file" className="h-4 w-4" /> Progress report</Link>}
+        right={<Link to={`/parent/children/${recordRef(child) || id}/report`} className="btn-primary px-5"><Icon name="file" className="h-4 w-4" /> Progress report</Link>}
       />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

@@ -3,7 +3,7 @@
 import http from 'node:http'
 import bcrypt from 'bcrypt'
 import { prisma } from '../config/prisma.js'
-import { signToken } from '../services/token.service.js'
+import { createSession, csrfForSession, sessionCookieName } from '../services/session.service.js'
 import app from '../app.js'
 import { addDays, mytParts, mytToDate, todayMyt } from '../utils/time.js'
 
@@ -24,23 +24,50 @@ export async function stopServer() {
   await prisma.$disconnect()
 }
 
+// Test fixtures retain the `token` property name, but its value is an opaque
+// cookie credential backed by AuthSession, never a browser JWT/Bearer token.
+export const authHeaders = (token) => token ? { Cookie: `${sessionCookieName()}=${token}`, 'X-CSRF-Token': csrfForSession(token) } : {}
+export const testSession = async (user) => (await createSession(user)).raw
+
+// A small cookie jar exercises the same CSRF bootstrap/rotation as the browser.
 // api(token).post('/parent/bookings', body) -> { ...json, status: <HTTP status code> }
 export function api(token) {
+  const cookies = new Map(token ? [[sessionCookieName(), token]] : [])
+  let csrfToken = token ? csrfForSession(token) : null
+  const saveCookies = (res) => {
+    for (const header of res.headers.getSetCookie()) {
+      const [pair] = header.split(';')
+      const split = pair.indexOf('=')
+      const name = pair.slice(0, split), value = pair.slice(split + 1)
+      if (!value || /max-age=0/i.test(header)) cookies.delete(name)
+      else cookies.set(name, value)
+    }
+  }
+  const headers = () => ({ 'Content-Type': 'application/json', ...(cookies.size && { Cookie: [...cookies].map(([name, value]) => `${name}=${value}`).join('; ') }) })
   const call = async (method, path, body) => {
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(method) && !csrfToken) {
+      const bootstrap = await fetch(baseUrl + '/auth/csrf', { headers: headers() })
+      saveCookies(bootstrap)
+      csrfToken = (await bootstrap.json()).csrfToken
+    }
     const res = await fetch(baseUrl + path, {
       method,
-      headers: { 'Content-Type': 'application/json', ...(token && { Authorization: `Bearer ${token}` }) },
+      headers: { ...headers(), ...(csrfToken && { 'X-CSRF-Token': csrfToken }) },
       body: body === undefined ? undefined : JSON.stringify(body),
     })
+    saveCookies(res)
+    const data = await res.json().catch(() => ({}))
+    if (data.csrfToken) csrfToken = data.csrfToken
     // HTTP status last, so a JSON field called "status" (e.g. booking status) can't hide it
-    return { ...(await res.json().catch(() => ({}))), status: res.status }
+    return { ...data, status: res.status }
   }
-  return { get: (p) => call('GET', p), post: (p, b = {}) => call('POST', p, b), put: (p, b) => call('PUT', p, b), patch: (p, b) => call('PATCH', p, b), del: (p) => call('DELETE', p) }
+  return { get session() { return cookies.get(sessionCookieName()) }, get: (p) => call('GET', p), post: (p, b = {}) => call('POST', p, b), put: (p, b) => call('PUT', p, b), patch: (p, b) => call('PATCH', p, b), del: (p) => call('DELETE', p) }
 }
 
 // Empty every table (children first) so each test file starts from a known state
 export async function resetDb() {
   for (const model of [
+    'authSession',
     'accountWarning', 'refund', 'payment', 'review', 'attendance', 'sessionSummary', 'rescheduleRequest', 'complaint', 'booking',
     'notification', 'matchingRequest', 'favouriteTutor', 'withdrawal', 'bankAccount', 'availabilitySlot',
     'availabilityException', 'portfolioItem', 'qualification', 'tutorSubject', 'child', 'tutorProfile', 'parentProfile', 'emailOtp', 'user', 'systemSetting',
@@ -66,7 +93,7 @@ export async function makeParent({ child = {} } = {}) {
     },
     include: { parent: { include: { children: true } } },
   })
-  return { user, parent: user.parent, child: user.parent.children[0], token: signToken(user) }
+  return { user, parent: user.parent, child: user.parent.children[0], token: await testSession(user) }
 }
 
 export async function makeChild(parentId, data = {}) {
@@ -89,14 +116,14 @@ export async function makeTutor({ rate = 50, commissionRate = null, online = tru
     },
     include: { tutor: true },
   })
-  return { user, tutor: user.tutor, token: signToken(user) }
+  return { user, tutor: user.tutor, token: await testSession(user) }
 }
 
 export async function makeAdmin() {
   const user = await prisma.user.create({
     data: { email: `admin${unique()}@test.local`, passwordHash, role: 'ADMIN', fullName: 'Test Admin', isEmailVerified: true },
   })
-  return { user, token: signToken(user) }
+  return { user, token: await testSession(user) }
 }
 
 // The next date (YYYY-MM-DD, Malaysia time) that falls on `dow` (0 = Sunday), at least 2 days from now

@@ -7,6 +7,7 @@ import { EmptyState, ErrorBox, LoadError, SelectBox, Spinner } from '../../compo
 import { gradeLabel } from '../../lib/education'
 import { addDaysYmd, fmtDate, fmtDateLong, fmtTimeRange, todayYmd } from '../../lib/format'
 import { saveCsv } from '../../lib/csv'
+import { recordRef } from '../../lib/recordRef'
 
 // A learning progress report for one child over a chosen period. It is the "historical progress report": every completed
 // lesson with what the tutor wrote, grouped into totals and subjects, to read on screen, print or save as PDF
@@ -84,7 +85,7 @@ export default function ProgressReport() {
   return (
     <div className="mx-auto max-w-4xl">
       <div className="print:hidden">
-        <BackLink id={id} />
+        <BackLink id={recordRef(child) || id} />
         <div className="card mb-4 space-y-3 p-4" role="group" aria-label="Report options">
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Period">

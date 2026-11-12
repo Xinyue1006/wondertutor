@@ -195,7 +195,7 @@ export default function Login({ admin = false }) {
             )}
           </LoginField>
 
-          {/* Remember me: the session is kept in localStorage instead of sessionStorage (see AuthContext) */}
+          {/* Remember me controls the server session lifetime and persistent HttpOnly cookie. */}
           <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-navy">
             <input type="checkbox" className="h-4 w-4 accent-brand-500" checked={form.remember}
               onChange={(e) => setForm({ ...form, remember: e.target.checked })} />
