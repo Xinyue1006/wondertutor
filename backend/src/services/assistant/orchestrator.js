@@ -21,6 +21,7 @@ import { PROMPT_VERSION, systemInstruction } from './prompt.js'
 import { FAQ_VERSION } from './faq.js'
 import { conversationalIntent, conversationalLanguage, conversationalReply, suggestedQuestions } from './conversation.js'
 import { approvedQuickQuestion, executeQuickQuestion } from './quickQuestions.js'
+import { explicitSchoolYear } from './explicitCriteria.js'
 
 const MAX_TOOL_RESULT_CHARS = 6000
 const opaque = () => randomBytes(12).toString('base64url')
@@ -56,13 +57,19 @@ function waitToRetry(ms, signal) {
 }
 
 async function callModel(provider, req, deadline, signal, timings) {
-  // At most one retry for a transient failure, and only while there is time left
+  // Longer turns allow two recovery attempts; shorter configured turns retain
+  // their single retry. Every attempt still shares the original turn deadline.
+  const maxAttempts = deadline - Date.now() > 45000 ? 3 : 2
   for (let attempt = 0; ; attempt++) {
     if (signal?.aborted) throw new ProviderError('cancelled', 'Cancelled') // never start a provider call for a dead turn
     const remaining = deadline - Date.now()
     if (remaining <= 0) throw new ProviderError('timeout', 'Took too long')
     const ac = new AbortController()
-    const timer = setTimeout(() => ac.abort('timeout'), remaining)
+    // Cap non-final attempts only when enough time remains to recover. The
+    // final attempt uses the remaining turn budget, never a fresh deadline.
+    const attemptTimeoutMs = attempt < maxAttempts - 1 && remaining > 22000 ? 18000 : remaining
+    const cappedAttempt = attemptTimeoutMs < remaining
+    const timer = setTimeout(() => ac.abort(cappedAttempt ? 'attempt_timeout' : 'timeout'), attemptTimeoutMs)
     const onAbort = () => ac.abort('cancelled')
     signal?.addEventListener('abort', onAbort, { once: true })
     const attemptStarted = Date.now()
@@ -70,15 +77,24 @@ async function callModel(provider, req, deadline, signal, timings) {
       return await provider.generate({ ...req, signal: ac.signal })
     } catch (err) {
       if (signal?.aborted) throw new ProviderError('cancelled', 'Cancelled')
+      if (ac.signal.aborted && ac.signal.reason === 'attempt_timeout') {
+        if (attempt < maxAttempts - 1 && deadline - Date.now() > 2000) {
+          // The attempt's signal is already aborted. Backoff must listen to the
+          // parent turn instead so a deliberate Cancel still stops recovery.
+          await waitToRetry(500 + Math.floor(Math.random() * 501), signal)
+          continue
+        }
+        throw new ProviderError('timeout', 'Took too long')
+      }
       if (ac.signal.aborted && ac.signal.reason === 'timeout') throw new ProviderError('timeout', 'Took too long')
       const pe = err instanceof ProviderError ? err : new ProviderError('bad_response', 'Unexpected AI error')
-      // One overload retry may recover a brief capacity failure. Pause with
-      // jitter, keep the original turn deadline, and let Cancel stop the pause.
-      // Quota errors are never retried; transport errors keep one bounded retry.
-      if (pe.transient && pe.kind !== 'rate_limit' && pe.httpStatus !== 429 && attempt === 0) {
+      // Brief capacity/transport failures share that same bounded retry budget.
+      // Provider blocks, invalid replies and quota errors are never retried.
+      const canRetry = pe.transient && !['rate_limit', 'blocked', 'bad_response', 'cancelled', 'disabled'].includes(pe.kind) && pe.httpStatus !== 429
+      if (canRetry && attempt < maxAttempts - 1) {
         const remainingAfterFailure = deadline - Date.now()
         if (pe.httpStatus === 503 && remainingAfterFailure > 2000) {
-          await waitToRetry(500 + Math.floor(Math.random() * 501), ac.signal)
+          await waitToRetry(500 + Math.floor(Math.random() * 501), signal)
           continue
         }
         if (pe.httpStatus !== 503 && remainingAfterFailure > 1000) continue
@@ -196,7 +212,7 @@ async function runTurn({ user, parent, data, session, turn, now, db, allowQuickQ
     let userText = redactText(data.message, { names: namesNow(), max: 2000 })
     if (selectedChildRef) userText += `\n(The parent selected [[${selectedChildRef}]].)`
 
-    const ctx = { session: work, user, parent, db, now, cards: [], sources: [], evidence: [], needs: null, clarification: null, matchResult: null, selectedChildRef }
+    const ctx = { session: work, user, parent, db, now, cards: [], sources: [], evidence: [], needs: null, clarification: null, matchResult: null, selectedChildRef, statedSchoolYear: explicitSchoolYear(data.message) }
     // Trusted internal evaluation can measure the model path separately. This
     // switch is never accepted in the strict HTTP request body.
     const quickQuestion = allowQuickQuestions ? approvedQuickQuestion(data.message) : null

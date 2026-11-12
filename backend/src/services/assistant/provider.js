@@ -36,10 +36,10 @@ export function geminiProvider(cfg = env.ai) {
         // low temperature can degrade tool selection and increase latency.
         generationConfig: {
           maxOutputTokens,
-          // These Flash models support minimal thinking. Keep a small lookup
-          // from spending the interactive turn budget on extended reasoning.
+          // Use each Flash model's lowest supported thinking level. 3.8 rejects
+          // minimal, while Flash-Lite and 3.6 support it.
           ...(/^gemini-3\.(?:1-flash-lite|5-flash-lite|6-flash|8-flash)$/.test(cfg.model) && {
-            thinkingConfig: { thinkingLevel: 'minimal' },
+            thinkingConfig: { thinkingLevel: cfg.model === 'gemini-3.8-flash' ? 'low' : 'minimal' },
           }),
         },
       }

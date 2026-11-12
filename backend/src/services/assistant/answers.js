@@ -43,8 +43,7 @@ const T = {
       ...e.items.slice(0, 5).map((b) => `• ${b.subject} for [[${b.childRef}]] with [[${b.tutorRef}]] on ${b.date} at ${b.time} (${MODE.en[b.mode]}, ${status('en', b.status)}${b.hourlyPrice != null ? `, ${rm(b.hourlyPrice)}/hour` : ''})`)],
     lesson: (e) => {
       const l = [`${e.subject} lesson for [[${e.childRef}]] with [[${e.tutorRef}]] on ${e.date} at ${e.time}: ${status('en', e.status)}, ${MODE.en[e.mode]}.`]
-      if (e.mode === 'PHYSICAL') l.push(e.checkInTime ? `The tutor's check-in was recorded at ${e.checkInTime}${e.checkOutTime ? ` and check-out at ${e.checkOutTime}` : ''}.` : 'No check-in is recorded for this lesson.')
-      else l.push('Online lessons have no attendance tracking.')
+      l.push(e.checkInTime ? `The tutor's check-in was recorded at ${e.checkInTime}${e.checkOutTime ? ` and check-out at ${e.checkOutTime}` : ''}.` : e.mode === 'ONLINE' && e.attendanceRecorded == null ? 'No online check-in record is available for this lesson.' : 'No check-in is recorded for this lesson.')
       l.push(e.hasSummary ? 'The tutor has submitted a lesson summary; it is shown below.' : 'The tutor has not submitted a lesson summary for this lesson.')
       return l
     },
@@ -79,8 +78,7 @@ const T = {
       ...e.items.slice(0, 5).map((b) => `• ${b.subject} untuk [[${b.childRef}]] bersama [[${b.tutorRef}]] pada ${b.date} jam ${b.time} (${MODE.ms[b.mode]}, ${status('ms', b.status)}${b.hourlyPrice != null ? `, ${rm(b.hourlyPrice)}/jam` : ''})`)],
     lesson: (e) => {
       const l = [`Kelas ${e.subject} untuk [[${e.childRef}]] bersama [[${e.tutorRef}]] pada ${e.date} jam ${e.time}: ${status('ms', e.status)}, ${MODE.ms[e.mode]}.`]
-      if (e.mode === 'PHYSICAL') l.push(e.checkInTime ? `Daftar masuk tutor direkodkan pada ${e.checkInTime}${e.checkOutTime ? ` dan daftar keluar pada ${e.checkOutTime}` : ''}.` : 'Tiada daftar masuk direkodkan untuk kelas ini.')
-      else l.push('Kelas dalam talian tidak mempunyai penjejakan kehadiran.')
+      l.push(e.checkInTime ? `Daftar masuk tutor direkodkan pada ${e.checkInTime}${e.checkOutTime ? ` dan daftar keluar pada ${e.checkOutTime}` : ''}.` : e.mode === 'ONLINE' && e.attendanceRecorded == null ? 'Rekod daftar masuk kelas dalam talian ini tidak tersedia.' : 'Tiada daftar masuk direkodkan untuk kelas ini.')
       l.push(e.hasSummary ? 'Tutor telah menghantar ringkasan kelas; ia dipaparkan di bawah.' : 'Tutor belum menghantar ringkasan untuk kelas ini.')
       return l
     },
@@ -115,8 +113,7 @@ const T = {
       ...e.items.slice(0, 5).map((b) => `• ${b.subject}，[[${b.childRef}]]，老师 [[${b.tutorRef}]]，${b.date} ${b.time}（${MODE.zh[b.mode]}，${status('zh', b.status)}${b.hourlyPrice != null ? `，每小时 ${rm(b.hourlyPrice)}` : ''}）`)],
     lesson: (e) => {
       const l = [`${e.date} ${e.time} 的${e.subject}课，学生 [[${e.childRef}]]，老师 [[${e.tutorRef}]]：${status('zh', e.status)}，${MODE.zh[e.mode]}。`]
-      if (e.mode === 'PHYSICAL') l.push(e.checkInTime ? `老师的签到时间记录为 ${e.checkInTime}${e.checkOutTime ? `，签退时间 ${e.checkOutTime}` : ''}。` : '这节课没有签到记录。')
-      else l.push('线上课程没有出勤记录。')
+      l.push(e.checkInTime ? `老师的签到时间记录为 ${e.checkInTime}${e.checkOutTime ? `，签退时间 ${e.checkOutTime}` : ''}。` : e.mode === 'ONLINE' && e.attendanceRecorded == null ? '这节线上课暂没有可用的签到记录。' : '这节课没有签到记录。')
       l.push(e.hasSummary ? '老师已提交课堂总结，详见下方。' : '老师尚未提交这节课的总结。')
       return l
     },

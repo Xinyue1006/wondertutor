@@ -84,6 +84,12 @@ MINIMUM ENVIRONMENT REVIEW
 - CLOUDINARY_*: production account; private delivery for identity/attendance media
 - BILLPLZ_API_KEY / COLLECTION_ID / X_SIGNATURE / BASE_URL: matching environment
 - AI_ASSISTANT_ENABLED=false initially; enable after synthetic live evaluation
+- The current assistant defaults to AI_REQUEST_TIMEOUT_MS=60000; the browser's
+  chat-only deadline is 65000. Verify the hosting reverse-proxy request limit
+  before using this budget. Configure sufficient headroom where the plan allows,
+  or explicitly lower the AI deadline to fit the verified limit. An existing
+  AI_REQUEST_TIMEOUT_MS value overrides the code default. Ordinary CRUD calls
+  retain their shorter timeout. Free-provider latency is not a hosting SLA.
 - SCHEDULER_ENABLED=false when using external cron
 
 Hostinger's current MySQL guide recommends 127.0.0.1 rather than localhost for

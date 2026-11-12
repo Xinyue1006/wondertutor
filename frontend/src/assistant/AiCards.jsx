@@ -68,7 +68,7 @@ export default function AiCard({ card, onChooseChild, onOpenResults, busy }) {
           <Row label="When">{card.date} {card.time}</Row>
           <Row label="Tutor">{card.tutorName}</Row>
           <Row label="Status">{word(card.status)}</Row>
-          <Row label="Attendance">{card.mode === 'ONLINE' ? 'Online lesson (not tracked)' : card.checkIn.recorded ? `Checked in ${card.checkIn.checkInTime}${card.checkIn.checkOutTime ? `, out ${card.checkIn.checkOutTime}` : ''}` : 'No check-in recorded'}</Row>
+          <Row label="Attendance">{card.checkIn.recorded ? `Checked in ${card.checkIn.checkInTime}${card.checkIn.checkOutTime ? `, out ${card.checkIn.checkOutTime}` : ''}` : card.checkIn.recorded === null ? 'No attendance record available' : 'No check-in recorded'}</Row>
           {card.summary ? (
             <div className="mt-1 border-t border-slate-100 pt-1">
               <div className="text-xs font-bold uppercase tracking-wide text-slate-400">The tutor recorded</div>
@@ -88,7 +88,7 @@ export default function AiCard({ card, onChooseChild, onOpenResults, busy }) {
           <Row label="Hours">{card.totals.hours}</Row>
           <Row label="Summaries received">{card.totals.summaries}</Row>
           <Row label="Homework set">{card.totals.homeworkSet}</Row>
-          {card.totals.physicalLessons > 0 && <Row label="Physical lessons checked in">{card.totals.checkedIn} of {card.totals.physicalLessons}</Row>}
+          {(card.totals.attendanceTrackedLessons ?? card.totals.physicalLessons) > 0 && <Row label="Lessons checked in">{card.totals.checkedIn} of {card.totals.attendanceTrackedLessons ?? card.totals.physicalLessons}</Row>}
           {card.recentLessons.length > 0 && (
             <ul className="mt-1.5 space-y-1 border-t border-slate-100 pt-1.5">
               {card.recentLessons.map((l, i) => (

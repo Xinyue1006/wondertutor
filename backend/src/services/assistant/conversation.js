@@ -4,7 +4,7 @@
 const clean = (value) => String(value || '').normalize('NFKC').trim().toLowerCase()
   .replace(/[!?.,，。！？、:;；：]+$/gu, '').replace(/\s+/g, ' ').trim()
 
-const GREETING = /^(?:(?:hi|hello|hey|hai|helo|hallo)(?: there)?(?: (?:bot|assistant|wondertutor|ngaw))?(?: (?:lah|la|ah))?|good (?:morning|afternoon|evening)|salam|assalamualaikum|selamat (?:pagi|tengah hari|petang|malam)|你好|您好|嗨|哈喽|早上好|下午好|晚上好)$/u
+const GREETING = /^(?:(?:hi|hello|hey|heyo|heya|hiya|hai|helo|hallo)(?: there)?(?: (?:bot|assistant|wondertutor|ngaw))?(?: (?:lah|la|ah))?|good (?:morning|afternoon|evening)|salam|assalamualaikum|selamat (?:pagi|tengah hari|petang|malam)|你好|您好|嗨|哈喽|早上好|下午好|晚上好)$/u
 const HELP = /^(?:help(?: me)?|what can (?:you|u) do|what can i ask(?: you)?|how can (?:you|u) help(?: me)?|can (?:you|u) help(?: me)?|how do i use (?:this|the assistant|this chatbot)|who are (?:you|u)|apa yang (?:(?:anda|awak|kamu) boleh|boleh (?:anda|awak|kamu)) (?:buat|bantu)|apa boleh tanya|boleh (?:tolong|bantu)(?: saya)?|macam mana (?:nak )?guna (?:ini|chatbot)|awak siapa|你(?:是誰|是谁|能做什么|会做什么|可以做什么)|有什么可以问|可以帮我什么|帮我一下)$/u
 const THANKS = /^(?:(?:ok(?:ay)?[,，]? )?(?:thanks(?: a lot)?|thank you(?: so much)?|thankyou|thx|tq)(?: (?:lah|la|ah))?|terima kasih|makasih|谢谢(?:你|您)?|多谢|谢啦)$/u
 

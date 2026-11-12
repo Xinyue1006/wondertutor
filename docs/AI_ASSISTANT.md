@@ -19,7 +19,7 @@ POST /api/parent/assistant/messages → requireAuth + PARENT + loadParentProfile
                                        ← functionCall(s)                                 ←──
                                        → allowlisted read tool, Zod-validated arguments,
                                          ownership in every query, minimised + redacted result
-                                       → (bounded loop: ≤4 rounds, ≤8 calls, 45 s deadline)
+                                       → (bounded loop: ≤4 rounds, ≤8 calls, 60 s deadline)
                                        → finish_lookup after a complete validated read plan,
                                          or trusted clarification: no wording-only generation
                                        ← final text only when another model round is needed ←──
@@ -231,7 +231,7 @@ Every tool follows the same rules:
 | `GEMINI_API_KEY` | | Server only. Never put it in a `VITE_` variable |
 | `GEMINI_MODEL` | | **Required when enabled.** Copy a current model name from https://ai.google.dev/gemini-api/docs/models. Nothing is hard-coded |
 | `GEMINI_BASE_URL` | `https://generativelanguage.googleapis.com/v1beta` | |
-| `AI_REQUEST_TIMEOUT_MS` | 45000 | Total deadline per message, including bounded retry. Browser chat uses the advertised deadline + 5 seconds; ordinary API requests retain 20 seconds. |
+| `AI_REQUEST_TIMEOUT_MS` | 60000 | Total deadline per message, including bounded retries. Browser chat uses the advertised deadline + 5 seconds (65 seconds by default); ordinary API requests retain 20 seconds. |
 | `AI_MAX_TOOL_ROUNDS` / `AI_MAX_TOOL_CALLS` | 4 / 8 | |
 | `AI_CONVERSATION_TTL_MS` / `AI_MAX_TURNS` | 1800000 / 20 | |
 | `AI_MAX_CONVERSATIONS_PER_USER` / `AI_MAX_CONVERSATIONS` | 5 / 1000 | |
@@ -244,7 +244,7 @@ An enabled assistant with a missing key or model, or an out-of-range number, sto
 
 - The adapter calls `models/{GEMINI_MODEL}:generateContent` with `functionDeclarations`, using plain `fetch` so no new dependency is added.
 - Within a turn, model parts are sent back unchanged, so `thoughtSignature` values on `functionCall` parts are preserved, as newer Gemini models require.
-- Sampling overrides were removed. Supported Gemini 3.1/3.5 Flash-Lite and 3.6/3.8 Flash models explicitly use minimal thinking for interactive lookups. One transient HTTP 503 can retry after cancellable 500–1000 ms jitter within the original deadline; quota errors are not automatically retried.
+- Sampling overrides were removed. Supported Gemini 3.1/3.5 Flash-Lite and 3.6 Flash models use minimal thinking; 3.8 Flash uses its lowest supported level, low. With over 45 seconds available, there are at most three attempts sharing the same deadline. Non-final attempts are capped at 18 seconds when sufficient budget remains; transient overload/stall recovery waits a cancellable 500–1000 ms. Shorter configured turns retain at most two attempts. Quota failures, provider safety blocks and malformed requests are never retried.
 - Google also documents a newer Interactions API. This adapter does not use it.
 
 ## 8. Setup and demo
@@ -354,3 +354,46 @@ A protocol correction also preserves Gemini's supplied function-call IDs in ever
 The evaluation harness internally disables quick routing when measuring model/oracle tool selection. HTTP clients cannot pass this internal flag. Direct record lookups must not be reported as successful language-model predictions.
 
 Validation after syncing the availability and tutor-booking changes from `main` through `53488f2`: 723 backend tests across 48 suites and 438 frontend tests across 50 files passed, and the production frontend build passed. Before that final tutor-booking sync, thirteen browser checks covered visit continuity, drafts, tabs, navigation, in-flight replies, clear/logout and desktop/mobile layouts. Twelve authenticated HTTP checks (four questions in each supported language) returned real synthetic database cards in 8–29 ms locally while the test provider was configured to throw on any model request. These timings are synthetic local checks, not production performance guarantees. All 24 browser checks passed (13 visit-continuity checks plus 11 strict-provider quick-question/recovery checks), including manual timeout recovery in the same conversation, accurate lookup labels and 1440/375/320 px layouts with no runtime errors.
+
+## 13. Free-form reliability and integration follow-up — 13 November 2026
+
+This section supersedes the earlier 15-second configuration snapshot. The actual model remains `gemini-3.5-flash-lite`; no API key, billing setting or actual `.env` was changed. The template `.env.example` now documents the 60-second default. Existing explicit environment values still override defaults.
+
+### Changes and boundaries
+
+- Whole-message `heyo`, `heya` and `hiya` now use the approved instant greeting path. Mixed greeting + record questions still use Gemini. Real Gemini responses to `heyo` were verified before adding that optimization; greetings must not be counted as model predictions afterward.
+- Free-form messages still use the model to select read-only tools and criteria. A final strict `finish_lookup({})` after fresh successful reads can complete the server-written answer without a wording-only model round. All calls in that batch run first. A rejected batch cannot fast-finish; a later corrected, error-free batch can. A dependent booking-detail query must still obtain a real booking reference.
+- `list_bookings` now accepts an ownership-scoped subject filter and rejects reversed date ranges. Prompt `2026-11-13.3` distinguishes child progress/counts/recent homework from booking lists and specific lesson attendance.
+- A narrow school-year consistency helper preserves an unambiguous year actually typed by the parent (English/Malay/Chinese) after the model selected tutor search. It never chooses a tool, child or unstated criterion. Negations, alternatives, ranges, quotations and conflicting years are left to the model; normal domain validation remains authoritative. The original model arguments remain visible to evaluation, so repaired criteria are not credited as correct raw model predictions.
+- The default turn budget is 60 seconds; the browser's chat-only deadline is 65 seconds. Ordinary CRUD requests retain 20 seconds. A generation call with more than 45 seconds left permits at most three attempts sharing the original turn deadline. Non-final attempts use an 18-second cap when enough budget remains. Backoff is cancellable and cannot turn a slow overload into a false user cancellation. Provider blocks, bad responses and quota failures are not retried.
+- Waiting text appears after eight seconds, Cancel remains available, and minimizing retains in-flight work. The generation budget is not a response-time guarantee.
+- The prose guard now allows bounded complete feature descriptions/clarifying questions without allowing attached account claims. Regression examples include semicolon/colon assertions, embedded copulas, unsupported figures and plural account nouns. This remains a conservative heuristic rather than a semantic proof.
+- Online attendance, optional tutor homework and the tracked-lesson denominator now agree across tutor sessions, parent pages/reports and AI cards. Legacy online lessons without a record remain unknown. No GPS/photo/upload signature is sent in assistant tool results.
+
+### Validation and honest interpretation
+
+Final automated verification: **904/904 backend tests (58 suites), 473/473 frontend tests (54 files), production build passed (185 modules)**. Frontend lint completed with **0 errors and 70 warnings**; this is not a warning-free result. The 100-case oracle replay remains regression coverage, not measured model accuracy.
+
+The same existing 20 diagnostic cases were rerun while changes were made. They cover English, Malay, Chinese and Manglish. Although the dataset historically marks them held out, reuse during debugging means these are **tuned diagnostic results, not independent held-out accuracy**. Exact quick routes are disabled by the evaluator. Results were not combined with scripted oracle results or greetings.
+
+| Diagnostic phase | Task success | Strict task + model score |
+| --- | --- | --- |
+| 45-second budget before completion-plan changes | 11/20 (55%) | 11/20 (55%) |
+| Completion plan and initial routing | 16/20 (80%) | 16/20 (80%) |
+| Progress routing and booking filter corrections | 18/20 (90%) | 17/20 (85%) |
+| First bounded stall-recovery version | 18/20 (90%) | 16/20 (80%) |
+| Final 60-second bounded-recovery version | **19/20 (95%)** | **17/20 (85%)** |
+
+The final report is `backend/eval/reports/live-2026-11-12T17-17-58-741Z.json` (local, ignored). The remaining task failure was the Chinese recent-homework question `PRO-10`, which received an unavailable/bad-response result. A separate diagnostic retry later succeeded in 12.2 seconds; that does not erase the original failure. Raw argument checks also flagged `MAT-15` and `BOO-05`; the task score does not imply perfect semantic parsing. Final median latency was 16.54 seconds and p90 was 52 seconds. One successful FAQ request took 55.23 seconds. **95% on this sample is not a promise of 95% production availability or model accuracy.** An intervening run was discarded because another regression reset its shared test database; subsequent live runs used an isolated `wondertutor_assistant_ai_test` database.
+
+Browser evidence uses a separate synthetic `wondertutor_browser_qa_test` database. Ten live assistant checks passed at the earlier budget, including real free-form next-lesson, custom filtered tutor search and compound payments + lesson requests. Eight fresh checks passed with the final 60/65-second budgets, including the Chinese custom request `帮我找中二英文女老师，想上网课，每小时不要超过RM60。`: English, SECONDARY, grade 2, FEMALE, ONLINE and RM60 were all preserved. That request took 42.10 seconds and used Gemini, not a quick route. A separate deterministic quick-question smoke is not counted as NLP quality. Mobile checks covered 375/320 px and no browser runtime errors were observed.
+
+The actual parent → tutor → parent booking journey passed ten checks: week/date precedence, two different dates in one request, tutor acceptance by booking UUID, the saved 24-hour payment deadline, **sandbox-only** payment confirmation and the shared HTTPS classroom link. Eleven mocked-API calendar/booking UI checks and twelve mocked-API session/finance checks also passed; mocked checks are reported separately from real API journeys.
+
+Artifacts are in `%TEMP%/wt-browser-qa/`: `live-assistant-browser-results.json`, `final-assistant-browser-results.json`, `live-booking-integration-results.json`, `integration-front-ui-results.json` and `session-finance-front-ui-results.json`. Screenshots contain synthetic people only. [Machine-readable summary](QA_EVIDENCE_2026-11-13.json) and [integration fixes](AVAILABILITY_INTEGRATION_REVIEW_2026-11-12.md) provide the review trail.
+
+### Before a supervisor demo or client release
+
+Refresh the browser after updating and restart the backend when changing configuration. `heyo` is now local; try a genuinely free-form question such as `Hi, could you tell me the next confirmed lesson in my account?` or the Chinese filtered search above to demonstrate model/tool use. Replies reflect the signed-in parent's actual data, including a truthful empty result where appropriate. Use synthetic accounts for evaluation and do not run fixture-resetting tests against live user data.
+
+The local frontend/API were left running on 5173/5000; temporary QA servers were stopped. Production deployment and real bank settlement were not performed. The free external provider can still stall, reject or block a response; the quick questions and normal pages remain available. See the handover's release limits: precise lesson-address coordinates are still needed for meaningful physical GPS verification, withdrawal approval is not proof of a transfer, and tutor Students/Admin Booking Oversight remain placeholders. The Hostinger guide explains checking proxy limits before retaining the 60-second budget.

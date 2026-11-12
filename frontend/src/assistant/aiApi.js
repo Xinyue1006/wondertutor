@@ -10,7 +10,7 @@ export const getCapabilities = () => api.get('/parent/assistant/capabilities').t
 // This applies only to chat: ordinary API requests keep their shorter deadline.
 export const assistantRequestTimeoutMs = (serverTimeoutMs) => Number.isFinite(serverTimeoutMs)
   ? Math.min(120000, Math.max(1000, serverTimeoutMs)) + 5000
-  : 50000
+  : 65000
 
 export const sendAssistantMessage = ({ conversationId, message, selection }, signal, serverTimeoutMs) =>
   api.post('/parent/assistant/messages', { ...(conversationId && { conversationId }), message, ...(selection && { selection }) }, { signal, timeout: assistantRequestTimeoutMs(serverTimeoutMs) }).then((r) => r.data)

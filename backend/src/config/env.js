@@ -25,7 +25,7 @@ export function readAiConfig(e) {
     apiKey: e.GEMINI_API_KEY || '',
     model: (e.GEMINI_MODEL || '').trim(),
     baseUrl: e.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta',
-    timeoutMs: intIn(e.AI_REQUEST_TIMEOUT_MS, 45000, 1000, 120000, 'AI_REQUEST_TIMEOUT_MS', problems),
+    timeoutMs: intIn(e.AI_REQUEST_TIMEOUT_MS, 60000, 1000, 120000, 'AI_REQUEST_TIMEOUT_MS', problems),
     maxToolRounds: intIn(e.AI_MAX_TOOL_ROUNDS, 4, 1, 8, 'AI_MAX_TOOL_ROUNDS', problems),
     maxToolCalls: intIn(e.AI_MAX_TOOL_CALLS, 8, 1, 20, 'AI_MAX_TOOL_CALLS', problems),
     conversationTtlMs: intIn(e.AI_CONVERSATION_TTL_MS, 1800000, 60000, 86400000, 'AI_CONVERSATION_TTL_MS', problems),

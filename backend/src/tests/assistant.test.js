@@ -334,7 +334,7 @@ describe('9. "paid this month" matches the Payments page at Malaysian month boun
 })
 
 describe('10. provider failures fall back clearly; normal pages keep working', () => {
-  test('quota errors are not retried and overload recovery is limited to one delayed retry', async () => {
+  test('quota errors are not retried and overload recovery respects the default three-attempt bound', async () => {
     for (const httpStatus of [429, 503]) {
       let calls = 0
       setProvider({ name: 'mock', generate: async () => {
@@ -343,7 +343,7 @@ describe('10. provider failures fall back clearly; normal pages keep working', (
       } })
       const response = await send(A, { message: 'show my next lesson' })
       expect(response.status).toBe(httpStatus)
-      expect(calls).toBe(httpStatus === 503 ? 2 : 1)
+      expect(calls).toBe(httpStatus === 503 ? 3 : 1)
     }
   })
 

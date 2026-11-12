@@ -40,6 +40,21 @@ test('the approved set contains only the four product questions in each supporte
   expect(approvedQuickQuestion(' WHEN IS MY NEXT LESSON? ')).toMatchObject({ intent: 'lesson', lang: 'en' })
 })
 
+test.each([
+  ['中二英文女老师', { subject: 'English', level: 'SECONDARY', gender: 'FEMALE' }, 'SECONDARY', 2],
+  ['Find an English teacher for Form 2', { subject: 'English', level: 'SECONDARY', grade: 5 }, 'SECONDARY', 2],
+  ['Cari guru Matematik Darjah empat', { subject: 'Mathematics', level: 'PRIMARY', grade: 2 }, 'PRIMARY', 4],
+])('explicit school years remain authoritative after a real model-selected search: %s', async (message, args, level, grade) => {
+  const original = { ...args }
+  generate.mockResolvedValueOnce({ parts: [{ functionCall: { name: 'search_tutors', args } }, { functionCall: { name: 'finish_lookup', args: {} } }] })
+  const reply = await ask(message, { db: fakeDb() })
+  expect(generate).toHaveBeenCalledTimes(1)
+  expect(reply.method).toBeUndefined() // no quick-question/NLP bypass
+  expect(args).toEqual(original) // model arguments remain observable for separate grading
+  expect(matching).toHaveBeenCalledWith(expect.objectContaining({ level, grade, subject: args.subject }), parent.id, expect.anything())
+  expect(reply.matchResult.criteria).toMatchObject({ level, grade })
+})
+
 test('the trusted evaluation switch measures Gemini routing without treating quick lookups as model accuracy', async () => {
   const reply = await ask('When is my next lesson?', { db: fakeDb(), allowQuickQuestions: false })
   expect(generate).toHaveBeenCalledTimes(1)

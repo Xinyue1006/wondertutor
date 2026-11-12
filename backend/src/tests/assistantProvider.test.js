@@ -59,6 +59,8 @@ test('supported Flash models use minimal thinking without changing unknown model
   await geminiProvider({ ...cfg(), model: 'gemini-3.6-flash' }).generate({ system: 's', contents: [] })
   expect(seen.body.generationConfig.thinkingConfig).toEqual({ thinkingLevel: 'minimal' })
   expect(seen.body.generationConfig).not.toHaveProperty('temperature')
+  await geminiProvider({ ...cfg(), model: 'gemini-3.8-flash' }).generate({ system: 's', contents: [] })
+  expect(seen.body.generationConfig.thinkingConfig).toEqual({ thinkingLevel: 'low' })
   await geminiProvider(cfg()).generate({ system: 's', contents: [] })
   expect(seen.body.generationConfig).not.toHaveProperty('thinkingConfig')
 })

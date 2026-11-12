@@ -16,6 +16,7 @@ afterEach(() => setProvider(null))
 
 test.each([
   ['hi', 'greeting', 'en'], ['Hello!', 'greeting', 'en'], ['hey lah', 'greeting', 'en'],
+  ['heyo', 'greeting', 'en'], ['hiya!', 'greeting', 'en'], ['heya lah', 'greeting', 'en'],
   ['hai', 'greeting', 'ms'], ['Selamat pagi', 'greeting', 'ms'], ['你好！', 'greeting', 'zh'],
   ['what can you do?', 'help', 'en'], ['Can u help me?', 'help', 'en'],
   ['boleh bantu saya?', 'help', 'ms'], ['你能做什么？', 'help', 'zh'],

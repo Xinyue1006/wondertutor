@@ -68,8 +68,8 @@ beforeEach(() => {
 test.each([
   [45000, 50000], [60000, 65000], [120000, 125000],
   [999999, 125000], [0, 6000], [-1000, 6000],
-  [undefined, 50000], [null, 50000], ['45000', 50000],
-  [Infinity, 50000], [NaN, 50000],
+  [undefined, 65000], [null, 65000], ['45000', 65000],
+  [Infinity, 65000], [NaN, 65000],
 ])('the assistant request deadline is bounded for server limit %s', (serverTimeoutMs, expected) => {
   expect(assistantRequestTimeoutMs(serverTimeoutMs)).toBe(expected)
 })

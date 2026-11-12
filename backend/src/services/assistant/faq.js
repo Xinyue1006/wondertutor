@@ -83,9 +83,9 @@ export const FAQ = [
     id: 'faq.attendance',
     topic: 'Attendance records',
     keywords: ['attendance', 'check in', 'check-in', 'present', 'kehadiran', '出席', '打卡'],
-    answer: 'For physical lessons the tutor checks in at the lesson location with a photo, and the Parent Portal shows the recorded check-in and check-out times. Online lessons only have a meeting link; there is no attendance tracking for them.',
-    source: 'backend/src/controllers/parent/children.controller.js#childProgress; CLAUDE.md scope (online lessons)',
-    reviewed: REVIEWED,
+    answer: 'For physical lessons the tutor checks in at the lesson location with a photo and GPS verification. Online lessons have in-app check-in and check-out without a photo or GPS; these are tutor-recorded times, not proof that somebody joined a video call. The Parent Portal shows available recorded times. Older online lessons without an attendance record are shown as unavailable rather than marked absent.',
+    source: 'backend/src/services/lessonSession.service.js; backend/src/controllers/parent/children.controller.js#childProgress',
+    reviewed: '2026-11-13',
   },
   {
     id: 'faq.complaints',

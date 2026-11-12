@@ -185,11 +185,15 @@ test('a brief overload gets one delayed retry and can recover a real read plan',
 })
 
 test('repeated overload stops after one retry, while quota errors never retry', async () => {
-  for (const [kind, httpStatus, attempts] of [['unavailable', 503, 2], ['rate_limit', 429, 1]]) {
-    const generate = model(async () => { throw new ProviderError(kind, 'Synthetic capacity error', { transient: true, httpStatus }) })
-    await expect(ask()).rejects.toMatchObject({ assistantStatus: 'unavailable', status: httpStatus })
-    expect(generate).toHaveBeenCalledTimes(attempts)
-  }
+  const saved = env.ai.timeoutMs
+  env.ai.timeoutMs = 45000
+  try {
+    for (const [kind, httpStatus, attempts] of [['unavailable', 503, 2], ['rate_limit', 429, 1]]) {
+      const generate = model(async () => { throw new ProviderError(kind, 'Synthetic capacity error', { transient: true, httpStatus }) })
+      await expect(ask()).rejects.toMatchObject({ assistantStatus: 'unavailable', status: httpStatus })
+      expect(generate).toHaveBeenCalledTimes(attempts)
+    }
+  } finally { env.ai.timeoutMs = saved }
 })
 
 test('an overload too close to the turn deadline is not retried', async () => {
@@ -221,4 +225,192 @@ test('cancel during overload backoff prevents the retry and leaves no committed 
   const session = [..._store.values()][0]
   expect(session.history).toEqual([])
   expect(session.turns).toBe(0)
+})
+
+// Fake clocks exercise long provider stalls without waiting in real time or
+// making network calls. Every stalled fake honours its attempt AbortSignal.
+const stalledGeneration = ({ signal }) => new Promise((_, reject) => {
+  if (signal.aborted) return reject(new Error('Synthetic aborted generation'))
+  signal.addEventListener('abort', () => reject(new Error('Synthetic aborted generation')), { once: true })
+})
+async function withTurnClock(timeoutMs, run) {
+  const saved = env.ai.timeoutMs
+  env.ai.timeoutMs = timeoutMs
+  jest.useFakeTimers()
+  const jitter = jest.spyOn(Math, 'random').mockReturnValue(0)
+  try { await run() }
+  finally { jitter.mockRestore(); jest.useRealTimers(); env.ai.timeoutMs = saved }
+}
+
+test('a stalled first generation is capped at eighteen seconds and its sole retry can recover', async () => {
+  await withTurnClock(45000, async () => {
+    let firstSignal, attempts = 0
+    const generate = model(async request => {
+      if (attempts++ === 0) { firstSignal = request.signal; return stalledGeneration(request) }
+      return { parts: [call('list_bookings'), call('finish_lookup')] }
+    })
+    const started = Date.now(), pending = ask()
+    await jest.advanceTimersByTimeAsync(17999)
+    expect(generate).toHaveBeenCalledTimes(1)
+    expect(firstSignal.aborted).toBe(false)
+    await jest.advanceTimersByTimeAsync(1)
+    expect(firstSignal.aborted).toBe(true)
+    expect(firstSignal.reason).toBe('attempt_timeout')
+    await jest.advanceTimersByTimeAsync(499)
+    expect(generate).toHaveBeenCalledTimes(1)
+    await jest.advanceTimersByTimeAsync(1)
+    const response = await pending
+    expect(generate).toHaveBeenCalledTimes(2)
+    expect(response.responseKind).toBe('records')
+    expect(response.cards[0].bookings[0].link).toContain(booking.publicId)
+    expect(Date.now() - started).toBe(18500)
+  })
+})
+
+test('two stalled generations stop at the original total deadline with no committed data', async () => {
+  await withTurnClock(45000, async () => {
+    const generate = model(stalledGeneration)
+    const started = Date.now(), pending = ask()
+    const rejected = expect(pending).rejects.toMatchObject({ assistantStatus: 'unavailable', status: 503, message: expect.stringMatching(/too long/i) })
+    await jest.advanceTimersByTimeAsync(44999)
+    expect(generate).toHaveBeenCalledTimes(2)
+    expect(generate.mock.calls[1][0].signal.aborted).toBe(false)
+    await jest.advanceTimersByTimeAsync(1)
+    await rejected
+    expect(Date.now() - started).toBe(45000)
+    expect(generate).toHaveBeenCalledTimes(2)
+    const session = [..._store.values()][0]
+    expect(session.history).toEqual([])
+    expect(session.refs.size).toBe(0)
+    expect(session.turns).toBe(0)
+  })
+})
+
+test('cancel during first-attempt timeout backoff stops recovery before another generation', async () => {
+  await withTurnClock(45000, async () => {
+    const ac = new AbortController(), generate = model(stalledGeneration)
+    const pending = ask({ signal: ac.signal })
+    const rejected = expect(pending).rejects.toMatchObject({ assistantStatus: 'cancelled' })
+    await jest.advanceTimersByTimeAsync(18000)
+    expect(generate.mock.calls[0][0].signal.reason).toBe('attempt_timeout')
+    ac.abort()
+    await rejected
+    await jest.advanceTimersByTimeAsync(1000)
+    expect(generate).toHaveBeenCalledTimes(1)
+    expect([..._store.values()][0].turns).toBe(0)
+  })
+})
+
+test.each([1200, 22000])('a configured %sms deadline is not replaced by the eighteen-second cap', async timeoutMs => {
+  await withTurnClock(timeoutMs, async () => {
+    const generate = model(stalledGeneration)
+    const pending = ask()
+    const rejected = expect(pending).rejects.toMatchObject({ assistantStatus: 'unavailable', status: 503 })
+    await jest.advanceTimersByTimeAsync(timeoutMs - 1)
+    expect(generate).toHaveBeenCalledTimes(1)
+    expect(generate.mock.calls[0][0].signal.aborted).toBe(false)
+    await jest.advanceTimersByTimeAsync(1)
+    await rejected
+    expect(generate).toHaveBeenCalledTimes(1)
+    expect(generate.mock.calls[0][0].signal.reason).toBe('timeout')
+  })
+})
+
+test('overload and stalled-generation recovery share the same single retry budget', async () => {
+  await withTurnClock(45000, async () => {
+    let attempts = 0
+    const generate = model(async request => {
+      if (attempts++ === 0) throw new ProviderError('unavailable', 'Synthetic overload', { transient: true, httpStatus: 503 })
+      return stalledGeneration(request)
+    })
+    const pending = ask()
+    const rejected = expect(pending).rejects.toMatchObject({ assistantStatus: 'unavailable', status: 503 })
+    await jest.advanceTimersByTimeAsync(18000)
+    expect(generate).toHaveBeenCalledTimes(2)
+    expect(generate.mock.calls[1][0].signal.aborted).toBe(false)
+    await jest.advanceTimersByTimeAsync(27000)
+    await rejected
+    expect(generate).toHaveBeenCalledTimes(2)
+  })
+})
+
+test('a longer turn permits a third generation to recover within the same sixty-second budget', async () => {
+  await withTurnClock(60000, async () => {
+    let attempts = 0
+    const generate = model(async request => {
+      if (attempts++ < 2) return stalledGeneration(request)
+      return { parts: [call('list_bookings'), call('finish_lookup')] }
+    })
+    const started = Date.now(), pending = ask()
+    await jest.advanceTimersByTimeAsync(36999)
+    expect(generate).toHaveBeenCalledTimes(2)
+    expect(generate.mock.calls[0][0].signal.reason).toBe('attempt_timeout')
+    expect(generate.mock.calls[1][0].signal.reason).toBe('attempt_timeout')
+    await jest.advanceTimersByTimeAsync(1)
+    const response = await pending
+    expect(generate).toHaveBeenCalledTimes(3)
+    expect(response.cards[0].bookings[0].link).toContain(booking.publicId)
+    expect(Date.now() - started).toBe(37000)
+  })
+})
+
+test('three stalled generations still terminate exactly at the sixty-second total deadline', async () => {
+  await withTurnClock(60000, async () => {
+    const generate = model(stalledGeneration)
+    const started = Date.now(), pending = ask()
+    const rejected = expect(pending).rejects.toMatchObject({ assistantStatus: 'unavailable', status: 503 })
+    await jest.advanceTimersByTimeAsync(59999)
+    expect(generate).toHaveBeenCalledTimes(3)
+    expect(generate.mock.calls[2][0].signal.aborted).toBe(false)
+    await jest.advanceTimersByTimeAsync(1)
+    await rejected
+    expect(Date.now() - started).toBe(60000)
+    expect(generate).toHaveBeenCalledTimes(3)
+    const session = [..._store.values()][0]
+    expect(session.history).toEqual([])
+    expect(session.refs.size).toBe(0)
+    expect(session.turns).toBe(0)
+  })
+})
+
+test('an overload followed by stalls cannot create more than three attempts in a longer turn', async () => {
+  await withTurnClock(60000, async () => {
+    let attempts = 0
+    const generate = model(async request => {
+      if (attempts++ === 0) throw new ProviderError('unavailable', 'Synthetic overload', { transient: true, httpStatus: 503 })
+      return stalledGeneration(request)
+    })
+    const pending = ask()
+    const rejected = expect(pending).rejects.toMatchObject({ assistantStatus: 'unavailable', status: 503 })
+    await jest.advanceTimersByTimeAsync(60000)
+    await rejected
+    expect(generate).toHaveBeenCalledTimes(3)
+  })
+})
+
+test('an overload close to an attempt cap does not turn retry backoff into a false user cancellation', async () => {
+  await withTurnClock(60000, async () => {
+    let attempts = 0
+    const generate = model(async () => {
+      if (attempts++ === 0) return new Promise((_, reject) => setTimeout(() => reject(new ProviderError('unavailable', 'Late overload', { transient: true, httpStatus: 503 })), 17750))
+      return { parts: [call('list_bookings'), call('finish_lookup')] }
+    })
+    const pending = ask()
+    await jest.advanceTimersByTimeAsync(18250)
+    const response = await pending
+    expect(generate).toHaveBeenCalledTimes(2)
+    expect(response.responseKind).toBe('records')
+  })
+})
+
+test.each([
+  ['blocked', null, 503], ['bad_response', null, 503], ['rate_limit', 429, 429],
+])('a %s response is never retried even in a longer turn', async (kind, httpStatus, status) => {
+  const saved = env.ai.timeoutMs
+  env.ai.timeoutMs = 60000
+  const generate = model(async () => { throw new ProviderError(kind, 'Synthetic non-retryable response', { transient: true, httpStatus }) })
+  try {
+    await expect(ask()).rejects.toMatchObject({ assistantStatus: 'unavailable', status })
+    expect(generate).toHaveBeenCalledTimes(1)
+  } finally { env.ai.timeoutMs = saved }
 })

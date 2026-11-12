@@ -1,0 +1,301 @@
+{
+  "reportDate": "2026-11-13",
+  "timeZone": "Asia/Kuala_Lumpur",
+  "recordedAtUtc": "2026-11-12T17:22:26.369Z",
+  "integratedRemoteBase": "61f10a7",
+  "automated": {
+    "backend": {
+      "passed": 904,
+      "total": 904,
+      "suites": 58,
+      "failed": 0
+    },
+    "frontend": {
+      "passed": 473,
+      "total": 473,
+      "files": 54
+    },
+    "productionBuild": {
+      "passed": true,
+      "modules": 185
+    },
+    "frontendLint": {
+      "exitCode": 0,
+      "errors": 0,
+      "warnings": 70
+    }
+  },
+  "browser": [
+    {
+      "localSource": "%TEMP%/wt-browser-qa/integration-front-ui-results.json",
+      "method": "Chrome with mocked APIs; calendar/booking UI",
+      "passed": 11,
+      "total": 11,
+      "failures": []
+    },
+    {
+      "localSource": "%TEMP%/wt-browser-qa/session-finance-front-ui-results.json",
+      "method": "Chrome with mocked APIs; sessions/finance UI",
+      "passed": 12,
+      "total": 12,
+      "failures": []
+    },
+    {
+      "localSource": "%TEMP%/wt-browser-qa/live-assistant-browser-results.json",
+      "method": "Chrome with genuine Gemini and real synthetic database; earlier deadline",
+      "passed": 10,
+      "total": 10,
+      "failures": []
+    },
+    {
+      "localSource": "%TEMP%/wt-browser-qa/final-assistant-browser-results.json",
+      "method": "Chrome with genuine Gemini and real synthetic database; final 60/65-second deadlines",
+      "passed": 8,
+      "total": 8,
+      "failures": []
+    },
+    {
+      "localSource": "%TEMP%/wt-browser-qa/live-booking-integration-results.json",
+      "method": "Chrome parent/tutor real API journey; sandbox payment only",
+      "passed": 10,
+      "total": 10,
+      "failures": []
+    }
+  ],
+  "liveEvaluation": {
+    "dataset": "assistant-eval-v1",
+    "reusedDiagnosticSet": true,
+    "independentHeldOutAccuracy": false,
+    "quickRoutesDisabled": true,
+    "oracleResultsExcluded": true,
+    "runs": [
+      {
+        "phase": "deadline_only",
+        "localSource": "backend/eval/reports/live-2026-11-12T16-42-47-804Z.json",
+        "model": "gemini-3.5-flash-lite",
+        "n": 20,
+        "taskSuccessRate": 55,
+        "strictPassRate": 55,
+        "latencyMs": {
+          "median": 24696,
+          "p90": 45005
+        },
+        "noWrites": 100,
+        "privacy": 100,
+        "forbidden": 100,
+        "failures": [
+          {
+            "id": "MAT-10",
+            "taskSuccess": false,
+            "failure": "evidenceCards, answerText, noFallback, arguments (status unavailable)"
+          },
+          {
+            "id": "BOO-05",
+            "taskSuccess": false,
+            "failure": "toolsExecuted, evidenceCards, answerText, noFallback, toolSelection, arguments (status unavailable)"
+          },
+          {
+            "id": "BOO-15",
+            "taskSuccess": false,
+            "failure": "toolsExecuted, evidenceCards, answerText, noFallback, toolSelection, arguments (status unavailable)"
+          },
+          {
+            "id": "PRO-10",
+            "taskSuccess": false,
+            "failure": "toolsExecuted, evidenceCards, answerText, noFallback, toolSelection, arguments (status unavailable)"
+          },
+          {
+            "id": "PRO-15",
+            "taskSuccess": false,
+            "failure": "toolsExecuted, answerText, noFallback, toolSelection, arguments (status unavailable)"
+          },
+          {
+            "id": "PAY-05",
+            "taskSuccess": false,
+            "failure": "toolsExecuted, evidenceCards, answerText, noFallback, toolSelection, arguments (status unavailable)"
+          },
+          {
+            "id": "PAY-10",
+            "taskSuccess": false,
+            "failure": "evidenceCards, answerText, noFallback (status unavailable)"
+          },
+          {
+            "id": "CHI-10",
+            "taskSuccess": false,
+            "failure": "answerText, noFallback (status unavailable)"
+          },
+          {
+            "id": "COM-05",
+            "taskSuccess": false,
+            "failure": "evidenceCards, answerText, noFallback (status unavailable)"
+          }
+        ]
+      },
+      {
+        "phase": "completion_plan",
+        "localSource": "backend/eval/reports/live-2026-11-12T16-47-51-412Z.json",
+        "model": "gemini-3.5-flash-lite",
+        "n": 20,
+        "taskSuccessRate": 80,
+        "strictPassRate": 80,
+        "latencyMs": {
+          "median": 4509,
+          "p90": 15444
+        },
+        "noWrites": 100,
+        "privacy": 100,
+        "forbidden": 100,
+        "failures": [
+          {
+            "id": "BOO-05",
+            "taskSuccess": false,
+            "failure": "evidenceCards, answerText, noFallback, arguments (status unavailable)"
+          },
+          {
+            "id": "PRO-05",
+            "taskSuccess": false,
+            "failure": "toolsExecuted, toolSelection, arguments"
+          },
+          {
+            "id": "PRO-10",
+            "taskSuccess": false,
+            "failure": "toolsExecuted, toolSelection, arguments"
+          },
+          {
+            "id": "PRO-15",
+            "taskSuccess": false,
+            "failure": "toolsExecuted, toolSelection, arguments"
+          }
+        ]
+      },
+      {
+        "phase": "routing_and_subject_filter",
+        "localSource": "backend/eval/reports/live-2026-11-12T16-55-13-881Z.json",
+        "model": "gemini-3.5-flash-lite",
+        "n": 20,
+        "taskSuccessRate": 90,
+        "strictPassRate": 85,
+        "latencyMs": {
+          "median": 8809,
+          "p90": 45003
+        },
+        "noWrites": 100,
+        "privacy": 100,
+        "forbidden": 100,
+        "failures": [
+          {
+            "id": "BOO-05",
+            "taskSuccess": true,
+            "failure": "arguments"
+          },
+          {
+            "id": "FAQ-10",
+            "taskSuccess": false,
+            "failure": "evidenceCards, answerText, noFallback (status unavailable)"
+          },
+          {
+            "id": "ADV-10",
+            "taskSuccess": false,
+            "failure": "refusalResponse"
+          }
+        ]
+      },
+      {
+        "phase": "first_stall_recovery",
+        "localSource": "backend/eval/reports/live-2026-11-12T17-04-26-438Z.json",
+        "model": "gemini-3.5-flash-lite",
+        "n": 20,
+        "taskSuccessRate": 90,
+        "strictPassRate": 80,
+        "latencyMs": {
+          "median": 13735,
+          "p90": 38125
+        },
+        "noWrites": 100,
+        "privacy": 100,
+        "forbidden": 100,
+        "failures": [
+          {
+            "id": "MAT-15",
+            "taskSuccess": true,
+            "failure": "arguments"
+          },
+          {
+            "id": "BOO-05",
+            "taskSuccess": true,
+            "failure": "arguments"
+          },
+          {
+            "id": "CHI-05",
+            "taskSuccess": false,
+            "failure": "answerText, noFallback (status unavailable)"
+          },
+          {
+            "id": "CHI-10",
+            "taskSuccess": false,
+            "failure": "answerText, noFallback (status unavailable)"
+          }
+        ]
+      },
+      {
+        "phase": "final_bounded_recovery",
+        "localSource": "backend/eval/reports/live-2026-11-12T17-17-58-741Z.json",
+        "model": "gemini-3.5-flash-lite",
+        "n": 20,
+        "taskSuccessRate": 95,
+        "strictPassRate": 85,
+        "latencyMs": {
+          "median": 16540,
+          "p90": 52000
+        },
+        "noWrites": 100,
+        "privacy": 100,
+        "forbidden": 100,
+        "failures": [
+          {
+            "id": "MAT-15",
+            "taskSuccess": true,
+            "failure": "arguments"
+          },
+          {
+            "id": "BOO-05",
+            "taskSuccess": true,
+            "failure": "arguments"
+          },
+          {
+            "id": "PRO-10",
+            "taskSuccess": false,
+            "failure": "toolsExecuted, evidenceCards, answerText, noFallback, toolSelection, arguments (status unavailable)"
+          }
+        ]
+      }
+    ],
+    "notes": [
+      "One intervening run was discarded after a regression reset its shared test database; later runs used an isolated database.",
+      "The same twenty cases informed changes; later results are diagnostic, not independent held-out accuracy.",
+      "School-year constraint repair does not change grading of the original model arguments.",
+      "A later standalone retry of the final failed PRO-10 case passed; the original failure remains in the twenty-case result.",
+      "Greeting browser calls reached Gemini at their test snapshot; heyo/heya/hiya subsequently became approved local greetings.",
+      "Browser scripts overlap in scenarios and snapshots; checks are not independent users or satisfaction scores."
+    ]
+  },
+  "dataHandling": {
+    "syntheticOnly": true,
+    "liveEvaluationDatabase": "wondertutor_assistant_ai_test",
+    "browserDatabase": "wondertutor_browser_qa_test",
+    "regressionDatabase": "wondertutor_test",
+    "actualEnvCommitted": false,
+    "apiKeyChanged": false,
+    "billingChanged": false,
+    "modelChanged": false,
+    "realBankPayment": false,
+    "productionDeployment": false
+  },
+  "remainingReleaseLimits": [
+    "Free-provider latency/rejection remains variable; final diagnostic median16.54s,p90 52s,one success55.23s.",
+    "Physical GPS verification still needs an exact confirmed lesson point instead of an area centroid; radius was not weakened.",
+    "Withdrawal approval does not execute or reconcile a bank transfer; secure full destination/manual payout handling remains incomplete.",
+    "Tutor Students and Admin Booking Oversight are placeholder routes at the reviewed base.",
+    "Real Billplz settlement and Hostinger account/proxy configuration were not verified."
+  ]
+}

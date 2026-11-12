@@ -2,6 +2,8 @@
 
 Review began 11 November and completed 12 November 2026 (Malaysia time). Scope: Xin Yue's Parent Portal and Admin users/qualifications/complaints/reports, plus shared integration needed for those workflows.
 
+**Current follow-up:** the 13 November section at the end records the subsequent AI reliability and tutor integration work. Earlier branch/placeholder statements below describe the earlier snapshot. Use the final follow-up and its evidence JSON for current results.
+
 ## Result and practical limits
 
 Follow-up after this review: [child-avatar privacy](CHILD_PHOTO_PRIVACY_2026-11-12.md) now protects new child-photo uploads and their DTO delivery. Final follow-up regressions passed 483 backend and 234 frontend tests, with a synthetic live Cloudinary signed/unsigned access check. The original results and gap list below describe the earlier review snapshot; old public references still require ownership-verified cleanup. Ranking, suspension and other client-policy decisions have not been silently changed.
@@ -130,3 +132,36 @@ The domain class diagram describes entities/associations; it does not invent a J
 - Hostinger primary references checked: [Node app deployment](https://www.hostinger.com/support/how-to-deploy-a-nodejs-website-in-hostinger/), [Prisma deployment](https://www.hostinger.com/support/how-to-deploy-prisma-apps-on-hostinger-node-js-hosting/), [environment updates/recovery limitations](https://www.hostinger.com/support/how-to-edit-or-add-environment-variables-after-deployment/). These describe platform capabilities; they do not verify this account's subscription or settings.
 
 For human acceptance, ask a first-time parent, tutor and Admin to complete real scenarios without coaching; record completion, time, mistakes, help requests and satisfaction. Resolve the critical release gates before introducing real clients or bank money.
+
+## 13 November 2026 follow-up
+
+Integrated concurrent `main` updates through `61f10a7`, including tutor sessions, earnings and withdrawal reviews. Preserved the public UUID, cookie/CSRF/session, private-file and ownership protections. No schema migration was needed for these follow-up fixes. The actual `.env`, API key and billing configuration were not changed or published.
+
+### Result
+
+- **904 backend tests /58 suites and 473 frontend tests /54 files passed.** Production build passed with 185 modules. Lint exited successfully with zero errors and 70 warnings.
+- **19/20 (95%) task success and 17/20 (85%) strict model + task score** on the final live Gemini diagnostic run. These are twenty reused synthetic cases, not independent held-out accuracy. One recent-homework query received an unavailable/bad response; a separate later retry passed. The failure remains in the published score. Median 16.54 seconds, p90 52 seconds: free-provider speed/availability remains variable.
+- Real Chrome/Gemini tests verified free-form next-lesson, filtered tutor matching, compound payments + lesson and Chinese multi-criterion requests. The final Chinese browser search preserved subject, level, year, gender, mode and maximum budget, but took 42.10 seconds.
+- A real parent → tutor → parent browser journey verified date/week/usual availability precedence, two dates in one request, acceptance by UUID, the payment deadline, **sandbox-only** payment confirmation and classroom-link visibility. Mocked UI tests are identified separately in the evidence.
+
+### Fixes made
+
+The assistant now answers approved casual greetings instantly, retains the signed-in visit's conversation, and offers quick questions. Free-form NLP still uses Gemini. Complete read plans avoid an unnecessary final generation; corrected tool calls can recover from earlier argument rejection. School years explicitly typed in English/Malay/Chinese cannot silently disappear from a model-selected tutor search. Booking lookups support subject filtering, and progress questions use authoritative progress totals rather than counting a limited booking list. Model arguments are still graded before server repairs.
+
+The default AI budget is 60 seconds with at most three attempts per generation call, within the same turn deadline; the browser allows 65 seconds for chat. Non-final stalled attempts have an 18-second cap where enough budget remains. Backoff and waiting states support cancellation; quota failures, provider blocks and malformed replies are not blindly retried. Actual provider latency cannot be fixed by claiming a timeout is a successful answer.
+
+Availability protects whole lesson intervals and required teaching modes, including half-hour reschedules. Exact-date/week overrides no longer pollute usual-hour editor locks. Pending saves cannot erase later edits. Late profile requests cannot restore a logged-out tutor or update another account. Stale booking/session versions offer refresh without losing the selected booking or typed report. Tutor booking/session links and actions use owned UUIDs.
+
+Tutor reports now save optional homework, and parent booking details/progress/reports/CSV and AI cards agree on summaries and online attendance. Old online lessons with no attendance remain unknown. Private GPS/photo/upload-signature evidence does not enter AI results. Escalated refund requests now prevent a duplicate parent refund. Bank-conflict recovery reloads the destination and clears sensitive confirmation input; Admin wording states that approval does not automatically transfer funds.
+
+### Remaining release limits
+
+1. Physical check-in currently compares GPS against coordinates copied from the parent's **area**. A real client needs an explicitly confirmed full lesson address and precise map point saved on the booking. The radius was not weakened to conceal this gap.
+2. Withdrawal approval is a ledger decision, not proof of bank settlement. The current Admin response shows a masked destination; secure full-destination access, manual payout execution/reconciliation and transfer recording remain incomplete.
+3. Real Billplz settlement and the Hostinger subscription/proxy/environment configuration were not verified. Check the Hostinger proxy limit before retaining the 60-second AI deadline; deployed explicit environment values override defaults.
+4. Tutor Students and Admin Booking Oversight remain placeholder routes. The newly integrated Earnings and withdrawal-review screens are implemented and tested; that does not complete every finance operation.
+5. The free external AI can still stall or reject a response. Quick record questions and normal parent pages remain available. The diagnostic score is not a guarantee or client satisfaction measurement.
+
+For a supervisor demo, refresh the browser and use a synthetic account with known records. `heyo` now demonstrates the instant social path. A genuinely free-form example is `Hi, could you tell me the next confirmed lesson in my account?`; the Chinese filtered tutor question in the AI document demonstrates multilingual extraction. Use the normal progress page as the recovery route for homework. Do not demonstrate real payment or bank transfer as verified.
+
+Detailed AI design, all diagnostic phases and artifact locations: [AI reliability follow-up](AI_ASSISTANT.md#13-free-form-reliability-and-integration-follow-up--13-november-2026). [Machine-readable evidence](QA_EVIDENCE_2026-11-13.json) separates scripted regression, mocked UI, real API/sandbox browser journeys and genuine model runs. Normal local frontend/API were left running on ports 5173/5000; temporary QA servers were stopped.

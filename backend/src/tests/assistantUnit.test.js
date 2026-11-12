@@ -39,7 +39,7 @@ describe('configuration', () => {
     expect(readAiConfig({}).enabled).toBe(false)
     expect(() => readAiConfig({ AI_ASSISTANT_ENABLED: 'true' })).toThrow(/GEMINI_API_KEY/)
     expect(() => readAiConfig({ AI_ASSISTANT_ENABLED: 'true', GEMINI_API_KEY: 'k', GEMINI_MODEL: 'm', AI_MAX_TOOL_ROUNDS: '99' })).toThrow(/AI_MAX_TOOL_ROUNDS/)
-    expect(readAiConfig({ AI_ASSISTANT_ENABLED: 'true', GEMINI_API_KEY: 'k', GEMINI_MODEL: 'some-model' })).toMatchObject({ enabled: true, timeoutMs: 45000, maxToolRounds: 4 })
+    expect(readAiConfig({ AI_ASSISTANT_ENABLED: 'true', GEMINI_API_KEY: 'k', GEMINI_MODEL: 'some-model' })).toMatchObject({ enabled: true, timeoutMs: 60000, maxToolRounds: 4 })
   })
 })
 

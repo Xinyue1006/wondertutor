@@ -119,6 +119,10 @@ function describe(c) {
 }
 
 async function searchTutors(ctx, args) {
+  // The model still chooses the tool and every other criterion. Preserve an
+  // unambiguous school year explicitly typed by the parent if the model omits
+  // or miscopies it. Never infer a year from a budget, child or earlier search.
+  if (ctx.statedSchoolYear && !args.clear?.some(field => field === 'grade' || field === 'level')) args = { ...args, ...ctx.statedSchoolYear }
   const s = ctx.session
   // Refinements keep the previous search's preferences; explicitly given fields replace them; "clear" resets them
   const base = args.newSearch || !s.lastCriteria ? { ...DEFAULTS, childId: null, subject: null, level: null } : { ...s.lastCriteria }
@@ -266,7 +270,7 @@ async function getLessonDetails(ctx, { bookingRef }) {
   const refs = bookingRefs(ctx, b)
   const p = myt(b.startAt)
   const a = b.attendance
-  const checkIn = b.teachingMode === 'PHYSICAL'
+  const checkIn = b.teachingMode === 'PHYSICAL' || a
     ? { recorded: Boolean(a?.checkInAt), checkInTime: a?.checkInAt ? myt(a.checkInAt).time : null, checkOutTime: a?.checkOutAt ? myt(a.checkOutAt).time : null }
     : { recorded: null, checkInTime: null, checkOutTime: null }
   const sm = b.summary
@@ -276,11 +280,11 @@ async function getLessonDetails(ctx, { bookingRef }) {
     summary: sm ? { content: cut(sm.content, 1200), topics: cut(sm.topics, 400), homework: cut(sm.homework, 800), recommendations: cut(sm.recommendations, 800), progressNote: cut(sm.progressNote, 800) } : null,
     link: `/parent/bookings?booking=${publicReference(b)}`,
   })
-  evid(ctx, { kind: 'lesson', bookingRef: refs.bookingRef, childRef: refs.childRef, tutorRef: refs.tutorRef, subject: b.subject, status: b.status, date: p.date, time: p.time, mode: b.teachingMode, checkInTime: checkIn.checkInTime, checkOutTime: checkIn.checkOutTime, hasSummary: Boolean(sm) })
+  evid(ctx, { kind: 'lesson', bookingRef: refs.bookingRef, childRef: refs.childRef, tutorRef: refs.tutorRef, subject: b.subject, status: b.status, date: p.date, time: p.time, mode: b.teachingMode, attendanceRecorded: checkIn.recorded, checkInTime: checkIn.checkInTime, checkOutTime: checkIn.checkOutTime, hasSummary: Boolean(sm) })
   source(ctx, 'booking', refs.bookingRef, `Lesson ${p.date} ${b.subject}`, `/parent/bookings?booking=${publicReference(b)}`)
   return {
     ...refs, subject: b.subject, status: b.status, date: p.date, time: p.time, mode: b.teachingMode,
-    attendance: b.teachingMode === 'PHYSICAL' ? checkIn : { recorded: null, note: 'Online lessons have no attendance tracking.' },
+    attendance: { ...checkIn, ...(b.teachingMode === 'ONLINE' && { note: checkIn.recorded === null ? 'No online attendance record is available for this lesson.' : 'Online check-in/out is recorded in WonderTutor, without GPS or a photo.' }) },
     tutorRecorded: sm
       ? { summary: safe(ctx, sm.content, 600), topics: safe(ctx, sm.topics, 200), homework: safe(ctx, sm.homework, 400), recommendations: safe(ctx, sm.recommendations, 400), observations: safe(ctx, sm.progressNote, 400) }
       : null,
@@ -299,7 +303,7 @@ async function getLearningProgress(ctx, args) {
   ctx.cards.push({
     type: 'progress_summary', childName: child.name,
     period: { from: r.period.from, to: r.period.to, subject: r.period.subject },
-    totals: { lessons: r.totals.lessons, hours: r.totals.hours, summaries: r.totals.summaries, homeworkSet: r.totals.homeworkSet, physicalLessons: r.totals.physicalLessons, checkedIn: r.totals.checkedIn },
+    totals: { lessons: r.totals.lessons, hours: r.totals.hours, summaries: r.totals.summaries, homeworkSet: r.totals.homeworkSet, physicalLessons: r.totals.physicalLessons, attendanceTrackedLessons: r.totals.attendanceTrackedLessons ?? r.totals.physicalLessons, checkedIn: r.totals.checkedIn },
     subjects: r.subjects.map((x) => ({ subject: x.subject, lessons: x.lessons, hours: x.hours })),
     recentLessons: recent.map((l) => ({ date: myt(l.startAt).date, subject: l.subject, tutorName: l.tutor, homework: cut(l.summary?.homework, 800), summary: cut(l.summary?.content, 800) })),
     link: `/parent/children/${publicReference(child)}/progress`,
@@ -492,7 +496,12 @@ export const TOOLS = {
   },
 }
 
-export const toolDeclarations = () => Object.entries(TOOLS).map(([name, t]) => ({ name, description: t.description, parameters: t.parameters }))
+export const toolDeclarations = () => Object.entries(TOOLS).map(([name, t]) => ({
+  name, description: t.description,
+  parameters: t.parameters.type === 'OBJECT' && Object.keys(t.parameters.properties || {}).length === 0
+    ? { ...t.parameters, maxProperties: '0' } // match the server's strict empty-argument schema
+    : t.parameters,
+}))
 
 // Runs one model-requested tool. Unknown names and invalid arguments fail closed with an error result (no exception
 // reaches the model loop, and nothing is executed).
