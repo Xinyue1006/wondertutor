@@ -19,6 +19,8 @@ import { executeTool, toolDeclarations } from './tools.js'
 import { getProvider, ProviderError } from './provider.js'
 import { PROMPT_VERSION, systemInstruction } from './prompt.js'
 import { FAQ_VERSION } from './faq.js'
+import { conversationalIntent, conversationalLanguage, conversationalReply, suggestedQuestions } from './conversation.js'
+import { approvedQuickQuestion, executeQuickQuestion } from './quickQuestions.js'
 
 const MAX_TOOL_RESULT_CHARS = 6000
 const opaque = () => randomBytes(12).toString('base64url')
@@ -87,7 +89,7 @@ const MISSING = { not_found: 'not_found', not_in_results: 'not_found', no_childr
 const cancelled = (reason) => Object.assign(new AppError(reason === 'deleted' ? 404 : 499, reason === 'deleted' ? USER_MESSAGES.gone : 'Cancelled'), { assistantStatus: 'cancelled' })
 const stopIfCancelled = (turn) => { if (turn.signal.aborted) throw new ProviderError('cancelled', 'Cancelled') }
 
-export async function handleMessage({ user, parent, body, signal, now = new Date(), db = prisma }) {
+export async function handleMessage({ user, parent, body, signal, now = new Date(), db = prisma, allowQuickQuestions = true }) {
   const data = messageRequestSchema.parse(body)
   let session
   if (data.conversationId) {
@@ -106,13 +108,13 @@ export async function handleMessage({ user, parent, body, signal, now = new Date
     throw err
   }
   try {
-    return await runTurn({ user, parent, data, session, turn, now, db })
+    return await runTurn({ user, parent, data, session, turn, now, db, allowQuickQuestions })
   } finally {
     endTurn(session, turn)
   }
 }
 
-async function runTurn({ user, parent, data, session, turn, now, db }) {
+async function runTurn({ user, parent, data, session, turn, now, db, allowQuickQuestions }) {
   const started = Date.now()
   const requestId = opaque()
   const log = { requestId, tools: [], providerMs: [], outcome: 'ok', usage: { inputTokens: 0, outputTokens: 0 }, prompt: PROMPT_VERSION, faq: FAQ_VERSION }
@@ -128,6 +130,33 @@ async function runTurn({ user, parent, data, session, turn, now, db }) {
 
   try {
     stopIfCancelled(turn)
+    const provider = getProvider()
+    const cfg = env.ai
+    if (!cfg.enabled && provider.name === 'gemini') {
+      finish('disabled')
+      throw Object.assign(new AppError(503, USER_MESSAGES.disabled), { assistantStatus: 'unavailable' })
+    }
+
+    // A plain greeting/help/thanks is conversation, not a request to inspect a
+    // family's records. Answer locally and preserve the same staged-turn rules.
+    // A selected reference still takes the normal validation path below.
+    const intent = !data.selection && conversationalIntent(data.message)
+    if (intent) {
+      const lang = conversationalLanguage(data.message)
+      const finalText = conversationalReply(intent, lang, { returning: session.turns > 0 })
+      if (!commitStaged(session, turn, work, data.message, finalText)) {
+        finish('cancelled')
+        throw cancelled(turn.signal.aborted ? turn.signal.reason : 'deleted')
+      }
+      log.answer = 'server_conversation'
+      finish('ok')
+      return {
+        conversationId: session.id, messageId: opaque(), status: 'answer',
+        responseKind: 'conversation', text: finalText, suggestions: suggestedQuestions(lang),
+        entities: {}, cards: [], sources: [], criteria: null, matchResult: null, asOf: now.toISOString(),
+      }
+    }
+
     // Known names in the conversation become references before anything is sent to the provider
     const kids = await db.child.findMany({ where: { parentId: parent.id }, select: { id: true, name: true } })
     for (const k of kids) refFor(work, 'child', k.id, k.name)
@@ -146,13 +175,9 @@ async function runTurn({ user, parent, data, session, turn, now, db }) {
     if (selectedChildRef) userText += `\n(The parent selected [[${selectedChildRef}]].)`
 
     const ctx = { session: work, user, parent, db, now, cards: [], sources: [], evidence: [], needs: null, clarification: null, matchResult: null, selectedChildRef }
-    const provider = getProvider()
-    const cfg = env.ai
-    if (!cfg.enabled && provider.name === 'gemini') {
-      finish('disabled')
-      throw Object.assign(new AppError(503, USER_MESSAGES.disabled), { assistantStatus: 'unavailable' })
-    }
-
+    // Trusted internal evaluation can measure the model path separately. This
+    // switch is never accepted in the strict HTTP request body.
+    const quickQuestion = allowQuickQuestions ? approvedQuickQuestion(data.message) : null
     const today = mytParts(now)
     const system = systemInstruction({ todayMyt: today.date, nowMytTime: today.time })
     const contents = [...session.history, { role: 'user', parts: [{ text: userText }] }]
@@ -161,6 +186,23 @@ async function runTurn({ user, parent, data, session, turn, now, db }) {
     let calls = 0
     let text = null
 
+    const readTool = async (name, args) => {
+      stopIfCancelled(turn)
+      const out = await executeTool(ctx, name, args)
+      stopIfCancelled(turn)
+      log.tools.push(out.ok ? name : `${String(name).slice(0, 40)}:rejected`)
+      if (out.ok && out.result?.error && MISSING[out.result.error]) ctx.evidence.push({ kind: 'missing', tool: name, reason: MISSING[out.result.error] })
+      if (out.ok && (out.result?.needsClarification === 'subject' || out.result?.needsClarification === 'level')) ctx.needs = out.result.needsClarification
+      return out
+    }
+
+    if (quickQuestion) {
+      await executeQuickQuestion(quickQuestion, ctx, async (name, args) => {
+        if (++calls > cfg.maxToolCalls) throw new ProviderError('tool_loop', 'Tool call limit reached')
+        return readTool(name, args)
+      })
+      log.method = 'quick_question'
+    } else {
     for (let round = 0; round <= cfg.maxToolRounds; round++) {
       // The one boundary to the provider: history, the new message and tool results are all filtered here, every round
       const res = await callModel(provider, { system, contents: sanitizeContents(contents, namesNow()), tools: toolDeclarations(), maxOutputTokens: cfg.maxOutputTokens }, deadline, turn.signal, log.providerMs)
@@ -185,21 +227,21 @@ async function runTurn({ user, parent, data, session, turn, now, db }) {
         else if (seenCalls.has(key)) result = { error: 'duplicate_call', message: 'This exact call was already made; use its earlier result.' }
         else {
           seenCalls.add(key)
-          const out = await executeTool(ctx, name, args)
-          stopIfCancelled(turn)
-          log.tools.push(out.ok ? name : `${String(name).slice(0, 40)}:rejected`)
+          const out = await readTool(name, args)
           result = out.result
-          if (out.ok && result?.error && MISSING[result.error]) ctx.evidence.push({ kind: 'missing', tool: name, reason: MISSING[result.error] })
-          if (out.ok && (result?.needsClarification === 'subject' || result?.needsClarification === 'level')) ctx.needs = result.needsClarification
         }
-        responses.push({ functionResponse: { name, response: boundResult(result) } })
+        // Gemini 3.5 correlates responses by both name and the provider's call
+        // id. Preserve that id for successful, rejected and duplicate calls;
+        // do not invent one for older models that omitted it.
+        responses.push({ functionResponse: { ...(typeof p.functionCall.id === 'string' && { id: p.functionCall.id }), name, response: boundResult(result) } })
       }
       contents.push({ role: 'user', parts: responses })
+    }
     }
     stopIfCancelled(turn)
 
     // ── the visible answer ──
-    const lang = detectLanguage(data.message)
+    const lang = quickQuestion?.lang || detectLanguage(data.message)
     let finalText
     let cards = validCards(ctx.clarification ? [ctx.clarification, ...ctx.cards] : ctx.cards)
     let sources = ctx.sources.filter((s) => sourceSchema.safeParse(s).success).slice(0, 10)
@@ -210,7 +252,7 @@ async function runTurn({ user, parent, data, session, turn, now, db }) {
       finalText = USER_MESSAGES.tool_loop
       cards = []; sources = []; matchResult = null
       finish('tool_loop')
-      return { conversationId: session.id, messageId: opaque(), status: 'answer', text: finalText, entities: {}, cards, sources, criteria: null, matchResult: null, asOf: now.toISOString() }
+      return { conversationId: session.id, messageId: opaque(), status: 'answer', responseKind: 'fallback', text: finalText, suggestions: suggestedQuestions(lang), entities: {}, cards, sources, criteria: null, matchResult: null, asOf: now.toISOString() }
     }
     if (ctx.clarification || ctx.needs) {
       // A preliminary lookup must not hide the question needed to finish the task.
@@ -245,7 +287,10 @@ async function runTurn({ user, parent, data, session, turn, now, db }) {
       conversationId: session.id,
       messageId: opaque(),
       status: ctx.clarification || ctx.needs ? 'clarification' : 'answer',
+      responseKind: ctx.clarification || ctx.needs ? 'clarification' : ctx.evidence.length ? quickQuestion ? 'lookup' : 'records' : 'fallback',
+      ...(quickQuestion && { method: 'quick_question' }),
       text: finalText,
+      suggestions: suggestedQuestions(lang, ctx),
       entities,
       cards,
       sources,

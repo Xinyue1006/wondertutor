@@ -7,6 +7,7 @@ import { deleteSession } from '../../services/assistant/session.js'
 import { getProvider } from '../../services/assistant/provider.js'
 import { PROMPT_VERSION } from '../../services/assistant/prompt.js'
 import { FAQ_VERSION } from '../../services/assistant/faq.js'
+import { suggestedQuestions } from '../../services/assistant/conversation.js'
 
 // GET /parent/assistant/capabilities: what the widget may offer. Never includes keys or provider details beyond a name.
 export function capabilities(req, res) {
@@ -16,6 +17,7 @@ export function capabilities(req, res) {
     enabled,
     modes: enabled ? ['ai', 'guided'] : ['guided'],
     readOnly: true,
+    suggestions: suggestedQuestions('en'),
     limits: { maxMessageLength: 2000, maxTurns: env.ai.maxTurns, conversationMinutes: Math.round(env.ai.conversationTtlMs / 60000) },
     limitations: [
       'Read-only: it can look things up but cannot book, cancel, pay, change profiles or file complaints.',

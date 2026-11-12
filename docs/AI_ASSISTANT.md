@@ -28,7 +28,7 @@ POST /api/parent/assistant/messages → requireAuth + PARENT + loadParentProfile
   ← { status, text, entities, cards, sources, criteria, matchResult, asOf }
 ```
 
-The model **chooses tools and, when there is no account evidence, may write short fact-free wording** (a greeting, an explanation of what it can do, one clarifying question). It does **not** write the facts: dates, times, amounts, statuses, counts, attendance, progress and tutor scores in the answer come from server templates built from the tool results (§3a). The server does everything else: it authenticates the parent, validates arguments, reads the data, minimises it and builds the cards. The deterministic matching engine (`services/matching.service.js`) stays authoritative for every score, label, reason and ordering.
+For free-form questions, the model **chooses tools and, when there is no account evidence, may write short fact-free wording** (a greeting, an explanation of what it can do, one clarifying question). Approved social messages and quick questions have direct server paths described in §3b. The model does **not** write the facts: dates, times, amounts, statuses, counts, attendance, progress and tutor scores in the answer come from server templates built from the tool results (§3a). The server does everything else: it authenticates the parent, validates arguments, reads the data, minimises it and builds the cards. The deterministic matching engine (`services/matching.service.js`) stays authoritative for every score, label, reason and ordering.
 
 ## 2. Files
 
@@ -37,6 +37,7 @@ The model **chooses tools and, when there is no account evidence, may write shor
 | Endpoints | `backend/src/controllers/parent/assistant.controller.js`, routes in `routes/parent.routes.js` |
 | Orchestration, deadlines, staged turns | `backend/src/services/assistant/orchestrator.js` |
 | Server-written answers (en/ms/zh) and model-prose screen | `backend/src/services/assistant/answers.js` |
+| Approved social replies, suggestions and exact quick-question routes | `backend/src/services/assistant/conversation.js`, `quickQuestions.js` |
 | Tool allowlist | `backend/src/services/assistant/tools.js` |
 | Request / tool / card schemas | `backend/src/services/assistant/schemas.js` |
 | Conversations, references, staging, one-turn-at-a-time lock | `backend/src/services/assistant/session.js` |
@@ -68,6 +69,9 @@ The body must be `{ conversationId?, message, selection?: { kind: 'child', ref }
 {
   "conversationId": "opaque", "messageId": "opaque",
   "status": "answer | clarification",
+  "responseKind": "conversation | lookup | records | clarification | fallback",
+  "method": "quick_question (only for approved direct lookups)",
+  "suggestions": ["When is my next lesson?"],
   "text": "Plain text; [[child_1]] tokens only for references in entities",
   "entities": { "child_1": "Aina" },
   "cards": [ { "type": "booking_list", ... } ],
@@ -120,6 +124,10 @@ Every tool that returns account data also records a small **evidence** object (c
 
 ### 3b. Conversation state, cancellation and concurrency
 
+- **Minimizing during a visit.** The panel is mounted on its first opening, then hidden and made inert when minimized. Messages, draft input, the conversation ID, the selected AI/Guided tab and in-flight answers survive minimizing, reopening and navigation within the parent portal. They are scoped to the signed-in account and cleared on logout/account changes or explicit Clear chat. This is current-visit state only: refreshing the page starts a fresh browser chat. No message history is written to browser storage or a new database table. Server inactivity/turn limits still apply.
+- **Greetings and examples.** Whole-message greetings, capability questions and thanks in English, Malay, Chinese and common Manglish forms receive approved conversational replies without a model request or account lookup. Mixed messages such as "Hi, when is my next lesson?" still use the normal language-model/tool flow. Repeated greetings do not reset the conversation or matching criteria. Suggested questions come from a reviewed list, selected by language and evidence; clarification cards remain the main prompt when more detail is needed. Greeting captions do not claim that records were read.
+- **Quick record lookups.** Four approved starter questions, with explicit English/Malay/Chinese versions, use the same validated read-only tools directly: next lesson, latest completed-lesson homework, payments this month and Primary 4 Mathematics tutor search. This is an exact product-owned route, not a replacement for free-form language understanding. It returns `responseKind: lookup` and `method: quick_question`; the UI labels it as a record lookup rather than a Gemini-generated answer. Compound requests, names, custom criteria and action requests continue through the regular model/tool path. A timeout offers these quick questions without automatically replaying the failed message.
+- **Gemini function-call correlation.** Tool responses preserve each provider-supplied function-call ID, name and response count. Older responses without an ID remain supported; the app does not invent IDs or change thought signatures.
 - **Staged turns.** A turn works on a copy of the conversation (references, searches, last search criteria). `commitStaged()` copies it back, together with the history entry, in one synchronous step only when the turn finished. A cancelled, timed-out, failed or looping turn leaves no trace: it cannot change later refinements, references or history. (A turn that ends in the tool-loop limit also returns only an apology and stores nothing.)
 - **One turn at a time per conversation.** A second request while one is running gets `409 busy` (retryable) and changes nothing. If the first request was already cancelled by the browser, the new turn takes over immediately and the old turn can no longer commit (its token no longer matches).
 - **Clear chat / delete during a request.** `DELETE` marks the conversation deleted and aborts the running turn. A late finish cannot commit into it or bring it back; the request ends as `cancelled`.
@@ -327,3 +335,18 @@ node scripts/compare-assistant-models.js gemini-3.8-flash gemini-3.5-flash-lite 
 ```
 
 Check pricing and project billing status before opting in. The script writes synthetic reports to the ignored `backend/eval/reports/` directory, including tool arguments and failures. Original run files: `comparison-2026-11-10T08-03-29-608Z.json` and `comparison-2026-11-10T08-08-20-272Z.json`.
+
+
+## 12. Conversation reliability follow-up — 13 November 2026
+
+The signed-in visit now retains chat messages, draft text, selected tab and pending replies while minimized or navigating parent pages. A new browser visit/reload, logout/account change or Clear chat ends that browser history; no durable chat database or browser message storage was added. The existing privacy-notice acknowledgement is separate from message history.
+
+The four starter questions have exact approved English, Malay and Chinese routes. They call the same allowlisted, ownership-checked read tools without Gemini, return `responseKind: lookup`, and are labelled as record lookups. The UI uses those canonical questions at welcome and after an unavailable/timeout error. Clicking one is an explicit new request, not an automatic retry of the failed message. Free-form questions and custom criteria still require the language model.
+
+During bounded live diagnostics, the configured Google endpoint and API key responded to model metadata in 171 ms, while generation for a minimal Hello and for next-lesson tool selection both exceeded a 25-second probe limit. Gemini 3.1 Flash-Lite also exceeded a separate 12-second probe; the older 2.5 Flash-Lite request was rejected. Network/unauthenticated endpoint checks returned in under 250 ms. These observations establish the generation delay seen during the check; they do not establish Google's internal cause, a permanent outage or a latency guarantee. The application retains its 15-second total assistant deadline. No provider/model/billing configuration or actual `.env` file was changed, and live probes contained synthetic text rather than family records.
+
+A protocol correction also preserves Gemini's supplied function-call IDs in every corresponding function response. This addresses round-two compatibility; it does not claim to cure the measured first-generation delay.
+
+The evaluation harness internally disables quick routing when measuring model/oracle tool selection. HTTP clients cannot pass this internal flag. Direct record lookups must not be reported as successful language-model predictions.
+
+Validation after syncing the availability and tutor-booking changes from `main` through `53488f2`: 723 backend tests across 48 suites and 438 frontend tests across 50 files passed, and the production frontend build passed. Before that final tutor-booking sync, thirteen browser checks covered visit continuity, drafts, tabs, navigation, in-flight replies, clear/logout and desktop/mobile layouts. Twelve authenticated HTTP checks (four questions in each supported language) returned real synthetic database cards in 8–29 ms locally while the test provider was configured to throw on any model request. These timings are synthetic local checks, not production performance guarantees. All 24 browser checks passed (13 visit-continuity checks plus 11 strict-provider quick-question/recovery checks), including manual timeout recovery in the same conversation, accurate lookup labels and 1440/375/320 px layouts with no runtime errors.

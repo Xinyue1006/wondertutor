@@ -45,12 +45,18 @@ const clampPos = ({ right, bottom }) => ({
 })
 
 export default function AssistantWidget() {
-  const { chatOpen, setChatOpen } = useMatching()
+  const { chatOpen, chatVisited, setChatOpen } = useMatching()
   const [bubble, setBubble] = useState(true)
   const [pos, setPos] = useState({ right: 16, bottom: 16 })
   const [dragging, setDragging] = useState(false)
   const drag = useRef(null) // { x, y, start, moved }
   const suppressClick = useRef(false)
+  const launcher = useRef(null)
+
+  function minimise() {
+    setChatOpen(false)
+    launcher.current?.focus()
+  }
 
   // Keep it on screen when the window gets smaller
   useEffect(() => {
@@ -98,7 +104,8 @@ export default function AssistantWidget() {
 
   return (
     <>
-      {chatOpen && <ChatPanel />}
+      {/* Keep this visit's chat alive when hidden; the account provider removes it on logout/account change. */}
+      {chatVisited && <ChatPanel open={chatOpen} onMinimise={minimise} />}
       <div className={`fixed z-40 flex w-[76px] flex-col ${onLeft ? 'items-start' : 'items-end'}`} style={{ right: pos.right, bottom: pos.bottom }}>
         {bubble && !chatOpen && !dragging && (
           <div className={`pop-in relative mb-1 w-48 rounded-xl bg-white px-3 py-2 text-left shadow-lg ring-1 ring-brand-100 ${onLeft ? 'ml-2' : 'mr-2'}`}>
@@ -111,6 +118,7 @@ export default function AssistantWidget() {
           </div>
         )}
         <button
+          ref={launcher}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
@@ -132,8 +140,7 @@ export default function AssistantWidget() {
 
 // ───────────── chat panel (mode switch) ─────────────
 
-function ChatPanel() {
-  const { setChatOpen } = useMatching()
+function ChatPanel({ open, onMinimise }) {
   const { user } = useAuth()
   const caps = useAssistantCapabilities()
   const aiOn = Boolean(caps?.enabled)
@@ -215,10 +222,11 @@ function ChatPanel() {
 
   // Escape closes the panel (a dialog open on top, e.g. lesson details, gets the Escape key first)
   useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && !document.querySelector('[role=dialog]') && setChatOpen(false)
+    if (!open) return
+    const onKey = (e) => e.key === 'Escape' && !document.querySelector('[role=dialog]') && onMinimise()
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [setChatOpen])
+  }, [open, onMinimise])
 
   const tab = (id, label) => (
     <button
@@ -233,7 +241,7 @@ function ChatPanel() {
   )
 
   return (
-    <aside ref={panel} aria-label="AI Tutor Assistant" style={{ width: panelSize?.width, height: panelSize?.height || 'min(640px, calc(100dvh - 32px))', maxWidth: 'calc(100vw - 16px)', maxHeight: 'calc(100dvh - 16px)', ...(panelPosition ? { left: panelPosition.left, top: panelPosition.top } : { right: 16, top: 'min(96px, 4dvh)' }) }} className="fixed z-40 flex w-[min(390px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-brand-100">
+    <aside ref={panel} aria-label="AI Tutor Assistant" hidden={!open} inert={!open} aria-hidden={!open} style={{ width: panelSize?.width, height: panelSize?.height || 'min(640px, calc(100dvh - 32px))', maxWidth: 'calc(100vw - 16px)', maxHeight: 'calc(100dvh - 16px)', ...(panelPosition ? { left: panelPosition.left, top: panelPosition.top } : { right: 16, top: 'min(96px, 4dvh)' }) }} className={`fixed z-40 ${open ? 'flex' : 'hidden'} w-[min(390px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-brand-100`}>
       <header className="bg-gradient-to-r from-brand-50 to-white px-4 pb-2 pt-3">
         <div className="flex items-center gap-3">
           <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow ring-1 ring-brand-100">
@@ -243,10 +251,10 @@ function ChatPanel() {
             <div className="text-lg font-extrabold text-navy">AI Tutor Assistant</div>
             <div className="text-xs text-slate-500">{active === 'ai' ? 'Ask about your lessons, payments and tutors' : 'Your learning matchmaker'}</div>
           </div>
-          <button onClick={() => setChatOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Minimise">
+          <button onClick={onMinimise} title="Hide the chat and keep this conversation" className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Minimise">
             <Icon name="minus" className="h-[18px] w-[18px]" />
           </button>
-          <button onClick={() => setChatOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Close">
+          <button onClick={onMinimise} title="Close the window and keep this conversation" className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Close">
             <Icon name="x" className="h-[18px] w-[18px]" />
           </button>
         </div>
@@ -256,10 +264,10 @@ function ChatPanel() {
         </div>
       </header>
       {/* Both stay mounted so switching tabs never loses a conversation */}
-      <div className={active === 'ai' ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}>
-        <AiChat key={user?.id ?? 'none'} capabilities={caps} onUseGuided={() => setMode('guided')} />
+      <div hidden={active !== 'ai'} inert={active !== 'ai'} className={active === 'ai' ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}>
+        <AiChat key={user?.id ?? 'none'} capabilities={caps} visible={open && active === 'ai'} onUseGuided={() => setMode('guided')} />
       </div>
-      <div className={active === 'guided' ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}>
+      <div hidden={active !== 'guided'} inert={active !== 'guided'} className={active === 'guided' ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}>
         <GuidedChat />
       </div>
       <button type="button" aria-label="Resize chat window using drag or arrow keys" title="Drag to resize" onPointerDown={startResize} onPointerMove={dragResize} onPointerUp={() => { resizeStart.current = null }} onPointerCancel={() => { resizeStart.current = null }} onKeyDown={keyboardResize} className="absolute bottom-0 right-0 z-10 flex h-6 w-6 touch-none select-none items-center justify-center rounded-tl-lg bg-white text-slate-400 cursor-se-resize focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500">◢</button>

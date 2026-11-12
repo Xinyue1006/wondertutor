@@ -23,7 +23,7 @@ afterAll(() => new Promise((r) => server.close(r)))
 const cfg = () => ({ enabled: true, apiKey: 'test-key', model: 'my-model', baseUrl: base, maxOutputTokens: 100 })
 
 test('sends system instruction, contents and function declarations with the key in a header', async () => {
-  const parts = [{ functionCall: { name: 'list_bookings', args: {} }, thoughtSignature: 'abc' }]
+  const parts = [{ functionCall: { id: 'provider-call-opaque', name: 'list_bookings', args: {} }, thoughtSignature: 'abc' }]
   reply = () => [200, { candidates: [{ content: { role: 'model', parts }, finishReason: 'STOP' }], usageMetadata: { promptTokenCount: 12, candidatesTokenCount: 3 } }]
   const out = await geminiProvider(cfg()).generate({ system: 'rules', contents: [{ role: 'user', parts: [{ text: 'hi' }] }], tools: [{ name: 'list_bookings', description: 'd', parameters: { type: 'OBJECT', properties: {} } }] })
   expect(seen.url).toBe('/v1beta/models/my-model:generateContent')

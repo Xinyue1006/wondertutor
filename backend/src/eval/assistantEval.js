@@ -137,7 +137,10 @@ export async function observeCase(c, fx, { mode = 'mock', db = prisma } = {}) {
       rec.turn = i
       rec.turns[i] ||= { calls: [], results: [], requests: [] }
       try {
-        const r = await handleMessage({ user, parent, body: { ...(conversationId && { conversationId }), message: c.turns[i].user }, db })
+        // Evaluate the model/oracle's routing, not product-owned quick lookups.
+        // Otherwise exact starter questions would skip the provider and distort
+        // tool-selection metrics. The public API always keeps quick lookups on.
+        const r = await handleMessage({ user, parent, body: { ...(conversationId && { conversationId }), message: c.turns[i].user }, db, allowQuickQuestions: false })
         conversationId = r.conversationId
         replies.push(r)
       } catch (err) {

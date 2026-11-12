@@ -4,7 +4,7 @@
 // Safety in the browser:
 //   - a privacy notice is shown before the first AI message (with the guided search as the alternative);
 //   - answers are plain text; [[ref]] tokens are shown with names only when the server resolved them;
-//   - every reply is labelled as AI-generated, and cards (the facts) come from the server, not the model;
+//   - supporting cards come from the server; local conversational guidance is not labelled as a records lookup;
 //   - every request has an identity: only the CURRENT request may show a reply, an error or change the busy state. A
 //     cancelled, cleared or replaced request is ignored completely, including its finally block;
 //   - logging out or switching account clears the chat, and any reply that arrives late for an old chat is dropped.
@@ -18,7 +18,9 @@ import { useMatching } from './MatchingContext'
 import AiCard from './AiCards'
 import { deleteConversation, sendAssistantMessage, splitEntities } from './aiApi'
 
-const EXAMPLES = ['When is my next lesson?', 'How much have I paid this month?', "Show my child's recent homework", 'Find an online Maths tutor below RM60']
+// These exact approved questions have a server-side record lookup that does not
+// depend on the external language-model service being available.
+const EXAMPLES = ['When is my next lesson?', 'What homework was given in the latest lesson?', 'How much have I paid this month?', 'Find a Maths tutor for Primary 4']
 const NOTICE_KEY = 'wt-ai-notice-v1'
 let seq = 1
 
@@ -29,6 +31,8 @@ function rememberNotice(userId) {
   try { localStorage.setItem(`${NOTICE_KEY}:${userId}`, '1') } catch { /* shown again next time */ }
 }
 
+const questionList = (value) => [...new Set((Array.isArray(value) ? value : []).filter((question) => typeof question === 'string' && question.trim() && question.length <= 200).map((question) => question.trim()))].slice(0, 4)
+
 // Backend criteria -> the shape the wizard/results page keep in MatchingContext
 const toUiCriteria = (c) => ({
   childId: c.childId ?? null, subject: c.subject, level: c.level, grade: c.grade ?? null, days: c.days || [], timePreset: null,
@@ -36,7 +40,7 @@ const toUiCriteria = (c) => ({
   budgetMax: c.budgetMax ?? null, gender: c.gender || 'ANY', language: c.language || '', characteristics: c.characteristics || [], notes: '',
 })
 
-export default function AiChat({ capabilities, onUseGuided }) {
+export default function AiChat({ capabilities, onUseGuided, visible = true }) {
   const { user } = useAuth()
   const userId = user?.id
   const navigate = useNavigate()
@@ -61,8 +65,8 @@ export default function AiChat({ capabilities, onUseGuided }) {
   }, [])
 
   useEffect(() => {
-    scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' })
-  }, [messages, busy])
+    if (visible) scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' })
+  }, [messages, busy, visible])
 
   const enabled = Boolean(capabilities?.enabled)
 
@@ -86,7 +90,8 @@ export default function AiChat({ capabilities, onUseGuided }) {
       const busyConflict = err?.response?.data?.status === 'busy' // the server is still answering something else: keep this chat
       // An expired or unknown chat: start a fresh one next time
       if ((status === 404 || status === 409) && !busyConflict) setConversationId(null)
-      setLastFailed({ message: value, selection })
+      const quickQuestions = status === 429 || status >= 500 || !err?.response
+      setLastFailed({ message: value, selection, quickQuestions })
       setMessages((m) => [...m, { id: seq++, from: 'system', text: errorMessage(err), unavailable: status === 503 || status === 429 }])
     } finally {
       if (isCurrent()) {
@@ -111,6 +116,7 @@ export default function AiChat({ capabilities, onUseGuided }) {
     request.current = null
     req?.ac.abort()
     setMessages([])
+    setText('')
     setConversationId(null)
     setLastFailed(null)
     setBusy(false)
@@ -132,6 +138,14 @@ export default function AiChat({ capabilities, onUseGuided }) {
     setChatOpen(false)
     navigate('/parent/find-tutor/results')
   }
+
+  const lastReply = messages.slice().reverse().find((message) => message.from === 'ai')
+  const hasSuggestions = Array.isArray(lastReply?.suggestions)
+  const approvedQuestions = questionList(capabilities?.suggestions)
+  const quickQuestions = approvedQuestions.length ? approvedQuestions : EXAMPLES
+  const followUps = hasSuggestions ? questionList(lastReply.suggestions) : lastReply?.status === 'clarification' ? [] : quickQuestions
+  const showQuickQuestions = Boolean(lastFailed?.quickQuestions)
+  const offeredQuestions = showQuickQuestions ? quickQuestions : followUps
 
   if (!capabilities) {
     return <div className="flex flex-1 items-center justify-center text-sm text-slate-500" role="status">Loading…</div>
@@ -165,7 +179,7 @@ export default function AiChat({ capabilities, onUseGuided }) {
   return (
     <>
       <div className="flex items-center justify-between border-b border-slate-100 bg-white px-4 py-1.5 text-xs text-slate-500">
-        <span>Read-only · answers from your records</span>
+        <span>Read-only · your records and tutor search</span>
         <button type="button" onClick={clearChat} disabled={!messages.length && !busy} className="flex min-h-9 items-center gap-1 rounded-lg px-2 font-semibold text-brand-600 hover:bg-brand-50 disabled:opacity-40" aria-label="Clear chat">
           <Icon name="trash" className="h-3.5 w-3.5" /> Clear chat
         </button>
@@ -173,13 +187,21 @@ export default function AiChat({ capabilities, onUseGuided }) {
       <div ref={scroller} className="flex-1 space-y-3 overflow-y-auto overflow-x-hidden bg-brand-25 px-4 py-4">
         {!messages.length && (
           <div className="text-sm text-slate-600">
-            <p className="mb-2">Hi! Ask me about your lessons, homework, payments, complaints or finding a tutor.</p>
+            <p className="mb-2">Hi! How can I help? Ask about your lessons, homework, payments or finding a tutor, or try a question below.</p>
             <div className="flex flex-wrap gap-2">
-              {EXAMPLES.map((ex) => <button key={ex} type="button" onClick={() => send(ex)} className="chip px-3 py-1.5 text-left text-[13px]">{ex}</button>)}
+              {quickQuestions.map((ex) => <button key={ex} type="button" onClick={() => send(ex)} className="chip px-3 py-1.5 text-left text-[13px]">{ex}</button>)}
             </div>
           </div>
         )}
         {messages.map((m) => <ChatMessage key={m.id} m={m} busy={busy} onChooseChild={(c) => send(`For ${c.name}`, { kind: 'child', ref: c.ref }, c.label)} onOpenResults={() => openResults(m)} />)}
+        {!busy && (showQuickQuestions || (lastReply && !lastFailed)) && offeredQuestions.length > 0 && (
+          <div className="space-y-2" aria-label={showQuickQuestions ? 'Quick questions' : 'Suggested questions'}>
+            <p className="text-xs font-semibold text-slate-500">{showQuickQuestions ? 'Try a quick question' : 'You can also ask'}</p>
+            <div className="flex flex-wrap gap-2">
+              {offeredQuestions.map((question) => <button key={question} type="button" onClick={() => send(question)} className="chip max-w-full break-words px-3 py-1.5 text-left text-[13px]">{question}</button>)}
+            </div>
+          </div>
+        )}
         <div aria-live="polite" role="status" className="text-sm text-slate-500">
           {busy && (
             <span className="inline-flex items-center gap-2">
@@ -222,6 +244,14 @@ function ChatMessage({ m, busy, onChooseChild, onOpenResults }) {
   if (m.from === 'system') {
     return <div role="alert" className="rounded-xl bg-white px-3.5 py-2.5 text-sm text-slate-700 ring-1 ring-amber-200">{m.text}{m.unavailable && <div className="mt-1 text-xs text-slate-500">You can switch to Guided Tutor Search above.</div>}</div>
   }
+  const hasEvidence = Boolean(m.sources?.length || m.cards?.length)
+  const caption = m.responseKind === 'lookup'
+    ? 'WonderTutor records'
+    : m.responseKind === 'clarification'
+      ? 'Clarifying question'
+    : m.responseKind === 'conversation' || m.responseKind === 'fallback' || !hasEvidence
+      ? 'WonderTutor assistant'
+      : 'AI-assisted answer · supporting details below'
   return (
     <div className="flex items-start gap-2">
       <span className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-brand-100"><Robot className="h-6 w-6" sparkles={false} /></span>
@@ -229,7 +259,7 @@ function ChatMessage({ m, busy, onChooseChild, onOpenResults }) {
         <div className="whitespace-pre-line break-words rounded-xl rounded-tl-sm bg-white px-3.5 py-2.5 text-sm text-slate-700 shadow-sm ring-1 ring-brand-100">
           {splitEntities(m.text, m.entities).map((p, i) => (p.entity ? <strong key={i} className="font-semibold text-navy">{p.entity}</strong> : <span key={i}>{p.text}</span>))}
         </div>
-        <div className="mt-0.5 text-[11px] text-slate-400">AI-generated answer · details below come from your records</div>
+        <div className="mt-0.5 text-[11px] text-slate-400">{caption}</div>
         {m.cards?.map((c, i) => <AiCard key={i} card={c} busy={busy} onChooseChild={onChooseChild} onOpenResults={onOpenResults} />)}
         {m.sources?.length > 0 && (
           <details className="mt-1 text-xs text-slate-500">

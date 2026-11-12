@@ -63,7 +63,12 @@ function AccountMatchingProvider({ children }) {
   const [kidsLoaded, setKidsLoaded] = useState(false)
   const [criteria, setCriteria] = useState(EMPTY_CRITERIA)
   const [result, setResult] = useState(null)
-  const [chatOpen, setChatOpen] = useState(false)
+  const [chatOpen, setChatOpenState] = useState(false)
+  const [chatVisited, setChatVisited] = useState(false)
+  const setChatOpen = useCallback((open) => {
+    setChatOpenState(open)
+    if (open) setChatVisited(true)
+  }, [])
   // Set when the option lists or the children could not be loaded, so pages can offer "Try again" instead of spinning
   const [loadError, setLoadError] = useState('')
 
@@ -117,9 +122,9 @@ function AccountMatchingProvider({ children }) {
   const value = useMemo(
     () => ({
       catalog, kids, kidsLoaded, refreshChildren, criteria, setCriteria, patchCriteria, applyChild,
-      result, setResult, runMatching, chatOpen, setChatOpen, loadError, reloadShared: loadShared,
+      result, setResult, runMatching, chatOpen, chatVisited, setChatOpen, loadError, reloadShared: loadShared,
     }),
-    [catalog, kids, kidsLoaded, refreshChildren, criteria, patchCriteria, applyChild, result, runMatching, chatOpen, loadError, loadShared],
+    [catalog, kids, kidsLoaded, refreshChildren, criteria, patchCriteria, applyChild, result, runMatching, chatOpen, chatVisited, setChatOpen, loadError, loadShared],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

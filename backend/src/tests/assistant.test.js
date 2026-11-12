@@ -339,7 +339,7 @@ describe('10. provider failures fall back clearly; normal pages keep working', (
         calls++
         throw new ProviderError(httpStatus === 429 ? 'rate_limit' : 'unavailable', 'busy', { transient: true, httpStatus })
       } })
-      const response = await send(A, { message: 'hello' })
+      const response = await send(A, { message: 'show my next lesson' })
       expect(response.status).toBe(httpStatus)
       expect(calls).toBe(1)
     }
@@ -349,20 +349,20 @@ describe('10. provider failures fall back clearly; normal pages keep working', (
     const saved = env.ai.timeoutMs
     env.ai.timeoutMs = 1200
     setProvider({ name: 'mock', generate: ({ signal }) => new Promise((_, reject) => signal.addEventListener('abort', () => reject(new Error('aborted')))) })
-    const t = await send(A, { message: 'hello' })
+    const t = await send(A, { message: 'show my next lesson' })
     expect(t.status).toBe(503)
     expect(t.status).toBe(503)
     expect(t.message).toMatch(/too long/i)
     env.ai.timeoutMs = saved
 
     setProvider({ name: 'mock', generate: async () => { throw new ProviderError('rate_limit', 'busy', { transient: true }) } })
-    const r = await send(A, { message: 'hello' })
+    const r = await send(A, { message: 'show my next lesson' })
     expect(r.status).toBe(429)
 
     setProvider({ name: 'mock', generate: async () => ({ parts: 'not-an-array' }) })
-    const m = await send(A, { message: 'hello' })
+    const m = await send(A, { message: 'show my next lesson' })
     expect(m.status).toBe(200)
-    expect(m.text).toMatch(/haven't looked anything up/i)
+    expect(m.text).toMatch(/What would you like to check/i)
 
     let n = 0
     setProvider({ name: 'mock', generate: async () => ({ parts: [{ functionCall: { name: 'list_notifications', args: { limit: (n++ % 20) + 1 } } }] }) })
