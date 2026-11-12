@@ -89,10 +89,9 @@ export default function PrivacyAccountCard({ emailReminders, privacyAcceptedAt, 
         <DeleteAccountModal
           email={email}
           onClose={() => setDeleting(false)}
-          onDeleted={() => {
-            // Sent to Log In first, then logged out: the page behind must not react to the ended login in between
+          onDeleted={async () => {
+            await logout()
             navigate('/login', { replace: true, state: { deleted: true } })
-            logout()
           }}
         />
       )}
@@ -119,7 +118,7 @@ function DeleteAccountModal({ email, onClose, onDeleted }) {
     setError('')
     try {
       await api.post('/parent/account/delete', { confirmEmail: typed, ...(check.hasPassword && { password }) })
-      onDeleted()
+      await onDeleted()
     } catch (err) {
       setError(errorMessage(err))
       setBusy(false)

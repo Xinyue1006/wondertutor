@@ -21,7 +21,8 @@ describe('administrator login', () => {
     const signedIn = await api().post('/auth/login', { email: admin.user.email, password: 'Test1234', portal: 'ADMIN' })
     expect(signedIn.status).toBe(200)
     expect(signedIn.user.role).toBe('ADMIN')
-    expect(signedIn.token).toBeTruthy()
+    expect(signedIn.token).toBeUndefined()
+    expect(signedIn.csrfToken).toBeTruthy()
     for (const account of [await makeParent(), await makeTutor()]) {
       const denied = await api().post('/auth/login', { email: account.user.email, password: 'Test1234', portal: 'ADMIN' })
       expect(denied.status).toBe(403)

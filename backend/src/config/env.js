@@ -49,7 +49,7 @@ export const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
   clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
   jwtSecret: required('JWT_SECRET'),
-  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d', // legacy JWT test utility only; browser session lifetimes are defined in session.service.js
   smtp: {
     host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT || 465),
@@ -77,8 +77,8 @@ export const env = {
 
 export const isDev = env.nodeEnv !== 'production'
 
-// A live site must not start with settings that make it easy to break into. A weak JWT secret lets anybody forge a login
-// for any account, including the admin, so that one stops the server. The rest are warnings.
+// A live site must not start with settings that make it easy to break into. This
+// server-only secret protects session credential binding and CSRF proofs.
 export function productionProblems(e) {
   const stop = []
   const warn = []

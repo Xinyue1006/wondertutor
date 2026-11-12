@@ -1,7 +1,7 @@
 import api, { errorMessage } from '../api/client'
 
-// Downloads a file the server only gives to a logged-in user (calendar files, "my data"). A plain link cannot send the
-// login, so the file is fetched with it and then saved from the browser's memory.
+// Downloads a protected file through the shared cookie-authenticated client, so
+// the page can show a readable failure and honour the server's suggested filename.
 // Returns '' when it worked, or the message to show.
 export async function downloadFile(path, fallbackName) {
   try {

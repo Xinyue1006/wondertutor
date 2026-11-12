@@ -2,7 +2,7 @@
 // only ever contain the logged-in parent's own confirmed lessons.
 import { prisma } from '../config/prisma.js'
 import { buildCalendar, icsEscape, icsFold, icsTime } from '../services/calendar.service.js'
-import { MONDAY, api, apiBase, makeBooking, makeParent, makeTutor, nextDate, resetDb, startServer, stopServer } from './helpers.js'
+import { authHeaders, MONDAY, api, apiBase, makeBooking, makeParent, makeTutor, nextDate, resetDb, startServer, stopServer } from './helpers.js'
 
 beforeAll(async () => {
   await resetDb()
@@ -58,7 +58,7 @@ describe('calendar download', () => {
     monday = nextDate(MONDAY)
   })
   const book = (p, status, start) => makeBooking({ parent: p.parent, child: p.child, tutor: tutor.tutor, date: monday, start, status })
-  const download = async (token, path) => fetch(`${apiBase()}${path}`, { headers: { Authorization: `Bearer ${token}` } })
+  const download = async (token, path) => fetch(`${apiBase()}${path}`, { headers: authHeaders(token) })
 
   test('a confirmed lesson downloads as a calendar file', async () => {
     const b = await book(parent, 'CONFIRMED', '16:00')

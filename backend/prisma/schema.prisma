@@ -120,6 +120,20 @@ model User {
   complaintsHandled  Complaint[]    @relation("ComplaintHandler")
   warningsReceived   AccountWarning[] @relation("WarnedUser")
   warningsIssued     AccountWarning[] @relation("WarningIssuer")
+  sessions           AuthSession[]
+}
+
+// Opaque browser session IDs are hashed before storage; raw IDs only live in HttpOnly cookies.
+model AuthSession {
+  id            String   @id @db.Char(64)
+  userId        Int
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentialTag String   @db.Char(43)
+  createdAt     DateTime @default(now())
+  expiresAt     DateTime
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model EmailOtp {

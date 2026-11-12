@@ -76,7 +76,8 @@ MINIMUM ENVIRONMENT REVIEW
 - CLIENT_URL=https://your-canonical-domain (no trailing slash)
 - PORT from the hosting platform
 - DATABASE_URL for the correct production database and restricted application user
-- JWT_SECRET: random, private, at least 32 characters
+- JWT_SECRET: random, private, at least 32 characters; retained configuration name
+  for server-side session/CSRF credential binding, not browser bearer JWT storage
 - SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS / MAIL_FROM: verified sender
 - GOOGLE_CLIENT_ID plus matching frontend ID and allowed production origin
 - RECAPTCHA_SECRET plus frontend site key and production domain registration
@@ -133,10 +134,14 @@ CANONICAL HOSTNAME AND PROCESS STATE
 
 Use one canonical hostname and redirect the other at the proxy. Hostinger's
 current limits guide notes that domain and www may run as separate processes.
-Assistant sessions and rate-limit counters currently live in process memory. A
-restart loses chat state; multiple processes do not share sessions or counters.
-Before scaling, move rate limits/session state to a shared store supported by the
-chosen environment. Do not assume a managed plan can run a local Redis service.
+Authentication sessions now use MySQL AuthSession records and HttpOnly cookies;
+apply the additive migration and deploy frontend/backend together. Secure cookies
+need the canonical HTTPS site and CLIENT_URL must match the real browser origin.
+Old bearer-token logins must sign in again. See SAFER_SESSIONS_2026-11-12.md.
+AI conversation memory and rate-limit counters still live in process memory. A
+restart loses chat state; multiple processes do not share conversations/counters.
+Before scaling, move those to a shared store supported by the chosen environment.
+Do not assume a managed plan can run a local Redis service.
 
 RELIABILITY WORK BEFORE REAL MONEY
 

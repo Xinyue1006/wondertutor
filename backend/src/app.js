@@ -10,6 +10,7 @@ import { errorHandler, notFound } from './middleware/error.js'
 import { rateLimit } from './middleware/rateLimit.js'
 import { prisma } from './config/prisma.js'
 import { requireFrontendBuild } from './services/deployment.service.js'
+import { csrfProtection } from './middleware/csrf.js'
 
 const app = express()
 
@@ -39,7 +40,7 @@ app.get('/api/ready', rateLimit({ name: 'readiness', windowMs: 60_000, max: 30 }
     res.set('Cache-Control', 'no-store').status(503).json({ status: 'unavailable' })
   } finally { clearTimeout(timer) }
 })
-app.use('/api', routes)
+app.use('/api', csrfProtection, routes)
 
 // In production one Node app serves both the API and the built React site (frontend/dist),
 // so the whole project lives on a single domain and needs no CORS or second hosting plan.

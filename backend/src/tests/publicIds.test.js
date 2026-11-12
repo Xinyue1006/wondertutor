@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { prisma } from '../config/prisma.js'
 import { backfillPublicIds } from '../services/publicIds.service.js'
-import { api, apiBase, makeAdmin, makeBooking, makeParent, makeTutor, MONDAY, nextDate, resetDb, startServer, stopServer } from './helpers.js'
+import { authHeaders, api, apiBase, makeAdmin, makeBooking, makeParent, makeTutor, MONDAY, nextDate, resetDb, startServer, stopServer } from './helpers.js'
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 let parent, other, tutor, admin, completed, paid
@@ -68,10 +68,10 @@ test('receipt public links require the correct parent, including legacy and malf
 test('public booking calendar links remain authorized and return a calendar file', async () => {
   const confirmed = await makeBooking({ parent: parent.parent, child: parent.child, tutor: tutor.tutor, date: nextDate(MONDAY), start: '18:00', status: 'CONFIRMED' })
   const url = apiBase() + '/parent/bookings/' + confirmed.publicId + '/calendar.ics'
-  const owner = await fetch(url, { headers: { Authorization: 'Bearer ' + parent.token } })
+  const owner = await fetch(url, { headers: authHeaders(parent.token) })
   expect(owner.status).toBe(200)
   expect(owner.headers.get('content-type')).toContain('text/calendar')
-  expect((await fetch(url, { headers: { Authorization: 'Bearer ' + other.token } })).status).toBe(404)
+  expect((await fetch(url, { headers: authHeaders(other.token) })).status).toBe(404)
 })
 
 test('checkout and payment confirmation accept public references without weakening ownership', async () => {

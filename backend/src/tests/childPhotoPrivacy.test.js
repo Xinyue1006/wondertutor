@@ -1,7 +1,7 @@
 import { env } from '../config/env.js'
 import { prisma } from '../config/prisma.js'
 import { childPhotoFields } from '../services/privateMedia.js'
-import { api, apiBase, makeAdmin, makeBooking, makeParent, makeTutor, resetDb, startServer, stopServer, nextDate, MONDAY } from './helpers.js'
+import { authHeaders, api, apiBase, makeAdmin, makeBooking, makeParent, makeTutor, resetDb, startServer, stopServer, nextDate, MONDAY } from './helpers.js'
 
 const original = { ...env.cloudinary }
 let parent, other, tutor
@@ -70,7 +70,7 @@ test('private display links are used in bookings and export; private avatars can
   const dto = rows.bookings.find(b => b.id === booking.id)
   expect(dto.child.photoUrl).not.toBe(reference(parent, 'booked'))
   expect(new URL(dto.child.photoUrl).searchParams.get('public_id')).toContain('children/')
-  const response = await fetch(apiBase() + '/parent/account/export', { headers: { Authorization: `Bearer ${parent.token}` } })
+  const response = await fetch(apiBase() + '/parent/account/export', { headers: authHeaders(parent.token) })
   const data = await response.json()
   const exported = data.children.find(c => c.name === 'Legacy preserved')
   expect(exported.photoReference).toBe(reference(parent, 'booked'))

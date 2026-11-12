@@ -1,6 +1,6 @@
 // Admin complaints report and CSV export.
 import { prisma } from '../config/prisma.js'
-import { api, apiBase, makeAdmin, makeParent, makeTutor, resetDb, startServer, stopServer } from './helpers.js'
+import { authHeaders, api, apiBase, makeAdmin, makeParent, makeTutor, resetDb, startServer, stopServer } from './helpers.js'
 
 let admin, parent, tutor
 const days = (n) => new Date(Date.now() - n * 86_400_000)
@@ -55,7 +55,7 @@ describe('complaints report', () => {
 
 describe('CSV export', () => {
   test('downloads every complaint as a safe CSV file', async () => {
-    const res = await fetch(`${apiBase()}/admin/complaints/export`, { headers: { Authorization: `Bearer ${admin.token}` } })
+    const res = await fetch(`${apiBase()}/admin/complaints/export`, { headers: authHeaders(admin.token) })
     expect(res.status).toBe(200)
     expect(res.headers.get('content-type')).toMatch(/text\/csv/)
     expect(res.headers.get('content-disposition')).toMatch(/attachment; filename="complaints\.csv"/)
@@ -68,7 +68,7 @@ describe('CSV export', () => {
   })
 
   test('parents cannot export', async () => {
-    const res = await fetch(`${apiBase()}/admin/complaints/export`, { headers: { Authorization: `Bearer ${parent.token}` } })
+    const res = await fetch(`${apiBase()}/admin/complaints/export`, { headers: authHeaders(parent.token) })
     expect(res.status).toBe(403)
   })
 })

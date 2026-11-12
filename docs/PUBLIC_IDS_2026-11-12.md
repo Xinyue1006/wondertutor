@@ -15,7 +15,7 @@ publicId String? @unique @default(uuid()) @db.Char(36)
 ```
 
 - The public value is a UUIDv4, for example `3b74025c-8d19-46a6-b571-15560d0f3035`. It contains no child name, payment amount or sequential record number.
-- Numeric `id` remains the primary key. All joins and foreign keys continue using their current integer columns. The schema still has 25 models and 33 declared foreign-key relations.
+- Numeric `id` remains the primary key. All joins and foreign keys continue using their current integer columns. The public-ID change itself adds no model or relationship; consult [the current data model](CURRENT_DATA_MODEL.md) for the complete schema, including subsequent authentication-session additions.
 - `publicId` is nullable for migration compatibility, not a promise that new rows should be left without references. Prisma supplies the default for new rows; direct SQL writers would need to generate their own value.
 - A unique index protects each model's references. MySQL permits multiple nulls while old rows await backfill.
 - Treat references as stable. The backfill script never replaces an existing published value.

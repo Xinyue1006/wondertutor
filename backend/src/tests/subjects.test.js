@@ -3,7 +3,7 @@
 import { prisma } from '../config/prisma.js'
 import { SUBJECTS, SUBJECT_LEVELS, subjectsForLevel } from '../data/catalog.js'
 import { subjectsOf } from '../utils/childSubjects.js'
-import { MONDAY, api, apiBase, makeParent, makeTutor, nextDate, resetDb, startServer, stopServer } from './helpers.js'
+import { authHeaders, MONDAY, api, apiBase, makeParent, makeTutor, nextDate, resetDb, startServer, stopServer } from './helpers.js'
 
 beforeAll(async () => {
   await resetDb()
@@ -136,7 +136,7 @@ describe('download my data', () => {
   test('lists every subject of each child', async () => {
     const p = await makeParent()
     await api(p.token).post('/parent/children', kid({ name: 'Zara', subjects: ['Mathematics', 'Science'] }))
-    const data = JSON.parse(await (await fetch(`${apiBase()}/parent/account/export`, { headers: { Authorization: `Bearer ${p.token}` } })).text())
+    const data = JSON.parse(await (await fetch(`${apiBase()}/parent/account/export`, { headers: authHeaders(p.token) })).text())
     expect(data.children.find((c) => c.name === 'Zara').subjects).toEqual(['Mathematics', 'Science'])
   })
 })

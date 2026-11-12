@@ -1,27 +1,22 @@
-import { prisma } from '../config/prisma.js'
-import { verifyToken, credentialTag } from '../services/token.service.js'
+import { loadSession, readSessionId } from '../services/session.service.js'
 import { AppError } from '../utils/AppError.js'
 
-// Requires a valid JWT. Attaches req.user (fresh from DB).
+// The browser's opaque HttpOnly cookie must resolve to a live server-side session.
+// Bearer tokens and old stateless JWTs are deliberately not authentication paths.
 export async function requireAuth(req, res, next) {
-  const header = req.headers.authorization || ''
-  const token = header.startsWith('Bearer ') ? header.slice(7) : null
-  if (!token) throw new AppError(401, 'Please log in')
-
-  let payload
-  try {
-    payload = verifyToken(token)
-  } catch {
+  res.set('Cache-Control', 'private, no-store')
+  const session = await loadSession(req)
+  if (!session) {
+    const hadCookie = Boolean(readSessionId(req))
+    // Never clear cookies on a read/auth failure: a late response from an older
+    // request could otherwise erase a fresh login's cookie. Logout owns clearing.
+    if (!hadCookie) throw new AppError(401, 'Please log in')
     throw new AppError(401, 'Session expired, please log in again')
   }
-
-  const user = await prisma.user.findUnique({ where: { id: payload.sub } })
-  if (!user) throw new AppError(401, 'Account not found')
+  const user = session.user
   if (user.status === 'DEACTIVATED') throw new AppError(403, 'Your account has been deactivated. Please contact Admin.')
-  if (payload.credential !== credentialTag(user)) throw new AppError(401, 'Session expired, please log in again')
-
-  res.set('Cache-Control', 'private, no-store')
   req.user = user
+  req.session = session
   next()
 }
 

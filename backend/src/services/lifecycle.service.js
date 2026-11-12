@@ -14,6 +14,7 @@ import { prisma } from '../config/prisma.js'
 import { notify, notifyWithEmail } from './notification.service.js'
 import { promoteChildren } from './progression.service.js'
 import { publicReference } from '../utils/publicIds.js'
+import { cleanupExpiredSessions } from './session.service.js'
 
 export const PAYMENT_DEADLINE_MINUTES = 60
 export const REMINDER_HOURS = 24
@@ -110,6 +111,7 @@ export async function sendPaymentReminders(now = new Date()) {
 
 // One finite pass, shared by the local timer and the Hostinger cron entry point.
 export async function runHousekeeping(now = new Date()) {
+  await cleanupExpiredSessions(now)
   const { expired } = await expireStaleBookings(now)
   const { sent } = await sendLessonReminders(now)
   const { sent: paymentReminders } = await sendPaymentReminders(now)

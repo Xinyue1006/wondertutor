@@ -6,7 +6,7 @@ import { OAuth2Client } from 'google-auth-library'
 import { prisma } from '../config/prisma.js'
 import { env } from '../config/env.js'
 import { AppError } from '../utils/AppError.js'
-import { signToken } from '../services/token.service.js'
+import { anonymousCsrf, currentCsrfToken, revokeSession, startSession } from '../services/session.service.js'
 import { issueOtp, checkOtp } from '../services/otp.service.js'
 import { sendEmail } from '../services/email.service.js'
 import { escapeHtml, notify } from '../services/notification.service.js'
@@ -138,7 +138,8 @@ export async function verifyOtp(req, res) {
   await checkOtp(email, code)
   const verified = await prisma.user.update({ where: { id: user.id }, data: { isEmailVerified: true } })
 
-  res.json({ token: signToken(verified), user: await userResponse(verified) })
+  const session = await startSession(req, res, verified, { remember: true })
+  res.json({ user: await userResponse(verified), csrfToken: session.csrfToken })
 }
 
 // POST /api/auth/resend-otp
@@ -243,13 +244,14 @@ const DUMMY_HASH = bcrypt.hashSync(randomBytes(32).toString('hex'), 12)
 // POST /api/auth/login { email, password, recaptchaToken }
 // reCAPTCHA is checked before the password, so a bot cannot use this form to try passwords
 export async function login(req, res) {
-  const { email, password, recaptchaToken, portal } = z
+  const { email, password, recaptchaToken, portal, remember } = z
     // No strength rules at login (old passwords stay valid), only a cap so nobody can post megabytes to bcrypt
     .object({
       email: emailRule,
       password: z.string().min(1, 'Enter your password').max(200, 'Incorrect email or password'),
       recaptchaToken: z.string().max(4000).optional(),
       portal: z.literal('ADMIN').optional(),
+      remember: z.boolean().default(false),
     })
     .parse(req.body)
   await verifyRecaptcha(recaptchaToken)
@@ -261,7 +263,8 @@ export async function login(req, res) {
   if (!user.isEmailVerified) throw new AppError(403, 'Please verify your email before logging in')
   if (user.status === 'DEACTIVATED') throw new AppError(403, 'Your account has been deactivated. Please contact Admin.')
 
-  res.json({ token: signToken(user), user: await userResponse(user) })
+  const session = await startSession(req, res, user, { remember })
+  res.json({ user: await userResponse(user), csrfToken: session.csrfToken })
 }
 
 // POST /api/auth/google  { credential, role? }
@@ -326,10 +329,24 @@ export async function googleLogin(req, res) {
     })
   }
 
-  res.json({ token: signToken(user), user: await userResponse(user) })
+  const session = await startSession(req, res, user, { remember: true })
+  res.json({ user: await userResponse(user), csrfToken: session.csrfToken })
 }
 
 // GET /api/auth/me
 export async function me(req, res) {
-  res.json({ user: await userResponse(req.user) })
+  res.json({ user: await userResponse(req.user), csrfToken: req.session.csrfToken })
+}
+
+// Public bootstrap for login/signup and for recovering a stale tab's CSRF token.
+// CORS prevents another origin from reading this token; unsafe routes also check Origin.
+export function csrf(req, res) {
+  res.set('Cache-Control', 'private, no-store')
+  res.json({ csrfToken: currentCsrfToken(req) || anonymousCsrf(req, res) })
+}
+
+// Repeating logout is safe, but every attempt still passes global CSRF validation.
+export async function logout(req, res) {
+  const csrfToken = await revokeSession(req, res)
+  res.json({ message: 'You have been logged out.', csrfToken })
 }

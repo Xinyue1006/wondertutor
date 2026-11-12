@@ -1,16 +1,16 @@
 # WonderTutor current data model and domain class diagram
 
-Schema snapshot: 12 November 2026, including review moderation and random public references. Source of truth: `backend/prisma/schema.prisma` and its migrations. This document describes the **declared schema**, not proof that every environment has applied its migrations. No production database was queried by this workstream. Yan Hsi's weekly-availability branch is not included in this snapshot.
+Schema snapshot: 12 November 2026, including review moderation, random public references and database-backed browser sessions. Source of truth: `backend/prisma/schema.prisma` and its migrations. This document describes the **declared schema**, not proof that every environment has applied its migrations. No production database was queried by this workstream. Yan Hsi's weekly-availability branch is not included in this snapshot.
 
 View the exported diagrams: [full ERD](diagrams/current-erd.svg), [domain classes](diagrams/current-domain-classes.svg), and [application layers](diagrams/current-application-layers.svg). SVGs can be zoomed without losing text clarity; the Mermaid sources below remain editable.
 
 ## What the ERD currently looks like
 
-There are **25 Prisma models/tables and 33 declared foreign-key relations**, shared by Parent, Tutor and Admin in one MySQL database. The central relationship is **ParentProfile → Child → Booking ← TutorProfile**. A Booking can have at most one Payment, Attendance, SessionSummary and Review. A Payment can have several Refund records. A Complaint can connect an involved user, a booking and now a reported review. Public references add four scalar columns; they do not add tables or change these relations.
+There are **26 Prisma models/tables and 34 declared foreign-key relations**, shared by Parent, Tutor and Admin in one MySQL database. The central relationship is **ParentProfile → Child → Booking ← TutorProfile**. A Booking can have at most one Payment, Attendance, SessionSummary and Review. A Payment can have several Refund records. A Complaint can connect an involved user, a booking and now a reported review. Public references add four scalar columns; database-backed authentication adds AuthSession and its required User relationship.
 
 | Area | Tables |
 | --- | --- |
-| Identity and parent data | User, EmailOtp, ParentProfile, Child, MatchingRequest, FavouriteTutor |
+| Identity and parent data | User, AuthSession, EmailOtp, ParentProfile, Child, MatchingRequest, FavouriteTutor |
 | Tutor information and scheduling | TutorProfile, TutorSubject, Qualification, PortfolioItem, AvailabilitySlot, AvailabilityException |
 | Lessons and finance | Booking, RescheduleRequest, Payment, Refund, Attendance, SessionSummary, BankAccount, Withdrawal |
 | Feedback and operations | Review, Complaint, AccountWarning, Notification, SystemSetting |
@@ -19,6 +19,7 @@ The ERD below includes every table and scalar field. PK = primary key, FK = a de
 
 ```mermaid
 erDiagram
+  User ||--o{ AuthSession : "user (userId)"
   User ||--o| ParentProfile : "user (userId)"
   ParentProfile ||--o{ Child : "parent (parentId)"
   ParentProfile ||--o{ MatchingRequest : "parent (parentId)"
@@ -68,6 +69,13 @@ erDiagram
     DateTime deletedAt "nullable"
     DateTime createdAt
     DateTime updatedAt
+  }
+  AuthSession {
+    String id PK "Char(64); SHA-256 session digest"
+    Int userId FK
+    String credentialTag "Char(43); credential binding"
+    DateTime createdAt
+    DateTime expiresAt
   }
   EmailOtp {
     Int id PK
@@ -339,6 +347,7 @@ erDiagram
 - `Child.publicId`, `Booking.publicId`, `Payment.publicId` and `Complaint.publicId` are unique, nullable `CHAR(36)` columns with Prisma `uuid()` defaults for newly created rows. Existing rows are filled by an idempotent application script using Node `crypto.randomUUID()`. Nullable columns allow a staged deployment; null references fall back to the numeric ID until backfill finishes. The integer `id` primary keys and all existing foreign keys remain unchanged.
 - Public references reduce predictable URL enumeration; they are identifiers, not passwords or access grants. Parent routes still require authentication, the Parent role and ownership checks; Admin complaint routes still require the Admin role. Valid legacy numeric references remain accepted during the compatibility transition. See [public-ID rollout and routes](PUBLIC_IDS_2026-11-12.md).
 - `User.email` and optional `googleId` are unique. ParentProfile and TutorProfile each have a unique `userId`; both relations are optional from User. The role/profile consistency rule is enforced by application logic, not by a database XOR constraint. Admin accounts normally have neither profile.
+- `AuthSession.id` stores a SHA-256 digest of an opaque cookie credential, never the raw session cookie. Its required User foreign key cascades on physical User deletion; `userId` and `expiresAt` have indexes. Expiry, credential binding and current User status are checked in the API, while successful logout deletes that session. CSRF tokens and anonymous seed cookies are not additional database tables. See [session security and rollout](SAFER_SESSIONS_2026-11-12.md).
 - `FavouriteTutor` has a **composite primary key** `(parentId, tutorId)`, preventing the same parent from saving the same tutor twice.
 - `AvailabilityException` has a **composite unique constraint** `(tutorId, date)`. Its JSON `ranges` replace weekly AvailabilitySlot hours for one date; an empty array means unavailable all day.
 - `Payment.bookingId`, `Attendance.bookingId`, `SessionSummary.bookingId` and `Review.bookingId` are each unique. This enforces at most one of each record per booking, not a guarantee that a record already exists.
@@ -365,6 +374,12 @@ classDiagram
     +String email
     +Role role
     +AccountStatus status
+  }
+  class AuthSession {
+    +String id
+    +Int userId
+    +DateTime createdAt
+    +DateTime expiresAt
   }
   class ParentProfile {
     +Int userId
@@ -423,6 +438,7 @@ classDiagram
     +String homework
     +String progressNote
   }
+  User "1" --> "0..*" AuthSession : server-managed login sessions
   User "1" --> "0..1" ParentProfile : parent profile
   User "1" --> "0..1" TutorProfile : tutor profile
   ParentProfile "1" --> "0..*" Child : manages
@@ -474,4 +490,4 @@ Hostinger is the deployment target, not a logical application layer. One deploym
 
 ## Diagram maintenance
 
-Apply migrations `20261111090000_review_moderation` and `20261112090000_public_ids` through the normal reviewed release procedure for the moderation fields/relations and public-reference columns. The public-ID deployment also runs `backend/scripts/backfill-public-ids.js` after migration and Prisma Client generation; see the rollout document before deploying. Do not manually change production tables from this diagram. Re-generate/update this document whenever `schema.prisma` changes. Record any additional migration and update the 25-table/33-relation counts if a model or declared relation is added or removed. Use a domain class diagram for concepts and a deployment diagram for actual machines/processes; they answer different questions.
+Apply the moderation, public-ID and `20261112160000_cookie_sessions` authentication-session migrations through the normal reviewed release procedure. The public-ID deployment also runs `backend/scripts/backfill-public-ids.js` after migration and Prisma Client generation; see the rollout documents before deploying. Do not manually change production tables from this diagram. Re-generate/update this document whenever `schema.prisma` changes. Record any additional migration and update the 26-table/34-relation counts if a model or declared relation is added or removed. Use a domain class diagram for concepts and a deployment diagram for actual machines/processes; they answer different questions.
