@@ -3,7 +3,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import PublicLayout from './layouts/PublicLayout'
 import AppLayout from './layouts/AppLayout'
 import ProtectedRoute, { afterLogin } from './components/ProtectedRoute'
-import Placeholder from './components/Placeholder'
+import Students from './pages/tutor/Students'
 import { useAuth } from './context/AuthContext'
 
 import Home from './pages/Home'
@@ -19,7 +19,10 @@ const TutorDashboard = lazy(() => import('./pages/tutor/Dashboard'))
 const BookingRequests = lazy(() => import('./pages/tutor/BookingRequests'))
 const LessonSession = lazy(() => import('./pages/tutor/LessonSession'))
 const Earnings = lazy(() => import('./pages/tutor/Earnings'))
-const WithdrawalReviews = lazy(() => import('./pages/admin/WithdrawalReviews'))
+const Finance = lazy(() => import('./pages/admin/Finance'))
+const TutorRates = lazy(() => import('./pages/admin/TutorRates'))
+const BookingOversight = lazy(() => import('./pages/admin/BookingOversight'))
+const Reports = lazy(() => import('./pages/admin/Reports'))
 const DateAvailability = lazy(() => import('./pages/tutor/DateAvailability'))
 const ParentDashboard = lazy(() => import('./pages/parent/Dashboard'))
 const FindTutor = lazy(() => import('./pages/parent/FindTutor'))
@@ -99,7 +102,7 @@ export default function App() {
           <Route path="availability/dates" element={<DateAvailability />} />
           <Route path="bookings" element={<BookingRequests />} />
           <Route path="bookings/:id/session" element={<LessonSession />} />
-          <Route path="students" element={<Placeholder title="My Students" />} />
+          <Route path="students" element={<Students />} />
           <Route path="earnings" element={<Earnings />} />
           <Route path="setup" element={<ProfileSetup />} />
           {/* Verification now lives on My Profile; notifications already sent still link to this address */}
@@ -114,8 +117,10 @@ export default function App() {
           <Route index element={<AdminDashboard />} />
           <Route path="users" element={<AdminUsers />} />
           <Route path="complaints" element={<AdminComplaints />} />
-          <Route path="bookings" element={<Placeholder title="Booking Oversight" note="Yan Hsi" />} />
-          <Route path="finance" element={<WithdrawalReviews />} />
+          <Route path="bookings" element={<BookingOversight />} />
+          <Route path="finance" element={<Finance />} />
+          <Route path="rates" element={<TutorRates />} />
+          <Route path="reports" element={<Reports />} />
           <Route path="settings" element={<AdminSettings />} />
         </Route>
       </Route>

@@ -15,7 +15,7 @@ async function ledger(db, tutorId) {
   const payments = await db.payment.findMany({
     where: { booking: { tutorId }, status: { in: ['PAID', 'PARTIALLY_REFUNDED', 'REFUNDED'] } },
     include: { booking: { select: { id: true, subject: true, status: true, startAt: true, child: { select: { name: true } } } },
-      refunds: { select: { amount: true, status: true } } }, orderBy: [{ paidAt: 'desc' }, { id: 'desc' }],
+      refunds: { select: { amount: true, status: true, issuedAt: true, reviewNote: true } } }, orderBy: [{ paidAt: 'desc' }, { id: 'desc' }],
   })
   const withdrawals = await db.withdrawal.findMany({ where: { tutorId }, include: { bankAccount: true }, orderBy: { id: 'desc' } })
   let earned = zero, pending = zero, held = zero, paidOut = zero
@@ -23,7 +23,8 @@ async function ledger(db, tutorId) {
     const b = p.booking
     let commission = p.commissionAmount
     let fee = p.amount
-    const refunded = p.refunds.filter(r => r.status === 'APPROVED').reduce((sum, r) => sum.plus(r.amount), zero)
+    const refunded = p.refunds.filter(r => r.status === 'APPROVED' && (r.issuedAt || (!r.reviewNote && p.status !== 'PAID'))).reduce((sum, r) => sum.plus(r.amount), zero)
+    const refundInReview = p.refunds.some(r => ['PENDING', 'ESCALATED'].includes(r.status) || (r.status === 'APPROVED' && r.reviewNote && !r.issuedAt))
     if (p.status === 'PARTIALLY_REFUNDED' && refunded.gt(0) && fee.gt(0)) {
       fee = Prisma.Decimal.max(0, fee.minus(refunded))
       // Round the retained platform share once; the tutor receives the remaining sen.
@@ -34,7 +35,7 @@ async function ledger(db, tutorId) {
     if (p.status === 'REFUNDED' || b.status === 'CANCELLED') {
       state = p.status === 'REFUNDED' ? 'Refunded' : 'Cancelled'
       net = zero
-    } else if (!p.refunds.some(r => ['PENDING', 'ESCALATED'].includes(r.status)) &&
+    } else if (!refundInReview &&
         ((p.status === 'PAID' && refunded.isZero()) || (p.status === 'PARTIALLY_REFUNDED' && refunded.gt(0)))) {
       if (b.status === 'COMPLETED') { state = 'Earned'; earned = earned.plus(net) }
       if (b.status === 'CONFIRMED') { state = 'Report due'; pending = pending.plus(net) }
@@ -61,7 +62,7 @@ export function earnings(tutorId) {
     const base = await baseCommission(db)
     return { available: Prisma.Decimal.max(l.balance, 0), totalEarned: l.earned, pending: l.pending, held: l.held, withdrawn: l.paidOut,
       version: l.version, rate: tutor.commissionRate ?? base, baseRate: base, bank: bankView(bank), transactions: l.transactions,
-      withdrawals: l.withdrawals.map(w => ({ id: w.id, date: w.createdAt, amount: w.amount, status: w.status, reason: w.rejectReason, bank: bankView(w.bankAccount) })) }
+      withdrawals: l.withdrawals.map(w => ({ id: w.id, date: w.createdAt, reviewedAt: w.reviewedAt, amount: w.amount, status: w.status, reason: w.rejectReason, bank: bankView(w.bankAccount) })) }
   })
 }
 

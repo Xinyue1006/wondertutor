@@ -6,6 +6,7 @@ import * as users from '../controllers/admin/users.controller.js'
 import * as complaints from '../controllers/admin/complaints.controller.js'
 import { moderateReview } from '../controllers/admin/reviews.controller.js'
 import * as settings from '../controllers/admin/settings.controller.js'
+import * as ops from '../controllers/admin/operations.controller.js'
 import * as withdrawals from '../controllers/admin/withdrawals.controller.js'
 
 const router = validateIdParams(Router(), { publicIds: [
@@ -31,6 +32,15 @@ router.get('/complaints/:id', complaints.getComplaint)
 router.patch('/complaints/:id', complaints.updateComplaint)
 router.patch('/reviews/:id/moderation', moderateReview)
 
+router.get('/rates', ops.rates)
+router.patch('/rates/:id', ops.rate)
+router.get('/bookings', ops.bookings)
+router.post('/bookings/:id/decision', ops.decide)
+router.get('/refunds', ops.refunds)
+router.post('/refunds/:id/decision', ops.refund)
+router.get('/transactions', ops.ledger)
+router.get('/salary/:id', ops.payslip)
+router.get('/reports', ops.reports)
 router.get('/withdrawals', withdrawals.list)
 router.post('/withdrawals/:id/review', withdrawals.review)
 router.get('/settings', settings.list)
