@@ -12,6 +12,8 @@ import { bookingMode } from '../../lib/availability'
 import { childSubjects } from '../../lib/subjects'
 import { checkRinggit, checkText } from '../../lib/validation'
 import { matchesRecordRef, recordRef } from '../../lib/recordRef'
+import LessonLocationPicker from '../../components/LessonLocationPicker'
+import { lessonLocationError, lessonLocationPayload } from '../../lib/lessonLocationInput'
 
 // Parents select dated one-hour lessons; the server rechecks every selection.
 export default function BookLesson() {
@@ -28,12 +30,14 @@ export default function BookLesson() {
   const [selectedSlots, setSelectedSlots] = useState(prefill.slots?.length ? prefill.slots : prefill.date && prefill.time ? [{ date: prefill.date, start: prefill.time }] : [])
   const [childId, setChildId] = useState(prefill.childId || '')
   const [mode, setMode] = useState(prefill.mode || '')
-  const [subject, setSubject] = useState('')
+  const [subject, setSubject] = useState(prefill.subject || '')
   const [price, setPrice] = useState(prefill.price || '')
   const [msg, setMsg] = useState(prefill.msg || '')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(false)
+  // Exact venue data stays in this signed-in form, never in browser history state.
+  const [lessonLocation, setLessonLocation] = useState({ address: '', latitude: null, longitude: null, confirmed: false })
 
   useEffect(() => {
     api.get(`/parent/tutors/${id}`).then((r) => {
@@ -41,7 +45,7 @@ export default function BookLesson() {
       setTutor(t)
       setPrice((p) => p || String(t.hourlyRate))
       setMode((m) => m || (t.offersPhysical ? 'PHYSICAL' : 'ONLINE'))
-      setSubject(t.subjects[0])
+      setSubject(current => t.subjects.includes(current) ? current : t.subjects[0])
     }).catch((e) => setError(errorMessage(e)))
   }, [id])
 
@@ -63,8 +67,8 @@ export default function BookLesson() {
   useEffect(() => {
     // The first of the child's subjects that this tutor teaches
     const match = childSubjects(child).find((s) => tutor?.subjects.includes(s))
-    if (tutor && match) setSubject(match)
-  }, [tutor, child])
+    if (tutor && match && !prefill.subject) setSubject(match)
+  }, [tutor, child, prefill.subject])
 
   if (error && !tutor) return <div className="card p-8 text-center text-red-600">{error}</div>
   if (!kidsLoaded && loadError) return <LoadError message={loadError} onRetry={reloadShared} />
@@ -84,12 +88,14 @@ export default function BookLesson() {
     if (!selectedSlots.length) return setError('Please select an available time on the calendar.')
     if (lesson.conflict) return setError('Some of these hours are online only and some physical only. Send them as separate requests.')
     const problem = checkRinggit(price, 'Proposed price') || checkText(msg, { label: 'Message', max: 200 })
+      || (lesson.mode === 'PHYSICAL' ? lessonLocationError(lessonLocation) : '')
     if (problem) return setError(problem)
     setBusy(true)
     try {
       await api.post('/parent/bookings', {
         tutorId: tutor.id, childId: recordRef(child), slots: selectedSlots.map(s => ({ date: s.date, startTime: s.start })), teachingMode: lesson.mode,
         proposedPrice: Number(price), subject, messageToTutor: msg || undefined,
+        ...(lesson.mode === 'PHYSICAL' ? { lessonLocation: lessonLocationPayload(lessonLocation) } : {}),
       })
       setDone(true)
     } catch (err) {
@@ -107,14 +113,14 @@ export default function BookLesson() {
 
       <div className="grid items-start gap-6 xl:grid-cols-[1fr_400px]">
         <div className="min-w-0 space-y-4">
-          <section className="card flex flex-wrap items-center gap-4 p-4">
-            <Avatar src={tutor.photoUrl} name={tutor.name} className="h-20 w-20" rounded="rounded-xl" />
+          <section className="card grid grid-cols-[64px_minmax(0,1fr)] items-start gap-3 p-4 sm:flex sm:flex-wrap sm:items-center sm:gap-4">
+            <Avatar src={tutor.photoUrl} name={tutor.name} className="h-16 w-16 sm:h-20 sm:w-20" rounded="rounded-xl" />
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5 text-xl font-extrabold text-navy">{tutor.name} {tutor.verified && <VerifiedTick />}</div>
-              <div className="text-sm text-slate-500">{tutor.subjects.join(', ')} <span className="text-slate-300">|</span> {tutor.levels}</div>
-              <div className="flex items-center gap-3 text-sm"><span className="flex items-center gap-1"><Icon name="star" fill className="h-4 w-4 text-accent" /><b className="text-navy">{tutor.rating.toFixed(1)}</b> <span className="text-slate-500">({tutor.reviewCount} reviews)</span></span><b className="text-navy">RM {tutor.hourlyRate} / hour</b></div>
+              <div className="flex flex-wrap items-center gap-1.5 text-lg font-extrabold text-navy sm:text-xl"><span className="min-w-0 break-words">{tutor.name}</span> {tutor.verified && <VerifiedTick />}</div>
+              <div className="break-words text-sm text-slate-500">{tutor.subjects.join(', ')} <span className="text-slate-300">|</span> {tutor.levels}</div>
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm"><span className="flex flex-wrap items-center gap-1"><Icon name="star" fill className="h-4 w-4 shrink-0 text-accent" /><b className="text-navy">{tutor.rating.toFixed(1)}</b> <span className="text-slate-500">({tutor.reviewCount} reviews)</span></span><b className="text-navy">RM {tutor.hourlyRate} / hour</b></div>
             </div>
-            <Link to={`/parent/tutors/${tutor.id}`} className="btn-outline px-6">View Profile</Link>
+            <Link to={`/parent/tutors/${tutor.id}`} className="btn-outline col-span-2 min-h-11 w-full px-6 sm:w-auto">View Profile</Link>
           </section>
 
           <section className="card p-3 sm:p-4">
@@ -154,6 +160,11 @@ export default function BookLesson() {
               </div>
             )}
           </section>
+          {lesson.mode === 'PHYSICAL' && !lesson.conflict && <section className="card min-w-0 p-4 sm:p-5" aria-labelledby="lesson-venue-title">
+            <h2 id="lesson-venue-title" className="mb-2 text-xl font-extrabold text-navy">Physical lesson venue</h2>
+            <p className="mb-4 text-sm text-slate-600">All {selectedSlots.length || 'selected'} lessons in this request will use this address. Send separate requests for different venues.</p>
+            <LessonLocationPicker value={lessonLocation} onChange={setLessonLocation} disabled={busy} />
+          </section>}
         </div>
 
         <aside className="space-y-4 xl:sticky xl:top-[84px]">
@@ -193,6 +204,7 @@ export default function BookLesson() {
                     </button>))}
                 </div>
               </div>
+              {lesson.mode === 'PHYSICAL' && <p className="rounded-lg bg-brand-50 p-3 text-sm text-navy">Confirm the physical lesson address and entrance pin in the venue section before sending.</p>}
               <label className="block"><span className="mb-1 block text-sm font-bold text-navy">Proposed Price (RM per hour) <span className="text-red-500">*</span></span>
                 <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">RM</span>
                   <input type="number" min="1" className="input h-10 pl-11" value={price} onChange={(e) => setPrice(e.target.value)} /></div></label>
@@ -214,11 +226,11 @@ export default function BookLesson() {
         </aside>
       </div>
 
-      <Modal open={done} onClose={() => navigate('/parent/bookings')} title="Booking request sent!">
+      <Modal open={done} onClose={() => navigate('/parent/bookings?tab=pending')} title="Booking request sent!">
         <div className="flex flex-col items-center gap-3 py-2 text-center">
           <Robot className="h-24 w-24" />
           <p className="text-sm text-slate-600">{tutor.name} will review your request. They can accept, reject or send a counter offer, and we'll notify you as soon as they respond.</p>
-          <button onClick={() => navigate('/parent/bookings')} className="btn-primary mt-2 px-8">View My Bookings</button>
+          <button onClick={() => navigate('/parent/bookings?tab=pending')} className="btn-primary mt-2 px-8">View My Bookings</button>
         </div>
       </Modal>
     </div>

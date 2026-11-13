@@ -57,6 +57,34 @@ describe('parent asks to reschedule', () => {
     expect(await prisma.rescheduleRequest.count({ where: { bookingId: b.id, status: 'PENDING' } })).toBe(1)
   })
 
+  test.each(['PARENT', 'TUTOR'])('%s cannot replace a time change while administrator review is pending', async role => {
+    const t = await makeTutor()
+    const p = await makeParent()
+    const b = await makeBooking({ parent: p.parent, child: p.child, tutor: t.tutor, date, start: '16:00', status: 'CONFIRMED' })
+    const initial = await api(p.token).post(`/parent/bookings/${b.publicId}/reschedule`, {
+      date: nextDate(3), startTime: '17:00', reason: 'School activity',
+    })
+    expect(initial.status).toBe(201)
+    const requestId = initial.booking.reschedule.id
+    const declined = await api(t.token).post(`/tutor/bookings/${b.publicId}`, { action: 'decline-time', requestId })
+    expect(declined.status).toBe(200)
+    expect(declined.booking.reschedule.status).toBe('ESCALATED')
+    const noticesBefore = await prisma.notification.count()
+
+    const next = { date: nextDate(3), startTime: '18:00', reason: 'A different proposed time' }
+    const response = role === 'PARENT'
+      ? await api(p.token).post(`/parent/bookings/${b.publicId}/reschedule`, next)
+      : await api(t.token).post(`/tutor/bookings/${b.publicId}`, { action: 'reschedule', ...next })
+
+    expect(response.status).toBe(409)
+    expect(response.message).toMatch(/administrator is reviewing/i)
+    const requests = await prisma.rescheduleRequest.findMany({ where: { bookingId: b.id } })
+    expect(requests).toHaveLength(1)
+    expect(requests[0]).toMatchObject({ id: requestId, status: 'ESCALATED' })
+    expect(await prisma.booking.findUnique({ where: { id: b.id } })).toMatchObject({ status: 'CONFIRMED', startAt: b.startAt, endAt: b.endAt })
+    expect(await prisma.notification.count()).toBe(noticesBefore)
+  })
+
   test('a stale acceptance cannot move a booking cancelled after it was loaded', async () => {
     const t = await makeTutor()
     const p = await makeParent()
@@ -119,6 +147,7 @@ describe('parent asks to reschedule', () => {
 
 describe('tutor asks to reschedule', () => {
   test('the parent declining escalates to Admin and the lesson keeps its time', async () => {
+    const previousAdminNotices = await prisma.notification.count({ where: { userId: admin.user.id, type: 'RESCHEDULE_ESCALATED' } })
     const child = await makeChild(parent.parent.id, { name: 'Ivy' })
     const b = await makeBooking({ parent: parent.parent, child, tutor: tutor.tutor, date: nextDate(3), start: '16:00', status: 'CONFIRMED' })
     const req = await requestReschedule({ booking: await full(b), byUserId: tutor.user.id, date: nextDate(3), startTime: '18:00', reason: 'Clinic appointment' })
@@ -130,7 +159,7 @@ describe('tutor asks to reschedule', () => {
     expect(declined.status).toBe(200)
     expect(declined.booking.reschedule.status).toBe('ESCALATED')
     expect(hhmm(declined.booking.startAt)).toBe('16:00')
-    expect(await prisma.notification.count({ where: { userId: admin.user.id, type: 'RESCHEDULE_ESCALATED' } })).toBe(1)
+    expect(await prisma.notification.count({ where: { userId: admin.user.id, type: 'RESCHEDULE_ESCALATED' } })).toBe(previousAdminNotices + 1)
     expect(await prisma.notification.count({ where: { userId: tutor.user.id, type: 'RESCHEDULE_ESCALATED' } })).toBe(1)
   })
 

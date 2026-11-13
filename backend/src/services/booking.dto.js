@@ -2,6 +2,7 @@ import { childPhotoFields, mediaLink } from './privateMedia.js'
 // Shapes a Booking (with relations) for the Parent Portal.
 import { toTutorCard } from './tutor.service.js'
 import { toSummaryDto } from './progress.service.js'
+import { canEditLessonLocation, lessonLocationFields } from './lessonLocation.service.js'
 
 export const bookingInclude = {
   tutor: { include: { user: { select: { fullName: true, profilePhotoUrl: true, status: true } }, subjects: true, availability: true } },
@@ -31,6 +32,8 @@ export function toBookingDto(b) {
     hours,
     teachingMode: b.teachingMode,
     location: b.location,
+    ...lessonLocationFields(b),
+    locationCanBeEdited: canEditLessonLocation(b),
     meetingLink: b.status === 'CONFIRMED' || b.status === 'COMPLETED' ? b.meetingLink : null,
     isTrial: b.isTrial,
     messageToTutor: b.messageToTutor,
@@ -42,6 +45,7 @@ export function toBookingDto(b) {
     rejectionReason: b.rejectionReason,
     cancelReason: b.cancelReason,
     createdAt: b.createdAt,
+    updatedAt: b.updatedAt,
     tutor: b.tutor && { ...toTutorCard(b.tutor, b.subject), levels: undefined },
     child: b.child && { id: b.child.id, publicId: b.child.publicId, name: b.child.name, educationLevel: b.child.educationLevel, grade: b.child.grade, photoUrl: childPhotoFields(b.child).photoUrl },
     payment: b.payment && {

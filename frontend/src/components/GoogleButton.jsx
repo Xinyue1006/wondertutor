@@ -27,7 +27,9 @@ function GoogleG() {
 export default function GoogleButton({ role, onError, onNeedsRole, acceptedPrivacy = false, text = 'continue_with', label = 'Continue with Google' }) {
   const { googleLogin } = useAuth()
   const navigate = useNavigate()
-  const from = useLocation().state?.from
+  const { state } = useLocation()
+  const from = state?.from
+  const fromUserId = state?.fromUserId
   const box = useRef(null)
   const [ready, setReady] = useState(false)
 
@@ -41,7 +43,7 @@ export default function GoogleButton({ role, onError, onNeedsRole, acceptedPriva
         callback: async ({ credential }) => {
           try {
             const user = await googleLogin(credential, role, acceptedPrivacy)
-            navigate(afterLogin(user, from))
+            navigate(afterLogin(user, from, fromUserId), { replace: true, state: null })
           } catch (err) {
             const m = errorMessage(err)
             if (m.includes('choose Parent or Tutor') && onNeedsRole) return onNeedsRole(credential)

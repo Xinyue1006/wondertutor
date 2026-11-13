@@ -6,6 +6,7 @@ import { ErrorBox, LoadError, Spinner, StatusPill } from '../../components/ui/Co
 import { fmtDate, fmtTime, fmtTimeRange, money } from '../../lib/format'
 import { gradeLabel } from '../../lib/education'
 import { matchesRecordRef, recordRef } from '../../lib/recordRef'
+import { hasConfirmedLessonLocation, lessonLocationMapUrl } from '../../lib/lessonLocation'
 
 const groups = {
   Requests: ['PENDING', 'COUNTER_OFFERED'], Lessons: ['AWAITING_PAYMENT', 'CONFIRMED'],
@@ -30,6 +31,7 @@ function BookingDetails({ b, onUpdate, onReload }) {
   }, [])
   const future = Date.parse(b.startAt) > now
   const active = groups.Lessons.includes(b.status)
+  const venueMayBeConfirmed = [...groups.Requests, ...groups.Lessons].includes(b.status) && Date.parse(b.endAt) > now && !b.attendance?.checkInAt
   const request = b.reschedule
   function choose(action) { setForm(action); setMessage(''); setError('') }
   async function submit(action, fields = {}) {
@@ -65,11 +67,16 @@ function BookingDetails({ b, onUpdate, onReload }) {
     <p>{fmtDate(b.startAt)} · {fmtTimeRange(b.startAt, b.endAt)} (Malaysia time)</p>
     <dl className="grid gap-3 rounded-xl bg-brand-25 p-4 text-sm sm:grid-cols-2">
       {[['Parent', b.parentName], ['Student', b.child.name + ' · ' + gradeLabel(b.child.educationLevel, b.child.grade)],
-        ['Lesson', b.teachingMode === 'ONLINE' ? 'Online' : 'Physical · ' + (b.location || 'Location to be agreed')],
+        ['Lesson', b.teachingMode === 'ONLINE' ? 'Online' : 'Physical · ' + (hasConfirmedLessonLocation(b) ? b.location : venueMayBeConfirmed ? 'Exact address awaiting parent confirmation' : 'Exact address not recorded')],
         ['Parent’s offer', money(b.proposedPrice) + ' / hour'], ...(b.counterPrice ? [['Tutor’s offer', money(b.counterPrice) + ' / hour']] : []),
         ...(b.agreedPrice ? [['Agreed rate', money(b.agreedPrice) + ' / hour']] : [])].map(([name, value]) =>
         <div key={name}><dt className="text-slate-600">{name}</dt><dd className="font-semibold text-navy">{value}</dd></div>)}
     </dl>
+    {b.teachingMode === 'PHYSICAL' && (hasConfirmedLessonLocation(b)
+      ? <a href={lessonLocationMapUrl(b)} target="_blank" rel="noopener noreferrer" className="btn-outline min-h-11">View lesson map</a>
+      : <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{venueMayBeConfirmed
+        ? 'For an active lesson that has not been checked in, ask the parent to confirm the full lesson address and entrance pin in My Bookings. Any new GPS check-in requires a confirmed venue.'
+        : 'The exact address was not recorded for this lesson. Existing attendance and reports are kept; the previous area is not a confirmed GPS attendance point.'}</p>)}
     {b.parentSince && <p className="text-sm text-slate-600">Parent member since {fmtDate(b.parentSince)} · {b.completedLessons} completed lessons</p>}
     {b.messageToTutor && <p><b>Parent’s note</b> · {b.messageToTutor}</p>}
     {(b.cancelReason || b.rejectionReason) && <p><b>Reason</b> · {b.cancelReason || b.rejectionReason}</p>}

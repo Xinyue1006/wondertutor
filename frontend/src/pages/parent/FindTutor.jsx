@@ -149,6 +149,10 @@ export default function FindTutor() {
       <PageTitle title="Find the Right Tutor for Your Child" subtitle="Browse qualified tutors or let our AI Tutor Assistant help you find suitable matches." />
 
       <section className="card p-5">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-semibold text-navy">Search tutors</h2>
+          <button type="button" onClick={clearFilters} className="min-h-11 rounded-lg px-3 text-sm font-semibold text-brand-600 hover:bg-brand-50 hover:underline">Clear filters</button>
+        </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_1fr_auto] xl:items-end">
           <label className="block">
             <span className="mb-1.5 block text-sm font-semibold text-navy">Subject <span className="text-red-500">*</span></span>
@@ -209,7 +213,7 @@ export default function FindTutor() {
       </div>
 
       <div className="mt-3">
-        <FilterChips extra={extra} setExtra={setExtra} locationName={applied.location} onClear={clearFilters} />
+        <FilterChips extra={extra} setExtra={setExtra} locationName={applied.location} showClear={false} />
       </div>
 
       <div className="mt-4">

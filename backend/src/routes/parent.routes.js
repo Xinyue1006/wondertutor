@@ -62,6 +62,7 @@ router.get('/bookings', bookings.listBookings)
 // Registered before '/bookings/:id' so "calendar.ics" is not read as a booking id
 router.get('/bookings/calendar.ics', calendar.upcomingCalendar)
 router.get('/bookings/:id', bookings.getBooking)
+router.put('/bookings/:id/location', bookings.updateLessonLocation)
 router.get('/bookings/:id/calendar.ics', calendar.lessonCalendar)
 router.post('/bookings/:id/negotiate', bookings.negotiate)
 router.post('/bookings/:id/accept-counter', bookings.acceptCounter)

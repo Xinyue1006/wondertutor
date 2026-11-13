@@ -3,69 +3,153 @@ import { Link, useSearchParams } from 'react-router-dom'
 import api, { errorMessage } from '../../api/client'
 import Avatar from '../../components/ui/Avatar'
 import Icon from '../../components/ui/Icon'
-import { EmptyState, ErrorBox, LoadError, Modal, PageTitle, Spinner, StatusPill, Stars, VerifiedTick } from '../../components/ui/Common'
+import { EmptyState, ErrorBox, LoadError, Modal, PageTitle, Spinner, StatusPill, VerifiedTick } from '../../components/ui/Common'
 import LessonDetails from '../../components/LessonDetails'
+import LessonLocationPicker from '../../components/LessonLocationPicker'
 import RescheduleModal from '../../components/RescheduleModal'
 import { pickImage } from '../../components/PhotoPicker'
 import { downloadFile } from '../../lib/download'
-import { daysUntil, fmtDate, fmtDateLong, fmtTime, fmtTimeRange, money } from '../../lib/format'
-import { gradeLabel } from '../../lib/education'
+import { fmtDate, fmtDateLong, fmtTime, fmtTimeRange, money, toYmd } from '../../lib/format'
 import { matchesRecordRef, recordRef } from '../../lib/recordRef'
+import { canEditLessonLocation, hasConfirmedLessonLocation } from '../../lib/lessonLocation'
+import { lessonLocationError, lessonLocationPayload } from '../../lib/lessonLocationInput'
 
 const GROUPS = {
   pending: ['PENDING', 'COUNTER_OFFERED', 'AWAITING_PAYMENT'],
   upcoming: ['CONFIRMED'],
-  // A disputed lesson did take place (or is claimed to have): it waits for Admin with the finished lessons, not with the cancelled ones
   completed: ['COMPLETED', 'DISPUTED'],
   cancelled: ['CANCELLED', 'REJECTED'],
+}
+const TABS = [['upcoming', 'Upcoming'], ['pending', 'Pending'], ['attention', 'Needs attention'], ['completed', 'Completed'], ['cancelled', 'Cancelled & declined'], ['all', 'All']]
+const validTab = value => TABS.some(([key]) => key === value)
+const PAGE_SIZE = 5
+const GROUP_LABELS = { upcoming: 'upcoming lessons', pending: 'pending requests', attention: 'lessons needing attention', completed: 'completed lessons', cancelled: 'cancelled and declined bookings' }
+const needsAttention = (b, now) => b.status === 'CONFIRMED' && Date.parse(b.endAt) <= now
+function groupFor(b, now) {
+  if (needsAttention(b, now)) return 'attention'
+  return Object.keys(GROUPS).find(group => GROUPS[group].includes(b.status)) || 'all'
+}
+const joinable = (b, now) => b.status === 'CONFIRMED' && Date.parse(b.endAt) > now && b.teachingMode === 'ONLINE' && /^https:\/\//i.test(b.meetingLink || '')
+const payable = (b, now) => b.status === 'AWAITING_PAYMENT' && Date.parse(b.startAt) > now && (!b.payBy || Date.parse(b.payBy) > now)
+function orderBookings(rows, group, order) {
+  const latestFirst = order === 'new' || (order === 'auto' && ['attention', 'completed', 'cancelled'].includes(group))
+  return [...rows].sort((a, b) => latestFirst ? new Date(b.startAt) - new Date(a.startAt) : new Date(a.startAt) - new Date(b.startAt))
 }
 
 export default function MyBookings() {
   const [params, setParams] = useSearchParams()
-  const tab = params.get('tab') || 'all'
+  const tab = validTab(params.get('tab')) ? params.get('tab') : 'upcoming'
   const [bookings, setBookings] = useState(null)
-  const [sortNewest, setSortNewest] = useState(true)
+  const [now, setNow] = useState(Date.now)
+  const clock = useRef({ time: null, receivedAt: null })
+  const [sortOrder, setSortOrder] = useState('auto')
+  const [expanded, setExpanded] = useState({ tab, sortOrder: 'auto', limits: {} })
   const [detail, setDetail] = useState(null)
   const [cancelFor, setCancelFor] = useState(null)
   const [reviewFor, setReviewFor] = useState(null)
   const [rescheduleFor, setRescheduleFor] = useState(null)
+  const [locationFor, setLocationFor] = useState(null)
+  const [success, setSuccess] = useState('')
   const [notice, setNotice] = useState('')
   const [calendarBusy, setCalendarBusy] = useState(false)
-  // One action at a time: a double click on Accept/Decline must not send the request twice
   const inFlight = useRef(false)
   const [acting, setActing] = useState(false)
-
   const [loadError, setLoadError] = useState('')
+  const [needsRefresh, setNeedsRefresh] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const refreshRequired = useRef(false)
+  const applyBookings = useCallback(data => {
+    const serverTime = Date.parse(data.serverTime)
+    const time = Number.isFinite(serverTime) ? serverTime : Date.now()
+    clock.current = { time, receivedAt: performance.now() }
+    setNow(time)
+    setBookings(data.bookings)
+    refreshRequired.current = false
+    setNeedsRefresh(false)
+  }, [])
   const load = useCallback(() => {
     setLoadError('')
-    return api.get('/parent/bookings').then((r) => setBookings(r.data.bookings)).catch((e) => setLoadError(errorMessage(e)))
-  }, [])
+    setRefreshing(true)
+    return api.get('/parent/bookings').then(r => {
+      applyBookings(r.data)
+      return true
+    }).catch(e => {
+      setLoadError(errorMessage(e))
+      refreshRequired.current = true
+      setNeedsRefresh(true)
+      return false
+    }).finally(() => setRefreshing(false))
+  }, [applyBookings])
   useEffect(() => { load() }, [load])
+  useEffect(() => {
+    const tick = () => {
+      if (clock.current.time != null) setNow(clock.current.time + performance.now() - clock.current.receivedAt)
+    }
+    const timer = setInterval(tick, 1000)
+    window.addEventListener('focus', tick)
+    return () => { clearInterval(timer); window.removeEventListener('focus', tick) }
+  }, [])
 
-  // Opened from a notification (".../bookings?booking=12"): show that booking's details straight away, once
+  // A notification opens its booking and selects the matching group, unless an
+  // explicit group was supplied. Closing details leaves that booking reachable.
   const focusId = params.get('booking')
   useEffect(() => {
     if (!focusId || !bookings) return
-    const b = bookings.find((x) => matchesRecordRef(x, focusId))
-    if (b) setDetail(b)
-    setParams((p) => { p.delete('booking'); return p }, { replace: true })
+    const b = bookings.find(x => matchesRecordRef(x, focusId))
+    if (b) {
+      setDetail(b)
+      const group = groupFor(b, now)
+      const destinationTab = validTab(params.get('tab')) ? params.get('tab') : group
+      const position = orderBookings(bookings.filter(row => groupFor(row, now) === group), group, sortOrder).findIndex(row => matchesRecordRef(row, focusId))
+      // An older notification can target a row beyond the first five. Keep it
+      // visible after its details close without expanding every history group.
+      setExpanded({ tab: destinationTab, sortOrder, limits: { [group]: Math.max(PAGE_SIZE, Math.ceil((position + 1) / PAGE_SIZE) * PAGE_SIZE) } })
+    }
+    setParams(p => {
+      p.delete('booking')
+      if (b && !validTab(p.get('tab'))) {
+        const group = groupFor(b, now)
+        if (group !== 'upcoming') p.set('tab', group)
+      }
+      return p
+    }, { replace: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusId, bookings])
 
   const counts = useMemo(() => {
     const list = bookings || []
-    const n = (g) => list.filter((b) => GROUPS[g].includes(b.status)).length
-    return { all: list.length, pending: n('pending'), upcoming: n('upcoming'), completed: n('completed'), cancelled: n('cancelled'), finished: list.filter((b) => b.status === 'COMPLETED').length }
-  }, [bookings])
-
+    const n = group => list.filter(b => GROUPS[group].includes(b.status)).length
+    const attention = list.filter(b => needsAttention(b, now)).length
+    return { all: list.length, pending: n('pending'), upcoming: n('upcoming') - attention, attention, completed: n('completed'), cancelled: n('cancelled') }
+  }, [bookings, now])
   if (!bookings) return loadError ? <LoadError message={loadError} onRetry={load} /> : <Spinner />
+  const currentDetail = detail && (bookings.find(b => matchesRecordRef(b, recordRef(detail))) || detail)
+  const show = group => tab === 'all' || tab === group
+  const sections = [
+    ['upcoming', 'Upcoming Lessons', 'Confirmed future lessons and lessons in progress.'],
+    ['pending', 'Pending Requests', 'Requests, counter-offers and lessons awaiting payment.'],
+    ['attention', 'Needs attention', 'Past lessons awaiting completion or administrator review.'],
+    ['completed', 'Completed Lessons', 'Finished lessons and disputed attendance records.'],
+    ['cancelled', 'Cancelled & Declined', 'Requests and lessons that did not go ahead.'],
+  ].filter(([group]) => show(group)).map(([group, title, description]) => [group, title, description, orderBookings(bookings.filter(b => groupFor(b, now) === group), group, sortOrder)])
 
-  const sorted = [...bookings].sort((a, b) => (sortNewest ? new Date(b.startAt) - new Date(a.startAt) : new Date(a.startAt) - new Date(b.startAt)))
-  const show = (group) => tab === 'all' || tab === group
-  const by = (...statuses) => sorted.filter((b) => statuses.includes(b.status))
+  function changeTab(next) {
+    setExpanded({ tab: next, sortOrder, limits: {} })
+    setParams(next === 'upcoming' ? {} : { tab: next })
+  }
+  function changeSort(next) {
+    setSortOrder(next)
+    setExpanded({ tab, sortOrder: next, limits: {} })
+  }
+  function visibleLimit(group) {
+    return expanded.tab === tab && expanded.sortOrder === sortOrder ? expanded.limits[group] || PAGE_SIZE : PAGE_SIZE
+  }
+  function showRows(group, limit) {
+    setExpanded(current => ({ tab, sortOrder, limits: { ...(current.tab === tab && current.sortOrder === sortOrder ? current.limits : {}), [group]: limit } }))
+  }
 
   async function act(path, body) {
-    if (inFlight.current) return false
+    if (inFlight.current || refreshRequired.current) return false
     inFlight.current = true
     setActing(true)
     setNotice('')
@@ -75,161 +159,268 @@ export default function MyBookings() {
       return true
     } catch (err) {
       setNotice(errorMessage(err))
-      load() // the booking may have changed meanwhile (e.g. the tutor answered): show its real state
+      load()
       return false
-    } finally {
-      inFlight.current = false
-      setActing(false)
-    }
+    } finally { inFlight.current = false; setActing(false) }
+  }
+  const handlers = {
+    onCancel: b => { setNotice(''); setDetail(null); setCancelFor(b) },
+    onReview: b => { setDetail(null); setReviewFor(b) },
+    onReschedule: b => { setDetail(null); setRescheduleFor(b) },
+    act,
+  }
+  function updatedLocation(booking) {
+    setBookings(rows => rows.map(row => matchesRecordRef(row, recordRef(booking)) ? booking : row))
+    setDetail(current => current && matchesRecordRef(current, recordRef(booking)) ? booking : current)
+    setSuccess(locationFor?.status === 'COUNTER_OFFERED' && booking.status === 'PENDING'
+      ? 'Lesson address saved. The counter-offer was cleared so the tutor can review the new venue and rate.'
+      : 'Lesson address saved. Your tutor has been notified.')
+    setLocationFor(null)
   }
 
-  const sections = [
-    show('pending') && ['Pending Requests', "Waiting for tutor's response.", 'clock', 'bg-accent-50', 'text-accent-600', by('PENDING'), PendingRow],
-    show('pending') && ['Counter Offer', 'Tutor has sent a counter offer for your consideration.', 'refresh', 'bg-accent-50', 'text-accent-600', by('COUNTER_OFFERED'), CounterRow],
-    show('pending') && ['Payment Required', 'Your request was accepted. Pay to confirm the lesson.', 'wallet', 'bg-accent-50', 'text-accent-600', by('AWAITING_PAYMENT'), PayRow],
-    show('upcoming') && ['Upcoming Lessons', 'Your confirmed upcoming lessons.', 'calendar', 'bg-brand-50', 'text-brand-500', by('CONFIRMED'), UpcomingRow],
-    show('completed') && ['Under Admin Review', 'You reported a problem with these lessons. Our admin team will contact you.', 'info', 'bg-orange-50', 'text-orange-600', by('DISPUTED'), DisputedRow],
-    show('completed') && ['Completed Lessons', 'View past lessons and leave a review.', 'check-circle', 'bg-ok-50', 'text-ok', by('COMPLETED'), CompletedRow],
-    show('cancelled') && ['Cancelled & Declined', 'These requests did not go ahead.', 'x', 'bg-red-50', 'text-red-500', by('CANCELLED', 'REJECTED'), CancelledRow],
-  ].filter(Boolean)
-
-  const handlers = { onDetail: setDetail, onCancel: setCancelFor, onReview: setReviewFor, onReschedule: setRescheduleFor, act }
-
-  return (
-    <div>
-      <PageTitle
-        icon="calendar" title="My Bookings" subtitle="View and manage your tutor lessons and booking requests."
-        right={
-          <div className="grid max-w-full grid-cols-3 gap-2 sm:gap-3">
-            {[['calendar', counts.upcoming, 'Upcoming', 'bg-brand-50', 'bg-brand-100 text-brand-500'], ['clock', counts.pending, 'Pending', 'bg-accent-50', 'bg-accent-100 text-accent-600'], ['check', counts.finished, 'Completed', 'bg-ok-50', 'bg-ok text-white']].map(([icon, n, l, bg, tone]) => (
-              <div key={l} className={`flex min-w-0 flex-col items-center gap-1 rounded-xl px-2 py-2.5 text-center sm:flex-row sm:gap-3 sm:px-4 sm:text-left ${bg}`}>
-                <span className={`flex h-10 w-10 items-center justify-center rounded-full ${tone}`}><Icon name={icon} className="h-5 w-5" /></span>
-                <span><span className="block text-2xl font-extrabold leading-6 text-navy">{n}</span><span className="text-xs text-slate-600">{l}</span></span>
-              </div>))}
-          </div>
-        }
-      />
-
-      <div className="card mb-4 flex flex-wrap items-center justify-between gap-3 p-3">
-        <div className="flex flex-wrap gap-2">
-          {[['all', 'All'], ['pending', 'Pending'], ['upcoming', 'Upcoming'], ['completed', 'Completed'], ['cancelled', 'Cancelled']].map(([k, l]) => (
-            <button key={k} onClick={() => setParams(k === 'all' ? {} : { tab: k })} className={`rounded-lg border px-4 py-2 text-sm font-semibold ${tab === k ? 'border-brand-500 bg-brand-500 text-white' : 'border-brand-200 bg-white text-navy hover:border-brand-500'}`}>
-              {l} ({counts[k]})
-            </button>))}
+  return <div>
+    <PageTitle icon="calendar" title="My Bookings" subtitle="View your lessons at a glance. Open the details to manage a booking."
+      right={<Link to="/parent/find-tutor" className="btn-outline min-h-11 px-4 text-sm">Find a Tutor</Link>} />
+    <div className="card mb-4 space-y-3 p-3 sm:p-4">
+      <div className="sm:hidden">
+        <label htmlFor="booking-group-filter" className="mb-1.5 block text-sm font-semibold text-navy">Booking group</label>
+        <select id="booking-group-filter" value={tab} onChange={e => changeTab(e.target.value)} className="input min-h-11 w-full">
+          {TABS.map(([key, label]) => <option key={key} value={key}>{label} ({counts[key]})</option>)}
+        </select>
+      </div>
+      <nav aria-label="Booking groups" className="hidden flex-wrap gap-2 sm:flex">
+        {TABS.map(([key, label]) => <button type="button" key={key} aria-pressed={tab === key}
+          onClick={() => changeTab(key)}
+          className={'min-h-11 rounded-lg border px-3 py-2 text-sm font-semibold ' + (tab === key ? 'border-brand-500 bg-brand-500 text-white' : 'border-brand-200 bg-white text-navy hover:border-brand-500')}>
+          {label} ({counts[key]})
+        </button>)}
+      </nav>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
+        <label className="flex max-w-full items-center gap-2 text-sm text-slate-600">Sort by:
+          <select className="input min-h-11 w-44 max-w-full font-medium text-navy" value={sortOrder} onChange={e => changeSort(e.target.value)}>
+            <option value="auto">Recommended order</option><option value="old">Date (earliest first)</option><option value="new">Date (latest first)</option>
+          </select>
+        </label>
+        {bookings.some(b => b.status === 'CONFIRMED' && Date.parse(b.startAt) > now) && <button type="button" disabled={calendarBusy}
+          onClick={async () => { setCalendarBusy(true); setNotice(await downloadFile('/parent/bookings/calendar.ics', 'wondertutor-upcoming-lessons.ics')); setCalendarBusy(false) }}
+          className="btn-outline min-h-11 max-w-full px-3 text-left text-sm">
+          <Icon name="calendar" className="h-4 w-4 shrink-0" /> {calendarBusy ? 'Preparing…' : 'Add all upcoming lessons to my calendar'}
+        </button>}
+      </div>
+    </div>
+    {!currentDetail && !cancelFor && !needsRefresh && <ErrorBox className="mb-4">{notice}</ErrorBox>}
+    {!currentDetail && !cancelFor && needsRefresh && <div className="mb-4 space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
+      <ErrorBox>{loadError}</ErrorBox>
+      <p className="text-sm text-amber-900">Refresh your bookings to check the latest status before taking another action.</p>
+      <button type="button" disabled={refreshing} onClick={load} className="btn-outline min-h-11 px-3 text-sm">{refreshing ? 'Refreshing…' : 'Refresh bookings'}</button>
+    </div>}
+    {success && <p role="status" className="mb-4 rounded-xl bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">{success}</p>}
+    {tab === 'upcoming' && counts.attention > 0 && <p className="mb-4 rounded-xl bg-amber-50 px-4 py-2 text-sm text-amber-900">
+      {counts.attention} {counts.attention === 1 ? 'past lesson needs' : 'past lessons need'} attention. <Link to="?tab=attention" className="inline-flex min-h-9 items-center font-semibold underline">Review past lessons</Link>
+    </p>}
+    {counts[tab] === 0 && <div className="card"><EmptyState icon="calendar" title={tab === 'upcoming' ? 'No upcoming lessons' : 'No bookings in this group'}
+      action={tab === 'upcoming' && counts.pending > 0 ? <Link to="?tab=pending" className="btn-primary mt-2">View pending requests</Link> : <Link to="/parent/find-tutor" className="btn-primary mt-2">Find a Tutor</Link>}>
+      {tab === 'upcoming' ? 'Confirmed future lessons appear here. Check Pending for requests and lessons awaiting payment.' : 'Choose another group to view your other bookings.'}
+    </EmptyState></div>}
+    <div className="space-y-4" aria-busy={acting}>
+      {sections.map(([group, title, description, rows]) => {
+        if (!rows.length) return null
+        const limit = visibleLimit(group)
+        const visible = rows.slice(0, limit)
+        const remaining = rows.length - visible.length
+        const more = Math.min(PAGE_SIZE, remaining)
+        return <section key={group} className="card overflow-hidden">
+        <div className="border-b border-slate-100 bg-brand-25 px-4 py-3">
+          <div className="flex items-center gap-2"><h2 className="text-base font-bold text-navy">{title}</h2><span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-slate-600">{rows.length}</span></div>
+          <p className="mt-0.5 text-xs text-slate-500">{description}</p>
         </div>
-        {counts.upcoming > 0 && (
-          <button
-            type="button" disabled={calendarBusy}
-            onClick={async () => { setCalendarBusy(true); setNotice(await downloadFile('/parent/bookings/calendar.ics', 'wondertutor-upcoming-lessons.ics')); setCalendarBusy(false) }}
-            className="btn-outline min-h-10 px-4 text-sm"
-          >
-            <Icon name="calendar" className="h-4 w-4" /> {calendarBusy ? 'Preparing…' : 'Add all upcoming lessons to my calendar'}
-          </button>
-        )}
-        <label className="flex items-center gap-2 text-sm text-slate-600">Sort by:
-          <select className="input h-10 w-52 font-medium text-navy" value={sortNewest ? 'new' : 'old'} onChange={(e) => setSortNewest(e.target.value === 'new')}>
-            <option value="new">Date (Newest First)</option><option value="old">Date (Oldest First)</option>
-          </select></label>
-      </div>
-      <ErrorBox className="mb-4">{notice}</ErrorBox>
-
-      {counts[tab] === 0 && (
-        <div className="card"><EmptyState icon="calendar" title="No bookings here yet" action={<Link to="/parent/find-tutor" className="btn-primary mt-2">Find a Tutor</Link>}>
-          Your booking requests and lessons will appear here.</EmptyState></div>
-      )}
-
-      <div className={`space-y-4 ${acting ? 'pointer-events-none opacity-70' : ''}`} aria-busy={acting}>
-        {sections.map(([title, sub, icon, bg, tone, rows, Row]) => rows.length > 0 && (
-          <section key={title} className="card overflow-hidden">
-            <div className={`flex flex-wrap items-center gap-3 px-5 py-3 ${bg}`}>
-              <span className={`flex h-8 w-8 items-center justify-center rounded-full bg-white ${tone}`}><Icon name={icon} className="h-[18px] w-[18px]" /></span>
-              <h2 className="text-lg font-extrabold text-navy">{title}</h2>
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-xs font-bold text-navy">{rows.length}</span>
-              <span className="text-xs text-slate-500">{sub}</span>
-            </div>
-            <div className="divide-y divide-slate-100">
-              {rows.map((b) => (
-                <div key={b.id} className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-[minmax(230px,1.1fr)_minmax(260px,1.2fr)_minmax(280px,1.3fr)_200px] xl:items-center">
-                  <TutorBlock b={b} />
-                  <LessonBlock b={b} />
-                  <Row b={b} {...handlers} />
-                </div>
-              ))}
-            </div>
-          </section>
-        ))}
-      </div>
-
-      <LessonDetails booking={detail} onClose={() => setDetail(null)} onChanged={load} />
-      <RescheduleModal
-        booking={rescheduleFor}
-        onClose={() => setRescheduleFor(null)}
-        onSubmit={async (body) => {
-          try {
-            await api.post(`/parent/bookings/${recordRef(rescheduleFor)}/reschedule`, body)
-            setRescheduleFor(null)
-            await load()
-            return null
-          } catch (err) {
-            return errorMessage(err) // shown inside the dialog, next to the choice that caused it
-          }
-        }}
-      />
-      <CancelModal booking={cancelFor} onClose={() => setCancelFor(null)} onConfirm={async (reason) => { if (await act(`/parent/bookings/${recordRef(cancelFor)}/cancel`, { reason })) setCancelFor(null) }} />
-      <ReviewModal booking={reviewFor} onClose={() => setReviewFor(null)} onDone={() => { setReviewFor(null); load() }} />
+        <div className="divide-y divide-slate-100">{visible.map(b => <CompactBookingRow key={recordRef(b)} b={b} now={now} actionsBlocked={needsRefresh} onDetail={booking => { setNotice(''); setDetail(booking) }} />)}</div>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-4 py-2">
+          <p className="text-xs text-slate-500">Showing {visible.length} of {rows.length}</p>
+          {(remaining > 0 || visible.length > PAGE_SIZE) && <div className="flex flex-wrap gap-2">
+            {visible.length > PAGE_SIZE && <button type="button" aria-label={'Show fewer ' + GROUP_LABELS[group]} onClick={() => showRows(group, PAGE_SIZE)} className="btn-outline min-h-11 px-3 text-sm">Show fewer</button>}
+            {remaining > 0 && <button type="button" aria-label={'View ' + more + ' more ' + GROUP_LABELS[group]} onClick={() => showRows(group, limit + PAGE_SIZE)} className="btn-outline min-h-11 px-3 text-sm">View {more} more</button>}
+          </div>}
+        </div>
+      </section>})}
     </div>
-  )
+
+    <LessonDetails key={currentDetail ? recordRef(currentDetail) : 'closed'} booking={currentDetail} now={now} actionsDisabled={needsRefresh || acting} onClose={() => setDetail(null)} onChanged={load}
+      onLocation={b => { if (!refreshRequired.current) { setDetail(null); setLocationFor(b) } }}
+      actions={currentDetail && <div className="min-w-0 space-y-3">
+        <ErrorBox>{needsRefresh ? loadError : notice}</ErrorBox>
+        {needsRefresh ? <>
+          <p className="text-sm text-amber-900">Refresh this booking to check its latest status before taking another action. Your previous action will not be resent.</p>
+          <button type="button" disabled={refreshing} onClick={load} className="btn-outline min-h-11 w-full px-3 text-sm">{refreshing ? 'Refreshing…' : 'Refresh bookings'}</button>
+        </> : <fieldset disabled={acting} aria-label="Booking actions" className="min-w-0 space-y-3 disabled:opacity-60">
+          <BookingDetailActions key={recordRef(currentDetail)} b={currentDetail} now={now} {...handlers} />
+        </fieldset>}
+      </div>} />
+    {locationFor && <LocationModal key={recordRef(locationFor)} booking={locationFor} now={now} onClose={() => setLocationFor(null)} onUpdate={updatedLocation} onRefresh={async () => {
+      const { data } = await api.get('/parent/bookings')
+      applyBookings(data)
+      const fresh = data.bookings.find(b => matchesRecordRef(b, recordRef(locationFor)))
+      if (!fresh) throw new Error('This booking is no longer available. Close this form and review your bookings.')
+      return fresh
+    }} />}
+    <RescheduleModal booking={rescheduleFor} onClose={() => setRescheduleFor(null)} onSubmit={async body => {
+      try { await api.post('/parent/bookings/' + recordRef(rescheduleFor) + '/reschedule', body); setRescheduleFor(null); await load(); return null }
+      catch (err) { return errorMessage(err) }
+    }} />
+    <CancelModal key={cancelFor ? recordRef(cancelFor) : 'closed'} booking={cancelFor} error={notice} onClose={() => setCancelFor(null)} onConfirm={async reason => {
+      const cancelled = await act('/parent/bookings/' + recordRef(cancelFor) + '/cancel', { reason })
+      if (cancelled) setCancelFor(null)
+      return cancelled
+    }} />
+    <ReviewModal key={reviewFor ? recordRef(reviewFor) : 'closed'} booking={reviewFor} onClose={() => setReviewFor(null)} onDone={() => { setReviewFor(null); load() }} />
+  </div>
 }
 
-function TutorBlock({ b }) {
-  return (
-    <div className="flex items-center gap-4">
-      <Avatar src={b.tutor.photoUrl} name={b.tutor.name} className="h-[100px] w-[88px]" rounded="rounded-xl" text="text-2xl" />
+function bookingHint(b, now) {
+  if (needsAttention(b, now)) return 'Attendance or completion needs review.'
+  if (b.reschedule?.status === 'ESCALATED') return 'Time change under administrator review.'
+  if (b.reschedule?.status === 'PENDING') return b.reschedule.requestedBy === 'PARENT' ? 'Reschedule requested; waiting for tutor.' : 'New time proposed — review the details.'
+  if (b.status === 'AWAITING_PAYMENT') return b.payBy ? 'Pay by ' + fmtDate(b.payBy) + ', ' + fmtTime(b.payBy) : 'Payment needed to confirm this lesson.'
+  if (b.status === 'COUNTER_OFFERED') return 'Tutor proposed a different rate.'
+  if (b.status === 'PENDING') return 'Waiting for the tutor’s response.'
+  if (b.status === 'DISPUTED') return 'Attendance is under administrator review.'
+  if (b.status === 'COMPLETED') return b.review ? 'Review submitted.' : 'You can leave a review.'
+  if (b.status === 'REJECTED') return 'The tutor declined this request.'
+  if (b.status === 'CANCELLED') return b.payment?.status === 'REFUNDED' ? 'Payment refunded.' : 'This booking was cancelled.'
+  if (Date.parse(b.startAt) <= now) return 'Lesson in progress'
+  if (b.teachingMode === 'PHYSICAL' && !hasConfirmedLessonLocation(b)) return 'Confirm the lesson address in View Details.'
+  const days = Math.round((Date.parse(toYmd(b.startAt) + 'T00:00:00+08:00') - Date.parse(toYmd(now) + 'T00:00:00+08:00')) / 86400000)
+  return days === 0 ? 'Lesson today' : days === 1 ? 'Lesson tomorrow' : 'Lesson in ' + days + ' days'
+}
+
+function CompactBookingRow({ b, now, onDetail, actionsBlocked = false }) {
+  const join = !actionsBlocked && joinable(b, now)
+  const pay = !actionsBlocked && payable(b, now)
+  const price = b.status === 'COUNTER_OFFERED' ? b.counterPrice : b.hourlyPrice ?? b.agreedPrice ?? b.proposedPrice
+  return <article aria-label={b.subject + ' with ' + b.tutor.name + ' for ' + b.child.name}
+    className="grid min-w-0 gap-3 p-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-center">
+    <div className="flex min-w-0 items-center gap-3">
+      <Avatar src={b.tutor.photoUrl} name={b.tutor.name} className="h-11 w-11 shrink-0" rounded="rounded-xl" />
       <div className="min-w-0">
-        <Link to={`/parent/tutors/${b.tutor.id}`} className="flex items-center gap-1.5 text-lg font-extrabold text-navy hover:text-brand-500">{b.tutor.name} {b.tutor.verified && <VerifiedTick />}</Link>
-        <div className="text-sm text-slate-500">{b.subject} <span className="text-slate-300">|</span> {gradeLabel(b.child.educationLevel, b.child.grade)}</div>
-        <div className="mt-0.5 flex items-center gap-1 text-sm"><Icon name="star" fill className="h-4 w-4 text-accent" /><b className="text-navy">{b.tutor.rating.toFixed(1)}</b> <span className="text-slate-500">({b.tutor.reviewCount} reviews)</span></div>
+        <Link to={'/parent/tutors/' + b.tutor.id} className="flex min-w-0 items-center gap-1 font-bold text-navy hover:text-brand-600"><span className="break-words">{b.tutor.name}</span>{b.tutor.verified && <VerifiedTick />}</Link>
+        <p className="break-words text-sm text-slate-600">{b.subject} · {b.child.name}</p>
       </div>
     </div>
-  )
-}
-
-const L = ({ icon, children }) => <div className="flex items-center gap-2 text-sm text-slate-600"><Icon name={icon} className="h-4 w-4 shrink-0 text-brand-500" /> {children}</div>
-
-function LessonBlock({ b }) {
-  const online = b.teachingMode === 'ONLINE'
-  return (
-    <div className="space-y-1.5">
-      <div><div className="font-bold text-navy">{fmtDateLong(b.startAt)}</div><div className="text-sm text-slate-500">{fmtTimeRange(b.startAt, b.endAt)}</div></div>
-      <L icon="user">Child: {b.child.name} ({gradeLabel(b.child.educationLevel, b.child.grade)})</L>
-      <L icon={online ? 'monitor' : 'home'}>Teaching Mode: {online ? 'Online' : 'Physical'}</L>
-      <L icon="tag">
-        {b.status === 'COUNTER_OFFERED' ? 'Original Price' : b.status === 'PENDING' ? 'Proposed Price' : 'Price'}: <b className="text-navy">RM{b.status === 'COUNTER_OFFERED' ? b.proposedPrice : b.hourlyPrice} / hour</b>
-      </L>
+    <div className="min-w-0 text-sm">
+      <p className="font-semibold text-navy">{fmtDate(b.startAt)}</p>
+      <p className="text-slate-600">{fmtTimeRange(b.startAt, b.endAt)} <span className="whitespace-nowrap">· {b.teachingMode === 'ONLINE' ? 'Online' : 'Physical'}</span></p>
     </div>
-  )
+    <div className="min-w-0 space-y-1">
+      <div className="flex flex-wrap items-center gap-2"><StatusPill status={b.status} /><span className="whitespace-nowrap text-sm font-semibold text-navy">{price == null ? 'Rate pending' : money(price) + ' / hour'}</span></div>
+      <p className={'break-words text-xs ' + (needsAttention(b, now) || b.status === 'AWAITING_PAYMENT' || b.status === 'COUNTER_OFFERED' ? 'text-amber-800' : 'text-slate-500')}>{bookingHint(b, now)}</p>
+    </div>
+    <div className={'grid gap-2 lg:min-w-32 lg:grid-cols-1 ' + (join || pay ? 'grid-cols-2' : 'grid-cols-1')}>
+      {join && <a href={b.meetingLink} target="_blank" rel="noreferrer" className="btn-primary min-h-11 px-3 text-sm">Join online class</a>}
+      {pay && <Link to="/parent/payments" className="btn-primary min-h-11 px-3 text-sm">Pay Now</Link>}
+      <button type="button" onClick={() => onDetail(b)} className="btn-outline min-h-11 px-3 text-sm">View Details</button>
+    </div>
+  </article>
 }
 
-const Btn = ({ kind = 'outline', children, ...rest }) => <button className={`${kind === 'primary' ? 'btn-primary' : kind === 'danger' ? 'btn-danger' : 'btn-outline'} w-full`} {...rest}>{children}</button>
-
-function PendingRow({ b, onDetail, onCancel, act }) {
-  return (
-    <>
-      <div>
-        <StatusPill status="PENDING" />
-        <ol className="mt-3 flex items-start text-[11px] text-slate-500">
-          {[['Request Sent', fmtTime(b.createdAt) + ', ' + new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kuala_Lumpur', day: 'numeric', month: 'short' }).format(new Date(b.createdAt)), 'bg-brand-500 text-white', 'check'],
-            ['Waiting for Tutor', 'Tutor will respond soon', 'bg-accent text-white', 'clock'], ['Booking Confirmation', '', 'bg-slate-300 text-white', 'clock']].map(([t, s, tone, icon], i) => (
-            <li key={t} className="relative flex flex-1 flex-col items-center text-center">
-              {i > 0 && <span className="absolute right-1/2 top-2.5 h-0.5 w-full bg-slate-200" />}
-              <span className={`relative z-10 flex h-5 w-5 items-center justify-center rounded-full ${tone}`}><Icon name={icon} className="h-3 w-3" strokeWidth={3} /></span>
-              <b className="mt-1 text-navy">{t}</b><span>{s}</span>
-            </li>))}
-        </ol>
+function LocationModal({ booking, now, onClose, onUpdate, onRefresh }) {
+  const [current, setCurrent] = useState(booking)
+  const [value, setValue] = useState(() => hasConfirmedLessonLocation(booking)
+    ? { address: booking.location, latitude: booking.latitude, longitude: booking.longitude, confirmed: false }
+    : { address: '', latitude: null, longitude: null, confirmed: false })
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [needsRefresh, setNeedsRefresh] = useState(false)
+  const [message, setMessage] = useState('')
+  const allowed = canEditLessonLocation(current, now)
+  const locked = !allowed || needsRefresh
+  async function save(event) {
+    event.preventDefault()
+    if (busy || locked) return
+    const validation = lessonLocationError(value)
+    if (validation) return setError(validation)
+    setError(''); setBusy(true)
+    try {
+      const { data } = await api.put(`/parent/bookings/${recordRef(current)}/location`, { ...lessonLocationPayload(value), version: current.updatedAt })
+      onUpdate(data.booking)
+    } catch (err) {
+      setError(errorMessage(err))
+      setNeedsRefresh(err.response?.status === 409)
+    } finally { setBusy(false) }
+  }
+  async function refresh() {
+    setBusy(true); setError('')
+    try {
+      const fresh = await onRefresh()
+      setCurrent(fresh)
+      setValue(draft => ({ ...draft, confirmed: false }))
+      setNeedsRefresh(false)
+      setMessage('Booking refreshed. Your draft has been kept. Review the latest booking and confirm the address again before saving.')
+    } catch (err) { setError(errorMessage(err)) }
+    finally { setBusy(false) }
+  }
+  return <Modal open onClose={() => { if (!busy) onClose() }} title={booking.locationConfirmedAt ? 'Edit lesson address' : 'Confirm lesson address'} width="max-w-2xl">
+    <form onSubmit={save} className="min-w-0 space-y-4">
+      <p className="text-sm text-slate-600">{current.subject} with {current.tutor.name} · {fmtDateLong(current.startAt)}, {fmtTimeRange(current.startAt, current.endAt)}</p>
+      <p className="text-sm text-slate-600">Enter the full lesson address and place the pin at its entrance. Your tutor uses this point for GPS attendance. This address applies to this lesson only.</p>
+      {!booking.locationConfirmedAt && booking.location && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Previous area: {booking.location}. This is not a confirmed lesson address or entrance pin.</p>}
+      {current.locationConfirmedAt && <p className="break-words rounded-lg bg-brand-25 p-3 text-sm"><b>Current saved address:</b> {current.location}</p>}
+      {['PENDING', 'COUNTER_OFFERED'].includes(current.status) && <p className="text-sm text-slate-600">The venue is fixed once the tutor accepts. Changing a counter-offer’s venue sends it back to the tutor for review.</p>}
+      {!allowed && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">This lesson address can no longer be changed. A confirmed venue is fixed after acceptance, and attendance locks the address. If you need a different venue, cancel and book again.</p>}
+      <ErrorBox>{error}</ErrorBox>
+      {message && <p role="status" className="text-sm text-slate-700">{message}</p>}
+      <LessonLocationPicker value={value} onChange={setValue} disabled={busy || locked} />
+      {needsRefresh && <button type="button" onClick={refresh} disabled={busy} className="btn-outline min-h-11 w-full sm:w-auto">Refresh booking and review</button>}
+      <div className="flex flex-wrap gap-2">
+        <button disabled={busy || locked} className="btn-primary min-h-11 flex-1 sm:flex-none">{busy ? 'Saving…' : 'Save lesson address'}</button>
+        <button type="button" className="btn-outline min-h-11" disabled={busy} onClick={onClose}>Go back</button>
       </div>
-      <div className="space-y-2"><Btn onClick={() => onDetail(b)}>View Details <Icon name="arrow-right" className="h-4 w-4" /></Btn><Btn kind="danger" onClick={() => onCancel(b)}>Cancel Request</Btn><NegotiationForm b={b} act={act} /></div>
-    </>
-  )
+    </form>
+  </Modal>
+}
+
+const Btn = ({ kind = 'outline', children, ...rest }) => <button type="button" className={(kind === 'primary' ? 'btn-primary' : kind === 'danger' ? 'btn-danger' : 'btn-outline') + ' min-h-11 w-full'} {...rest}>{children}</button>
+
+function BookingDetailActions({ b, now, onCancel, onReview, onReschedule, act }) {
+  const future = Date.parse(b.startAt) > now
+  const ended = Date.parse(b.endAt) <= now
+  const canMove = !['PENDING', 'ESCALATED'].includes(b.reschedule?.status)
+  if (b.status === 'PENDING') return <div className="space-y-3">
+    <p className="text-sm text-slate-600">Waiting for the tutor's response.</p>
+    <Btn kind="danger" onClick={() => onCancel(b)}>Cancel Request</Btn>
+    <NegotiationForm b={b} act={act} />
+  </div>
+  if (b.status === 'COUNTER_OFFERED') return <div className="space-y-3">
+    <div className="grid grid-cols-2 gap-3 rounded-xl bg-brand-25 p-3 text-sm">
+      <div><p className="text-slate-600">Your proposed price</p><b>{money(b.proposedPrice)} / hour</b></div>
+      <div><p className="text-slate-600">Tutor's counter-offer</p><b>{money(b.counterPrice)} / hour</b></div>
+    </div>
+    <div className="grid gap-2 sm:grid-cols-2"><Btn kind="primary" onClick={() => act('/parent/bookings/' + recordRef(b) + '/accept-counter')}>Accept Counter Offer</Btn><Btn onClick={() => act('/parent/bookings/' + recordRef(b) + '/decline-counter')}>Decline</Btn></div>
+    <NegotiationForm b={b} act={act} counter />
+  </div>
+  if (b.status === 'AWAITING_PAYMENT') return <div className="space-y-3">
+    {b.payBy && <p className="text-sm">Pay by {fmtDate(b.payBy)}, {fmtTime(b.payBy)} (Malaysia time).</p>}
+    <RescheduleBanner b={b} act={act} />
+    {payable(b, now) ? <Link to="/parent/payments" className="btn-primary min-h-11 w-full">Pay Now</Link> : <p className="text-sm text-amber-800">The payment window has ended. Refresh your bookings to check the latest status.</p>}
+    {future && <div className="grid gap-2 sm:grid-cols-2">{canMove && <Btn onClick={() => onReschedule(b)}>Reschedule</Btn>}<Btn kind="danger" onClick={() => onCancel(b)}>Cancel Booking</Btn></div>}
+  </div>
+  if (b.status === 'CONFIRMED' && ended) return <div className="space-y-3 rounded-xl bg-orange-50 p-3 text-sm text-slate-700">
+    <p className="font-bold text-navy">{b.summary ? 'A report is recorded, but the lesson status still needs review.' : b.attendance?.checkInAt ? 'Waiting for the tutor to finish the attendance and report.' : 'No tutor check-in or completed report has been recorded.'}</p>
+    <p>{b.attendance?.checkInAt ? 'Ask your tutor to finish the attendance and report. If the lesson did not take place as recorded, report the problem for administrator review.' : 'Contact your tutor about the missing record. Report a problem for administrator review if attendance is missing or the lesson did not take place.'}</p>
+    {b.payment?.status === 'PAID' && <p>Your payment is still recorded as paid. Open the details to review refund options; refunds require administrator review.</p>}
+    <RescheduleBanner b={b} act={act} />
+  </div>
+  if (b.status === 'CONFIRMED') return <div className="space-y-3">
+    <p className="text-sm font-semibold text-navy">{bookingHint(b, now)}</p>
+    <RescheduleBanner b={b} act={act} />
+    {joinable(b, now) && <a className="btn-primary min-h-11 w-full" href={b.meetingLink} target="_blank" rel="noreferrer">Join online class</a>}
+    {future && <div className="grid gap-2 sm:grid-cols-2">{canMove && <Btn onClick={() => onReschedule(b)}>Reschedule</Btn>}<Btn kind="danger" onClick={() => onCancel(b)}>Cancel Booking</Btn></div>}
+  </div>
+  if (b.status === 'COMPLETED') return b.review
+    ? b.review.isHidden && <p className="text-sm text-slate-600">Your review is hidden from the public profile by an administrator. {b.review.moderationReason}</p>
+    : <Btn kind="primary" onClick={() => onReview(b)}>Leave a Review</Btn>
+  if (b.status === 'DISPUTED') return <p className="rounded-xl bg-orange-50 p-3 text-sm text-slate-700">Your refund request is with our admin team. They will check the lesson record and decide on the refund.</p>
+  if (b.status === 'CANCELLED') return <div className="space-y-3">{b.payment?.status === 'REFUNDED' && <StatusPill status="REFUNDED" />}<NegotiationForm b={b} act={act} /></div>
+  return null
 }
 
 function NegotiationForm({ b, act, counter = false }) {
@@ -247,28 +438,6 @@ function NegotiationForm({ b, act, counter = false }) {
       <label>What should admin review?<textarea className="input text-base" name="value" maxLength={200} required /></label>}
     <div className="flex flex-wrap gap-2"><button className="btn-primary min-h-11">Send</button><button type="button" className="btn-outline min-h-11" onClick={() => setAction('')}>Go back</button></div>
   </form>
-}
-
-function CounterRow({ b, onDetail, act }) {
-  return (
-    <>
-      <div className="space-y-2">
-        <StatusPill status="COUNTER_OFFERED" />
-        {b.messageToTutor && <div className="rounded-lg bg-brand-25 px-3 py-2 text-xs text-slate-600">{b.messageToTutor}</div>}
-        <div className="flex items-center justify-between rounded-xl bg-brand-25 px-4 py-3">
-          <div><div className="text-xs text-slate-500">Your Proposed Price</div><div className="text-lg font-bold text-slate-600">RM{b.proposedPrice} / hour</div></div>
-          <Icon name="arrow-right" className="h-5 w-5 text-slate-400" />
-          <div><div className="text-xs text-slate-500">Tutor's Counter Offer</div><div className="text-lg font-extrabold text-navy">RM{b.counterPrice} / hour</div></div>
-        </div>
-      </div>
-      <div className="space-y-2">
-        <Btn kind="primary" onClick={() => act(`/parent/bookings/${recordRef(b)}/accept-counter`)}>Accept Counter Offer</Btn>
-        <Btn onClick={() => act(`/parent/bookings/${recordRef(b)}/decline-counter`)}>Decline</Btn>
-        <NegotiationForm b={b} act={act} counter />
-        <Btn onClick={() => onDetail(b)}>View Details <Icon name="arrow-right" className="h-4 w-4" /></Btn>
-      </div>
-    </>
-  )
 }
 
 // Shows where a reschedule stands, with the right buttons for whoever has to act next
@@ -296,105 +465,7 @@ function RescheduleBanner({ b, act }) {
   )
 }
 
-const canAskReschedule = (b) => !(b.reschedule?.status === 'PENDING')
-
-function PayRow({ b, onDetail, onCancel, onReschedule, act }) {
-  return (
-    <>
-      <div className="space-y-2">
-        <StatusPill status="AWAITING_PAYMENT" />
-        {b.payBy && <p className="text-sm">Pay by {fmtDate(b.payBy)}, {fmtTime(b.payBy)} (Malaysia time).</p>}
-        <div className="rounded-xl bg-brand-25 px-4 py-3">
-          <div className="text-xs text-slate-500">Agreed price</div>
-          <div className="text-lg font-extrabold text-navy">RM{b.agreedPrice} / hour <span className="text-sm font-semibold text-slate-500">· total {money(b.totalAmount)}</span></div>
-        </div>
-        <RescheduleBanner b={b} act={act} />
-      </div>
-      <div className="space-y-2">
-        <Link to="/parent/payments" className="btn-primary w-full">Pay Now <Icon name="arrow-right" className="h-4 w-4" /></Link>
-        <Btn onClick={() => onDetail(b)}>View Details <Icon name="arrow-right" className="h-4 w-4" /></Btn>
-        {canAskReschedule(b) && <Btn onClick={() => onReschedule(b)}><Icon name="calendar" className="h-4 w-4" /> Reschedule</Btn>}
-        <Btn kind="danger" onClick={() => onCancel(b)}>Cancel Booking</Btn>
-      </div>
-    </>
-  )
-}
-
-function UpcomingRow({ b, onDetail, onCancel, onReschedule, act }) {
-  const d = daysUntil(b.startAt)
-  const now = Date.now()
-  // Once the lesson has started it can no longer be moved or cancelled; after it ends the tutor marks it complete
-  const started = new Date(b.startAt).getTime() <= now
-  const ended = new Date(b.endAt).getTime() <= now
-  const when = ended ? 'Waiting for the tutor to complete this lesson' : started ? 'Lesson in progress' : d <= 0 ? 'Lesson today' : d === 1 ? 'Lesson tomorrow' : `Lesson in ${d} days`
-  return (
-    <>
-      <div className="space-y-2">
-        <StatusPill status="CONFIRMED" />
-        <div className="flex items-center gap-3 rounded-xl bg-brand-25 px-4 py-3">
-          <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-brand-100 text-brand-500"><Icon name={started ? 'clock' : 'calendar'} className="h-5 w-5" /></span>
-          <div><div className="font-bold text-navy">{when}</div><div className="text-xs text-slate-500">{fmtDate(b.startAt)}</div></div>
-        </div>
-        <RescheduleBanner b={b} act={act} />
-      </div>
-      <div className="space-y-2">
-        {b.teachingMode === 'ONLINE' && /^https:\/\//i.test(b.meetingLink || '') && <a className="btn-primary min-h-11" href={b.meetingLink} target="_blank" rel="noreferrer">Join online class</a>}
-        <Btn kind="primary" onClick={() => onDetail(b)}>View Lesson Details</Btn>
-        {!started && canAskReschedule(b) && <Btn onClick={() => onReschedule(b)}><Icon name="calendar" className="h-4 w-4" /> Reschedule</Btn>}
-        {!started && <Btn kind="danger" onClick={() => onCancel(b)}>Cancel Booking</Btn>}
-      </div>
-    </>
-  )
-}
-
-function DisputedRow({ b, onDetail }) {
-  return (
-    <>
-      <div className="space-y-2">
-        <StatusPill status="DISPUTED" />
-        <div className="rounded-lg bg-orange-50 px-3 py-2 text-xs text-slate-700">Your refund request is with our admin team. They will check the lesson record and decide on the refund.</div>
-      </div>
-      <div><Btn onClick={() => onDetail(b)}>View Details <Icon name="arrow-right" className="h-4 w-4" /></Btn></div>
-    </>
-  )
-}
-
-function CompletedRow({ b, onDetail, onReview }) {
-  return (
-    <>
-      <div className="space-y-2">
-        <StatusPill status="COMPLETED" />
-        {b.review ? (
-          <div className="rounded-xl bg-brand-25 px-4 py-3"><div className="text-sm font-bold text-navy">Your review</div><Stars value={b.review.rating} size="h-5 w-5" />{b.review.isHidden && <p className="mt-1 text-xs text-slate-600">Hidden from the public profile by an administrator. {b.review.moderationReason}</p>}</div>
-        ) : (
-          <div className="flex items-center gap-3 rounded-xl bg-accent-50 px-4 py-3">
-            <Icon name="star" fill className="h-8 w-8 text-accent" />
-            <div><div className="font-bold text-navy">Not yet reviewed</div><div className="text-xs text-slate-500">Share your experience with this tutor.</div></div>
-          </div>)}
-      </div>
-      <div className="space-y-2">
-        {!b.review && <Btn kind="primary" onClick={() => onReview(b)}>Leave a Review</Btn>}
-        <Btn onClick={() => onDetail(b)}>View Details <Icon name="arrow-right" className="h-4 w-4" /></Btn>
-      </div>
-    </>
-  )
-}
-
-function CancelledRow({ b, onDetail, act }) {
-  return (
-    <>
-      <div className="space-y-2">
-        <StatusPill status={b.status} />
-        {(b.rejectionReason || b.cancelReason) && <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">{b.rejectionReason || b.cancelReason}</div>}
-        {b.payment?.status === 'REFUNDED' && <StatusPill status="REFUNDED" />}
-        {b.status === 'CANCELLED' && <NegotiationForm b={b} act={act} />}
-      </div>
-      <div><Btn onClick={() => onDetail(b)}>View Details <Icon name="arrow-right" className="h-4 w-4" /></Btn></div>
-    </>
-  )
-}
-
-function CancelModal({ booking, onClose, onConfirm }) {
+function CancelModal({ booking, error, onClose, onConfirm }) {
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
   if (!booking) return null
@@ -403,9 +474,10 @@ function CancelModal({ booking, onClose, onConfirm }) {
     <Modal open onClose={onClose} title={paid ? 'Cancel this booking?' : 'Cancel this request?'}
       footer={<>
         <button onClick={onClose} className="btn-outline">Keep it</button>
-        <button disabled={busy} onClick={async () => { setBusy(true); await onConfirm(reason); setBusy(false); setReason('') }} className="btn bg-red-500 text-white hover:bg-red-600">{busy ? 'Cancelling…' : 'Yes, cancel'}</button>
+        <button disabled={busy} onClick={async () => { setBusy(true); const cancelled = await onConfirm(reason); setBusy(false); if (cancelled) setReason('') }} className="btn bg-red-500 text-white hover:bg-red-600">{busy ? 'Cancelling…' : 'Yes, cancel'}</button>
       </>}>
       <p className="text-sm text-slate-600">{booking.subject} with {booking.tutor.name} on {fmtDateLong(booking.startAt)}, {fmtTimeRange(booking.startAt, booking.endAt)}.</p>
+      <ErrorBox className="mt-3">{error}</ErrorBox>
       {paid && <div className="mt-3 flex gap-2 rounded-lg bg-accent-50 p-3 text-sm text-amber-800"><Icon name="info" className="h-4 w-4 shrink-0" /> Because you already paid, your refund request will be reviewed by our Admin team.</div>}
       <label className="mt-3 block text-sm font-semibold text-navy">Reason (optional)
         <textarea rows={3} maxLength={200} className="input mt-1 resize-none" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Schedule changed" /></label>

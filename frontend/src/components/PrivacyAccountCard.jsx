@@ -135,7 +135,7 @@ function DeleteAccountModal({ email, onClose, onDeleted }) {
         <div className="space-y-3 text-sm text-slate-700">
           <p>Before you can delete your account, please finish:</p>
           <ul className="list-disc space-y-1.5 pl-5">
-            {blockers.bookings > 0 && <li><b>{blockers.bookings}</b> booking{blockers.bookings === 1 ? '' : 's'} still in progress. Cancel or finish {blockers.bookings === 1 ? 'it' : 'them'} in <Link to="/parent/bookings" onClick={onClose} className="font-semibold text-brand-600 hover:underline">My Bookings</Link>.</li>}
+            {blockers.bookings > 0 && <li><b>{blockers.bookings}</b> booking{blockers.bookings === 1 ? '' : 's'} still in progress. Cancel or finish {blockers.bookings === 1 ? 'it' : 'them'} in <Link to="/parent/bookings?tab=all" onClick={onClose} className="font-semibold text-brand-600 hover:underline">My Bookings</Link>.</li>}
             {blockers.refunds > 0 && <li><b>{blockers.refunds}</b> refund request{blockers.refunds === 1 ? '' : 's'} waiting for our team. See <Link to="/parent/payments" onClick={onClose} className="font-semibold text-brand-600 hover:underline">Payments</Link>.</li>}
             {blockers.complaints > 0 && <li><b>{blockers.complaints}</b> open complaint{blockers.complaints === 1 ? '' : 's'}. See <Link to="/parent/complaints" onClick={onClose} className="font-semibold text-brand-600 hover:underline">Complaints</Link>.</li>}
           </ul>

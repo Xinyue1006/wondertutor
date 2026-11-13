@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { vi } from 'vitest'
 import BookingRequests from '../pages/tutor/BookingRequests'
@@ -8,7 +8,7 @@ import api from '../api/client'
 vi.mock('../api/client', () => ({ default: { get: vi.fn(), post: vi.fn() }, errorMessage: e => e.message }))
 const startAt = new Date(Date.now() + 7 * 86400000).toISOString()
 const b = { id: 14, subject: 'Mathematics', teachingMode: 'ONLINE', status: 'AWAITING_PAYMENT', startAt,
-  endAt: new Date(Date.parse(startAt) + 3600000).toISOString(), updatedAt: startAt, payBy: startAt, parentName: 'Example Parent',
+  endAt: new Date(Date.parse(startAt) + 3600000).toISOString(), createdAt: new Date(Date.parse(startAt) - 86400000).toISOString(), updatedAt: startAt, payBy: startAt, parentName: 'Example Parent',
   child: { name: 'Example Student', grade: 4, educationLevel: 'PRIMARY' }, tutor: { id: 3, name: 'Example Tutor', rating: 5, reviewCount: 1 },
   proposedPrice: 40, agreedPrice: 40, totalAmount: 40 }
 beforeEach(() => {
@@ -29,8 +29,9 @@ test('tutor opens a linked lesson and saves its classroom URL', async () => {
 })
 
 test('parent sees the payment deadline on an accepted booking', async () => {
-  render(<MemoryRouter><MyBookings /></MemoryRouter>)
-  expect(await screen.findByText(/Pay by .*Malaysia time/)).toBeInTheDocument()
+  render(<MemoryRouter initialEntries={['/parent/bookings?tab=pending']}><MyBookings /></MemoryRouter>)
+  fireEvent.click(await screen.findByRole('button', { name: /^View (Lesson )?Details$/ }))
+  expect(await within(screen.getByRole('dialog')).findByText(/Pay by .*Malaysia time/)).toBeInTheDocument()
   expect(screen.queryByRole('link', { name: 'Join online class' })).toBeNull()
 })
 
@@ -67,4 +68,12 @@ test('the tutor opens a confirmed session using its public booking ID', async ()
   api.get.mockResolvedValue({ data: { bookings: [{ ...b, publicId, status: 'CONFIRMED' }] } })
   render(<MemoryRouter initialEntries={['/tutor/bookings?booking=' + publicId]}><BookingRequests /></MemoryRouter>)
   expect(await screen.findByRole('link', { name: 'Open session' })).toHaveAttribute('href', '/tutor/bookings/' + publicId + '/session')
+})
+
+test('a historical physical booking explains its missing exact venue without requesting an impossible confirmation', async () => {
+  api.get.mockResolvedValue({ data: { bookings: [{ ...b, teachingMode: 'PHYSICAL', status: 'COMPLETED', location: 'Old area', locationConfirmedAt: null }] } })
+  render(<MemoryRouter initialEntries={['/tutor/bookings?booking=14']}><BookingRequests /></MemoryRouter>)
+  expect(await screen.findByText(/Existing attendance and reports are kept/)).toBeInTheDocument()
+  expect(screen.queryByText(/ask the parent to confirm/)).not.toBeInTheDocument()
+  expect(screen.queryByRole('link', { name: 'View lesson map' })).not.toBeInTheDocument()
 })

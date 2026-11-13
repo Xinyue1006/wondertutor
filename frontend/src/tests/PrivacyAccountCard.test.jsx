@@ -70,7 +70,7 @@ describe('delete my account', () => {
     expect(await screen.findByText(/booking/, { selector: 'li' })).toHaveTextContent('2 bookings')
     expect(screen.getByText(/refund request/, { selector: 'li' })).toHaveTextContent('1 refund request')
     expect(screen.queryByRole('button', { name: /Delete my account permanently/ })).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'My Bookings' })).toHaveAttribute('href', '/parent/bookings')
+    expect(screen.getByRole('link', { name: 'My Bookings' })).toHaveAttribute('href', '/parent/bookings?tab=all')
   })
 
   test('needs the email typed and the password before the button works, then goes to Log In and logs out', async () => {

@@ -248,7 +248,7 @@ async function listBookings(ctx, args) {
     ctx.cards.push({
       type: 'booking_list',
       title: when === 'upcoming' ? 'Upcoming lessons' : 'Lessons',
-      link: '/parent/bookings',
+      link: '/parent/bookings?tab=all',
       bookings: rows.map((b, i) => ({
         ref: items[i].bookingRef, childName: b.child.name, tutorName: b.tutor.user.fullName, subject: b.subject, status: b.status,
         date: items[i].date, time: items[i].time, mode: b.teachingMode, hourlyPrice: items[i].hourlyPrice, link: `/parent/bookings?booking=${publicReference(b)}`,
@@ -490,7 +490,7 @@ export const TOOLS = {
     run: listNotifications,
   },
   search_faq: {
-    description: 'Approved WonderTutor policy answers (refunds, trial lessons, deadlines, how matching works). The only allowed source for policies.',
+    description: 'Approved WonderTutor help and policy answers: finding bookings, overdue or missed lessons, attendance, payments/refunds, deadlines, and how matching works. The only allowed source for policies.',
     parameters: S('OBJECT', { properties: { question: S('STRING') }, required: ['question'] }),
     run: faqTool,
   },

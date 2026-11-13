@@ -12,6 +12,7 @@ const child = { id: 803, parentId: parent.id, publicId: '0cc408ef-6770-49b8-8fae
 const privatePhoto = 'https://private.invalid/PRIVATE_ATTENDANCE_PHOTO'
 const privateSignature = 'PRIVATE_UPLOAD_RECEIPT_SIGNATURE'
 const privateLatitude = 3.123456789, privateLongitude = 101.987654321
+const privateLessonAddress = '12 PRIVATE LESSON STREET, Kuala Lumpur'
 const recorded = {
   checkInAt: mytToDate('2026-11-10', '17:02'), checkOutAt: mytToDate('2026-11-10', '18:03'),
   checkInLat: privateLatitude, checkInLng: privateLongitude, checkInDistance: 12.3456789,
@@ -41,7 +42,7 @@ function context(booking = baseBooking) {
 const lookup = ctx => executeTool(ctx, 'get_lesson_details', { bookingRef: 'booking_1' })
 function expectPrivateEvidenceAbsent(value) {
   const json = JSON.stringify(value)
-  for (const privateValue of [privatePhoto, privateSignature, String(privateLatitude), String(privateLongitude), 'checkInLat', 'checkOutLat', 'checkInDistance', 'checkInPhotoUrl', 'signature'])
+  for (const privateValue of [privatePhoto, privateSignature, privateLessonAddress, String(privateLatitude), String(privateLongitude), 'checkInLat', 'checkOutLat', 'checkInDistance', 'checkInPhotoUrl', 'signature'])
     expect(json).not.toContain(privateValue)
 }
 
@@ -83,12 +84,15 @@ test('an existing online tracking record with no check-in is recorded as false, 
   expect(composeFromEvidence(ctx, 'en')).toContain('No check-in is recorded for this lesson.')
 })
 
-test('physical attendance shares its recorded times without exposing the private GPS/photo receipt', async () => {
-  const ctx = context({ ...baseBooking, teachingMode: 'PHYSICAL' })
+test('physical attendance shares its times without exposing the exact lesson venue or private GPS/photo receipt', async () => {
+  const ctx = context({ ...baseBooking, teachingMode: 'PHYSICAL', location: privateLessonAddress,
+    latitude: privateLatitude, longitude: privateLongitude, locationConfirmedAt: new Date() })
   const out = await lookup(ctx)
   expect(out.result.attendance).toEqual({ recorded: true, checkInTime: '17:02', checkOutTime: '18:03' })
   expect(cardSchema.safeParse(ctx.cards[0]).success).toBe(true)
   expectPrivateEvidenceAbsent({ providerResult: out.result, cards: ctx.cards, evidence: ctx.evidence })
+  const list = await executeTool(ctx, 'list_bookings', { when: 'past' })
+  expectPrivateEvidenceAbsent({ providerResult: list.result, cards: ctx.cards, evidence: ctx.evidence, answer: composeFromEvidence(ctx, 'en') })
 })
 
 test('unknown and unavailable booking references reveal no attendance', async () => {

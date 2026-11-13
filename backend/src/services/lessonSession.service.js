@@ -7,11 +7,12 @@ import { publicReference } from '../utils/publicIds.js'
 import { distanceKm } from './matching.service.js'
 import { mediaLink, privateAsset } from './privateMedia.js'
 import { getSettings } from './systemSettings.service.js'
+import { hasConfirmedLessonLocation, lessonLocationFields } from './lessonLocation.service.js'
 
 async function booking(db, tutorId, id) {
   const result = await db.booking.findFirst({ where: { id, tutorId }, select: {
     id: true, publicId: true, status: true, subject: true, startAt: true, endAt: true, teachingMode: true,
-    latitude: true, longitude: true, location: true, child: { select: { name: true } },
+    latitude: true, longitude: true, location: true, locationConfirmedAt: true, updatedAt: true, child: { select: { name: true } },
     parent: { select: { userId: true } }, attendance: true, summary: true,
   } })
   if (!result) throw new AppError(404, 'Lesson not found')
@@ -23,7 +24,7 @@ export async function sessionView(tutorId, id) {
   if (!['CONFIRMED', 'COMPLETED', 'DISPUTED'].includes(b.status)) throw new AppError(409, 'This lesson is not confirmed.')
   const a = b.attendance
   return { id, publicId: b.publicId, subject: b.subject, student: b.child.name, status: b.status, startAt: b.startAt, endAt: b.endAt,
-    mode: b.teachingMode, address: b.location, latitude: b.latitude, longitude: b.longitude,
+    mode: b.teachingMode, address: b.location, updatedAt: b.updatedAt, ...lessonLocationFields(b),
     radius: settings.GPS_RADIUS_METRES, serverTime: new Date(),
     attendance: a && { checkInAt: a.checkInAt, checkOutAt: a.checkOutAt, distance: a.checkInDistance,
       photo: mediaLink(a.checkInPhotoUrl, 'wondertutor/attendance/' + id) },
@@ -46,6 +47,7 @@ async function checkIn(db, b, input, now) {
   if (now < b.startAt || now >= b.endAt) throw new AppError(409, 'Check in during the scheduled lesson.')
   let evidence = {}
   if (b.teachingMode === 'PHYSICAL') {
+    if (!hasConfirmedLessonLocation(b)) throw new AppError(409, 'The parent must confirm the exact lesson address and map pin in My Bookings before GPS check-in.')
     if (!input.coords || !input.photo) throw new AppError(400, 'Your location and a check-in photo are required.')
     const { lat, lng } = input.coords
     const km = distanceKm(lat, lng, b.latitude, b.longitude)

@@ -2,6 +2,7 @@
 // use the downloaded .ics file instead, see lib/download.js.)
 
 import { recordRef } from './recordRef'
+import { hasConfirmedLessonLocation } from './lessonLocation'
 
 const stamp = (d) => new Date(d).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
 
@@ -9,7 +10,7 @@ export const lessonTitle = (b) => `${b.child.name}: ${b.subject} with ${b.tutor.
 
 export function lessonLocation(b) {
   if (b.teachingMode === 'ONLINE') return b.meetingLink || 'Online lesson'
-  return b.location || 'Location agreed with the tutor'
+  return hasConfirmedLessonLocation(b) ? b.location : 'Lesson venue awaiting parent confirmation'
 }
 
 export function googleCalendarUrl(b) {
@@ -31,4 +32,4 @@ export function googleCalendarUrl(b) {
 }
 
 // Only a lesson that is really going ahead, and has not started, is worth adding
-export const canAddToCalendar = (b) => b.status === 'CONFIRMED' && new Date(b.startAt).getTime() > Date.now()
+export const canAddToCalendar = (b, now = Date.now()) => b.status === 'CONFIRMED' && new Date(b.startAt).getTime() > now

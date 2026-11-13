@@ -2,6 +2,8 @@
 
 Schema snapshot: 12 November 2026, including review moderation, random public references and database-backed browser sessions. Source of truth: `backend/prisma/schema.prisma` and its migrations. This document describes the **declared schema**, not proof that every environment has applied its migrations. No production database was queried by this workstream. Yan Hsi's weekly-availability branch is not included in this snapshot.
 
+13 November follow-up: the code now includes Yan Hsi's later integrations; the diagrams below remain the dated 12 November snapshot, not a regenerated complete ERD. The precise-location change adds one nullable scalar, `Booking.locationConfirmedAt DateTime?`, with no new table or relation. `Booking.location/latitude/longitude` now store a parent-confirmed per-booking physical venue. Null confirmation means legacy coordinates must not be used as a check-in destination. The migration deliberately does not backfill this timestamp. ParentProfile area coordinates retain their separate approximate matching purpose. See the latest follow-up in [review handover](REVIEW_HANDOVER_2026-11-12.md) for application rules.
+
 View the exported diagrams: [full ERD](diagrams/current-erd.svg), [domain classes](diagrams/current-domain-classes.svg), and [application layers](diagrams/current-application-layers.svg). SVGs can be zoomed without losing text clarity; the Mermaid sources below remain editable.
 
 ## What the ERD currently looks like

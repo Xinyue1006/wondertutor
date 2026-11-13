@@ -4,6 +4,7 @@ import { publicReference } from '../utils/publicIds.js'
 import { assertSlotBookable, assertChildFree } from './booking.service.js'
 import { newPayBy, assertCanAccept } from './paymentWindow.js'
 import { notify, notifyWithEmail } from './notification.service.js'
+import { lessonLocationFields } from './lessonLocation.service.js'
 
 const include = {
   parent: { select: { userId: true, user: { select: { id: true, fullName: true, email: true, createdAt: true } },
@@ -27,6 +28,7 @@ export function tutorBooking(b) {
     startAt: b.startAt, endAt: b.endAt, status: b.status, teachingMode: b.teachingMode,
     proposedPrice: Number(b.proposedPrice), counterPrice: b.counterPrice, agreedPrice: b.agreedPrice,
     messageToTutor: b.messageToTutor, location: b.location, meetingLink: b.meetingLink,
+    ...lessonLocationFields(b),
     rejectionReason: b.rejectionReason, cancelReason: b.cancelReason, payBy: b.payBy, updatedAt: b.updatedAt,
     reschedule: r && { id: r.id, status: r.status, startAt: r.newStartAt, reason: r.reason, mine: r.requestedById === b.tutor.userId },
   }

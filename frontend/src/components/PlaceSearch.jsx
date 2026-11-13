@@ -161,7 +161,7 @@ export default function PlaceSearch({
         <p id={`${id}-hint`} className="mt-1 text-xs text-slate-600">
           {value && !known
             ? <span className="text-amber-800">We cannot place “{value}” on the map, so tutors will not be ranked by how close they are. Pick a town or postcode from the list for that.</span>
-            : hint || 'Type a town or your postcode. We use it to show how far tutors are from you, and we do not keep your street address.'}
+            : hint || 'Choose a town or postcode for tutor matching. Confirm the full lesson address separately when booking a physical lesson.'}
         </p>
       )}
       <span className="sr-only" role="status" aria-live="polite">{open && !loading && !failed ? `${results.length} place${results.length === 1 ? '' : 's'} found` : ''}</span>

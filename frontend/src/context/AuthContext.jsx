@@ -10,6 +10,9 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [sessionError, setSessionError] = useState('')
+  // An explicit logout starts the next account at its dashboard. A forced
+  // reauthentication may resume a page only for the account that was using it.
+  const [sessionEnd, setSessionEnd] = useState(null)
   const userRef = useRef(null)
   const request = useRef(0)
   // Why the user was sent back to Log In (expired session, deactivated account); shown once on the login page
@@ -24,6 +27,7 @@ export function AuthProvider({ children }) {
       const message = err?.response?.data?.message || ''
       const ended = status === 401 || (status === 403 && /deactivated/i.test(message))
       if (userRef.current && ended && isCurrentSessionRequest(err.config) && err.config?.url !== '/auth/me' && !AUTH_CALL.test(err.config?.url || '')) {
+        setSessionEnd({ reason: 'expired', userId: userRef.current.id })
         clearCsrfToken()
         userRef.current = null
         setUser(null)
@@ -50,6 +54,7 @@ export function AuthProvider({ children }) {
     } catch (err) {
       if (current !== request.current) return
       if (err.response?.status === 401 || (err.response?.status === 403 && /deactivated/i.test(err.response.data?.message || ''))) {
+        if (userRef.current) setSessionEnd({ reason: 'expired', userId: userRef.current.id })
         userRef.current = null
         setUser(null)
         clearCsrfToken()
@@ -72,6 +77,7 @@ export function AuthProvider({ children }) {
     userRef.current = user
     setUser(user)
     setSessionError('')
+    setSessionEnd(null)
     setLoading(false)
     if (csrfToken) setCsrfToken(csrfToken)
   }
@@ -94,6 +100,7 @@ export function AuthProvider({ children }) {
   async function logout(message) {
     await api.post('/auth/logout')
     ++request.current
+    setSessionEnd({ reason: 'logout', userId: userRef.current?.id })
     userRef.current = null
     setUser(null)
     setSessionError('')
@@ -102,7 +109,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, setUser, loading, sessionError, refreshSession, login, googleLogin, logout, saveSession, notice }}>
+    <AuthContext.Provider value={{ user, setUser, loading, sessionError, sessionEnd, refreshSession, login, googleLogin, logout, saveSession, notice }}>
       {children}
     </AuthContext.Provider>
   )

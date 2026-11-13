@@ -52,7 +52,7 @@ function GuestOnly({ children }) {
   const { user, loading } = useAuth()
   const { state } = useLocation()
   if (loading) return null
-  return user ? <Navigate to={afterLogin(user, state?.from)} replace /> : children
+  return user ? <Navigate to={afterLogin(user, state?.from, state?.fromUserId)} replace state={null} /> : children
 }
 
 export default function App() {

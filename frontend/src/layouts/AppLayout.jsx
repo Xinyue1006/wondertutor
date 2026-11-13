@@ -144,7 +144,7 @@ function UserMenu() {
   )
 }
 
-function LogoutButton({ className, icon = false }) {
+export function LogoutButton({ className, icon = false }) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [busy, setBusy] = useState(false)
@@ -156,7 +156,7 @@ function LogoutButton({ className, icon = false }) {
     setError('')
     try {
       await logout()
-      navigate(destination)
+      navigate(destination, { replace: true, state: null })
     } catch (err) {
       setError(`We couldn't log you out. ${errorMessage(err)}`)
     } finally { setBusy(false) }

@@ -10,19 +10,20 @@ import { canAddToCalendar, googleCalendarUrl } from '../lib/calendar'
 import { downloadFile } from '../lib/download'
 import { recordRef } from '../lib/recordRef'
 import LessonNotes from './LessonNotes'
+import { canEditLessonLocation, hasConfirmedLessonLocation, lessonLocationMapUrl } from '../lib/lessonLocation'
 
 function Row({ icon, label, children }) {
   return (
-    <div className="flex items-start gap-3 py-2 text-sm">
+    <div className="grid min-w-0 grid-cols-[1rem_minmax(0,1fr)] items-start gap-x-3 gap-y-1 py-2 text-sm sm:grid-cols-[1rem_7rem_minmax(0,1fr)]">
       <Icon name={icon} className="mt-0.5 h-4 w-4 shrink-0 text-brand-500" />
-      <span className="w-28 shrink-0 text-slate-500">{label}</span>
-      <span className="flex-1 font-medium text-navy">{children}</span>
+      <span className="text-slate-500">{label}</span>
+      <span className="col-start-2 min-w-0 break-words font-medium text-navy sm:col-start-3">{children}</span>
     </div>
   )
 }
 
 // Read-only "View Lesson Details" popup shared by the dashboard and My Bookings
-export default function LessonDetails({ booking: b, onClose, footer, onChanged }) {
+export default function LessonDetails({ booking: b, onClose, footer, onChanged, onLocation, actions, actionsDisabled = false, now = Date.now() }) {
   const [asking, setAsking] = useState(false)
   const [reason, setReason] = useState('')
   const [dispute, setDispute] = useState(false)
@@ -34,13 +35,14 @@ export default function LessonDetails({ booking: b, onClose, footer, onChanged }
   // Parent-initiated refunds are reviewed by Admin (never automatic)
   const refunds = b.payment?.refunds || []
   // Only once the lesson has started or finished; before that, Cancel is the way to get the money back
-  const started = new Date(b.startAt).getTime() <= Date.now()
+  const started = new Date(b.startAt).getTime() <= now
   const canAsk = b.payment?.status === 'PAID' && (b.status === 'COMPLETED' || (b.status === 'CONFIRMED' && started)) && !refunds.some((r) => ['PENDING', 'APPROVED'].includes(r.status))
   // The meeting link is typed by the tutor, so only a normal web address is made clickable
   const safeLink = /^https?:\/\//i.test(b.meetingLink || '')
   const REFUND_LABEL = { PENDING: 'Pending Admin review', APPROVED: 'Approved', REJECTED: 'Not approved' }
 
   async function sendRefund() {
+    if (actionsDisabled || busy) return
     setError('')
     // Admin needs a real explanation to decide a refund, so a one-word reason is not enough
     if (reason.trim().length < 10) return setError('Please explain why you are asking for a refund (at least 10 characters).')
@@ -60,13 +62,13 @@ export default function LessonDetails({ booking: b, onClose, footer, onChanged }
   const online = b.teachingMode === 'ONLINE'
   return (
     <Modal open onClose={onClose} title={`${b.subject}${b.isTrial ? ' (Trial Lesson)' : ''}`} width="max-w-xl" footer={footer}>
-      <div className="mb-3 flex items-center gap-3 rounded-xl bg-brand-25 p-3">
-        <Avatar src={b.tutor.photoUrl} name={b.tutor.name} className="h-14 w-14" rounded="rounded-xl" />
+      <div className="mb-3 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 rounded-xl bg-brand-25 p-3 sm:flex">
+        <Avatar src={b.tutor.photoUrl} name={b.tutor.name} className="h-12 w-12 shrink-0 sm:h-14 sm:w-14" rounded="rounded-xl" />
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 font-bold text-navy">{b.tutor.name} {b.tutor.verified && <VerifiedTick />}</div>
+          <div className="flex flex-wrap items-center gap-1.5 break-words font-bold text-navy">{b.tutor.name} {b.tutor.verified && <VerifiedTick />}</div>
           <div className="flex items-center gap-1 text-xs text-slate-500"><Icon name="star" fill className="h-3.5 w-3.5 text-accent" /> {b.tutor.rating.toFixed(1)} ({b.tutor.reviewCount} reviews)</div>
         </div>
-        <StatusPill status={b.status} />
+        <div className="col-start-2 sm:ml-auto"><StatusPill status={b.status} /></div>
       </div>
 
       <div className="divide-y divide-slate-100">
@@ -74,7 +76,16 @@ export default function LessonDetails({ booking: b, onClose, footer, onChanged }
         <Row icon="clock" label="Time">{fmtTimeRange(b.startAt, b.endAt)}</Row>
         <Row icon="user" label="Child">{b.child.name} ({gradeLabel(b.child.educationLevel, b.child.grade)})</Row>
         <Row icon={online ? 'monitor' : 'home'} label="Teaching mode">{online ? 'Online' : 'Physical'}</Row>
-        {!online && b.location && <Row icon="pin" label="Location">{b.location}</Row>}
+        {!online && <Row icon="pin" label="Lesson address">
+          {hasConfirmedLessonLocation(b) ? <>
+            <span className="block">{b.location}</span>
+            <a href={lessonLocationMapUrl(b)} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center text-brand-600 hover:underline">View lesson map</a>
+          </> : <span className="block text-amber-900">Exact address not confirmed. The previous area is not a GPS attendance point.</span>}
+          {canEditLessonLocation(b, now) && (onLocation
+            ? <button type="button" disabled={actionsDisabled} className="btn-outline mt-2 min-h-11 w-full px-2 text-sm" onClick={() => { if (!actionsDisabled) onLocation(b) }}>{b.locationConfirmedAt ? 'Edit lesson address' : 'Confirm lesson address'}</button>
+            : !actionsDisabled && <Link to={`/parent/bookings?booking=${recordRef(b)}`} onClick={onClose} className="inline-flex min-h-11 items-center text-brand-600 hover:underline">Confirm or review address in My Bookings</Link>)}
+          {hasConfirmedLessonLocation(b) && !canEditLessonLocation(b, now) && <p className="mt-1 text-xs font-normal text-slate-500">The accepted lesson address is fixed. Attendance uses this saved entrance pin.</p>}
+        </Row>}
         {online && b.meetingLink && (
           <Row icon="globe" label="Meeting link">{safeLink ? <a href={b.meetingLink} target="_blank" rel="noopener noreferrer" className="break-all text-brand-600 hover:underline">{b.meetingLink}</a> : <span className="break-all">{b.meetingLink}</span>}</Row>
         )}
@@ -136,13 +147,13 @@ export default function LessonDetails({ booking: b, onClose, footer, onChanged }
             </label>
           )}
           <p className="text-xs text-slate-500">Our team reviews every request and will let you know the outcome.</p>
-          <div className="flex gap-2"><button disabled={busy} onClick={sendRefund} className="btn-primary px-4 py-1.5">{busy ? 'Sending…' : 'Send Request'}</button><button onClick={() => setAsking(false)} className="btn-outline px-4 py-1.5">Cancel</button></div>
+          <div className="flex gap-2"><button disabled={busy || actionsDisabled} onClick={sendRefund} className="btn-primary px-4 py-1.5">{busy ? 'Sending…' : 'Send Request'}</button><button onClick={() => setAsking(false)} className="btn-outline px-4 py-1.5">Cancel</button></div>
         </div>
       ) : (
-        <button onClick={() => setAsking(true)} className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-500 hover:underline"><Icon name="refresh" className="h-3.5 w-3.5" /> Request a refund</button>
+        <button disabled={busy || actionsDisabled} onClick={() => { if (!actionsDisabled) setAsking(true) }} className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-500 hover:underline"><Icon name="refresh" className="h-3.5 w-3.5" /> Request a refund</button>
       ))}
       {/* A confirmed lesson that has not started can go straight into the parent's own calendar */}
-      {canAddToCalendar(b) && (
+      {canAddToCalendar(b, now) && (
         <div className="mt-3 rounded-xl border border-brand-100 p-3">
           <div className="flex items-center gap-2 text-sm font-bold text-navy"><Icon name="calendar" className="h-4 w-4 text-brand-500" /> Add to your calendar</div>
           <div className="mt-2 flex flex-wrap gap-2">
@@ -155,12 +166,13 @@ export default function LessonDetails({ booking: b, onClose, footer, onChanged }
         </div>
       )}
       <div className="mt-3 text-xs text-slate-500">Requested on {fmtShortDate(b.createdAt)}</div>
+      {actions && <div className="mt-4 min-w-0 border-t border-slate-100 pt-4">{actions}</div>}
       {['CONFIRMED', 'COMPLETED', 'CANCELLED'].includes(b.status) && (
         <Link to={`/parent/complaints?booking=${recordRef(b)}`} className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-red-500">
           <Icon name="shield" className="h-3.5 w-3.5" /> Report a problem with this lesson
         </Link>
       )}
-      {b.status === 'AWAITING_PAYMENT' && (
+      {b.status === 'AWAITING_PAYMENT' && !actions && !actionsDisabled && (
         <Link to="/parent/payments" className="btn-primary mt-3 w-full">Pay Now <Icon name="arrow-right" className="h-4 w-4" /></Link>
       )}
     </Modal>

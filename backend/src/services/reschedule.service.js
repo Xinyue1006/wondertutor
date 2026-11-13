@@ -44,8 +44,10 @@ export async function requestReschedule({ booking, byUserId, date, startTime, re
     await tx.$queryRaw`SELECT id FROM Booking WHERE id = ${booking.id} FOR UPDATE`
     const current = await tx.booking.findUnique({ where: { id: booking.id } })
     if (!current || current.status !== booking.status || current.startAt.getTime() !== booking.startAt.getTime() || current.startAt <= new Date()) throw stale()
-    const pending = await tx.rescheduleRequest.findFirst({ where: { bookingId: booking.id, status: 'PENDING' } })
-    if (pending) throw new AppError(409, 'There is already a reschedule request waiting for an answer')
+    const open = await tx.rescheduleRequest.findFirst({ where: { bookingId: booking.id, status: { in: ['PENDING', 'ESCALATED'] } } })
+    if (open) throw new AppError(409, open.status === 'ESCALATED'
+      ? 'An administrator is reviewing the existing time change. Wait for their decision before requesting another change.'
+      : 'There is already a reschedule request waiting for an answer')
     await assertNewTimeOk(booking, startAt, endAt, tx)
     return tx.rescheduleRequest.create({
       data: { bookingId: booking.id, requestedById: byUserId, newStartAt: startAt, newEndAt: endAt, reason: reason || null },

@@ -66,6 +66,9 @@ export async function exportMyData(req, res) {
       endAt: b.endAt,
       teachingMode: b.teachingMode,
       location: b.location,
+      latitude: b.latitude,
+      longitude: b.longitude,
+      locationConfirmedAt: b.locationConfirmedAt,
       messageToTutor: b.messageToTutor,
       proposedPrice: num(b.proposedPrice),
       agreedPrice: num(b.agreedPrice),
@@ -139,7 +142,7 @@ export async function deleteMyAccount(req, res) {
   const parentId = req.parent.id
   await prisma.$transaction([
     // The address copied onto each booking, and the free-text the parent wrote to tutors
-    prisma.booking.updateMany({ where: { parentId }, data: { location: null, latitude: null, longitude: null, messageToTutor: null } }),
+    prisma.booking.updateMany({ where: { parentId }, data: { location: null, latitude: null, longitude: null, locationConfirmedAt: null, messageToTutor: null } }),
     prisma.review.updateMany({ where: { parentId }, data: { photoUrl: null } }),
     prisma.child.updateMany({ where: { parentId }, data: { name: 'Child', notes: null, goals: null, preferredLanguage: null, photoUrl: null } }),
     prisma.favouriteTutor.deleteMany({ where: { parentId } }),

@@ -768,7 +768,8 @@ describe('one availability rule for parents: date change, then week, then usual 
   const hoursOn = async (parentToken, tutor, date) =>
     (await api(parentToken).get(`/parent/tutors/${tutor.id}/slots?from=${date}`)).days[0].slots.map((c) => `${c.start} ${c.mode}`)
   const request = (tutor, child, date, startTime, teachingMode) =>
-    ({ tutorId: tutor.id, childId: child.id, teachingMode, proposedPrice: 45, slots: [{ date, startTime }] })
+    ({ tutorId: tutor.id, childId: child.id, teachingMode, proposedPrice: 45, slots: [{ date, startTime }],
+      ...(teachingMode === 'PHYSICAL' ? { lessonLocation: { address: '12 Jalan Test, Kuala Lumpur', latitude: 3.2, longitude: 101.6, confirmed: true } } : {}) })
   const search = (token, query) => api(token).get(`/parent/tutors?subject=Mathematics&level=PRIMARY&${query}`)
   const found = (res, tutor) => res.tutors.some((t) => t.id === tutor.id)
 

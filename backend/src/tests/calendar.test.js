@@ -1,7 +1,7 @@
 // "Add to calendar": the .ics file must be valid, escape what people typed, stay inside the 75-byte line rule and
 // only ever contain the logged-in parent's own confirmed lessons.
 import { prisma } from '../config/prisma.js'
-import { buildCalendar, icsEscape, icsFold, icsTime } from '../services/calendar.service.js'
+import { buildCalendar, icsEscape, icsFold, icsTime, lessonLocation } from '../services/calendar.service.js'
 import { authHeaders, MONDAY, api, apiBase, makeBooking, makeParent, makeTutor, nextDate, resetDb, startServer, stopServer } from './helpers.js'
 
 beforeAll(async () => {
@@ -11,6 +11,12 @@ beforeAll(async () => {
 afterAll(stopServer)
 
 describe('calendar file format', () => {
+  test('physical destinations require an explicit confirmed point rather than a legacy area', () => {
+    const legacy = { teachingMode: 'PHYSICAL', location: 'Kepong, Kuala Lumpur', latitude: 3.2, longitude: 101.6, locationConfirmedAt: null }
+    expect(lessonLocation(legacy)).toBe('Lesson venue awaiting parent confirmation')
+    expect(lessonLocation({ ...legacy, locationConfirmedAt: new Date() })).toBe(legacy.location)
+    expect(lessonLocation({ ...legacy, locationConfirmedAt: new Date(), latitude: null })).toBe('Lesson venue awaiting parent confirmation')
+  })
   test('times are written in UTC', () => {
     expect(icsTime('2026-10-22T10:00:00.000+08:00')).toBe('20261022T020000Z')
   })
@@ -30,7 +36,7 @@ describe('calendar file format', () => {
   test('a calendar has the required parts and one event per lesson', () => {
     const b = (id, mode) => ({
       id, startAt: new Date('2026-10-22T02:00:00Z'), endAt: new Date('2026-10-22T03:00:00Z'), updatedAt: new Date('2026-10-20T00:00:00Z'),
-      subject: 'Mathematics', isTrial: false, teachingMode: mode, location: 'Kepong, Kuala Lumpur', meetingLink: 'https://meet.example.com/abc',
+      subject: 'Mathematics', isTrial: false, teachingMode: mode, location: 'Kepong, Kuala Lumpur', latitude: 3.2, longitude: 101.6, locationConfirmedAt: new Date('2026-10-20T00:00:00Z'), meetingLink: 'https://meet.example.com/abc',
       child: { name: 'Sarah, Jr' }, tutor: { user: { fullName: 'Ms. Tan' } },
     })
     const ics = buildCalendar([b(1, 'PHYSICAL'), b(2, 'ONLINE')], { baseUrl: 'https://wondertutor.example' })

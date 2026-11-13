@@ -29,7 +29,7 @@ function proof(id) {
 }
 
 test('physical check-in rechecks the saved radius, photo receipt, and lesson ownership', async () => {
-  const { b, path, send } = await lesson({ teachingMode: 'PHYSICAL', latitude: 3, longitude: 101 })
+  const { b, path, send } = await lesson({ teachingMode: 'PHYSICAL', location: '12 Jalan Test, Kuala Lumpur', latitude: 3, longitude: 101, locationConfirmedAt: new Date() })
   const coords = { lat: 3.001, lng: 101 }
   const payload = { action: 'check-in', coords, photo: proof(b.id) }
   expect((await api(p.token).get(path)).status).toBe(403)

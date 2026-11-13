@@ -6,6 +6,7 @@ import TutorPageHeader from '../../components/TutorPageHeader'
 import { ErrorBox, LoadError, SectionCard, Spinner } from '../../components/ui/Common'
 import { fmtDate, fmtTime, fmtTimeRange } from '../../lib/format'
 import { matchesRecordRef, recordRef } from '../../lib/recordRef'
+import { hasConfirmedLessonLocation, lessonLocationMapUrl } from '../../lib/lessonLocation'
 
 function readLocation() {
   return new Promise((resolve, reject) => {
@@ -44,16 +45,26 @@ function SessionForm({ session: s, setSession }) {
     return () => { clearInterval(timer); window.removeEventListener('focus', tick) }
   }, [s.serverTime])
   const physical = s.mode === 'PHYSICAL'
+  const locationReady = !physical || hasConfirmedLessonLocation(s)
   const active = s.status === 'CONFIRMED' && !needsRefresh
   const ended = now >= Date.parse(s.endAt)
   const started = now >= Date.parse(s.startAt)
   const attendance = s.attendance
-  const distance = distanceFrom(point, s)
+  const awaitingVenue = physical && !locationReady && s.status === 'CONFIRMED' && !ended && !attendance?.checkInAt
+  const distance = locationReady ? distanceFrom(point, s) : null
   const within = distance != null && distance <= s.radius
-  const entry = active && started && !ended && !attendance?.checkInAt
+  const entry = active && locationReady && started && !ended && !attendance?.checkInAt
   const exit = active && ended && attendance?.checkInAt && !attendance.checkOutAt
   const reportReady = active && attendance?.checkOutAt && !s.report
   const path = '/tutor/bookings/' + recordRef(s) + '/session'
+
+  function updateSession(data) {
+    if (data.latitude !== s.latitude || data.longitude !== s.longitude || data.locationConfirmedAt !== s.locationConfirmedAt) {
+      setPoint(null)
+      setPhoto(null)
+    }
+    setSession(data)
+  }
 
   async function run(task) {
     setBusy(true)
@@ -72,10 +83,11 @@ function SessionForm({ session: s, setSession }) {
   }
   async function send(fields) {
     const { data } = await api.post(path, fields)
-    setSession(data)
+    updateSession(data)
   }
   async function checkIn() {
     if (!physical) return send({ action: 'check-in' })
+    if (!locationReady) throw new Error('The parent must confirm the full lesson address and entrance pin before check-in.')
     // Reacquire GPS at submission in case the tutor moved after the distance check.
     const fresh = await locate()
     await send({ action: 'check-in', coords: { lat: fresh.lat, lng: fresh.lng }, photo })
@@ -88,11 +100,16 @@ function SessionForm({ session: s, setSession }) {
   }
   return <div className="min-w-0 space-y-4">
     <Link to={'/tutor/bookings?booking=' + recordRef(s)} className="btn-outline min-h-11">Back to my bookings</Link>
-    <TutorPageHeader title={s.subject + ' · ' + s.student} subtitle={fmtDate(s.startAt) + ' · ' + fmtTimeRange(s.startAt, s.endAt) + ' (Malaysia time) · ' + (physical ? s.address || 'Physical lesson' : 'Online lesson')} />
+    <TutorPageHeader title={s.subject + ' · ' + s.student} subtitle={fmtDate(s.startAt) + ' · ' + fmtTimeRange(s.startAt, s.endAt) + ' (Malaysia time) · ' + (physical ? locationReady ? s.address : awaitingVenue ? 'Physical lesson · exact address awaiting confirmation' : 'Physical lesson · exact address not recorded' : 'Online lesson')} />
+    {physical && (locationReady
+      ? <div className="min-w-0 rounded-xl bg-brand-25 p-3"><p className="break-words font-semibold text-navy">Lesson address: {s.address}</p><a href={lessonLocationMapUrl(s)} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center font-semibold text-brand-600 hover:underline">View lesson map</a></div>
+      : <p role={awaitingVenue ? 'alert' : 'status'} className="rounded-xl bg-amber-50 p-3 text-amber-900">{awaitingVenue
+        ? 'The precise lesson address has not been confirmed. Ask the parent to confirm the full address and entrance pin in My Bookings, then refresh this session. An area centre cannot be used for GPS check-in.'
+        : 'The exact lesson address was not recorded for this lesson. Existing attendance and session reports are kept. The old area centre is not a confirmed GPS attendance point.'}</p>)}
     {error && <div role="alert"><ErrorBox>{error}</ErrorBox></div>}
-    {needsRefresh && <button className="btn-outline min-h-11" disabled={busy} onClick={() => run(async () => {
+    {(needsRefresh || awaitingVenue) && <button className="btn-outline min-h-11" disabled={busy} onClick={() => run(async () => {
       const { data } = await api.get(path)
-      setSession(data)
+      updateSession(data)
       setNeedsRefresh(false)
     })}>Refresh session</button>}
     <div className="grid min-w-0 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
@@ -101,12 +118,13 @@ function SessionForm({ session: s, setSession }) {
           {attendance?.checkInAt ? <p>Checked in at {fmtTime(attendance.checkInAt)}.</p> : <div className="space-y-3">
             {physical ? <>
               <p>Check in within <b>{s.radius} metres</b> of the lesson address and add a photo for the attendance record.</p>
-              {s.latitude == null || s.longitude == null ? <p role="alert">This lesson address has no saved coordinates. Contact admin.</p> :
-                <button disabled={!entry || busy} className="btn-outline min-h-11" onClick={() => run(async () => {
-                  const [{ data }] = await Promise.all([api.get(path), locate()])
-                  setSession(data)
-                })}>{point ? 'Refresh my location' : 'Check my location'}</button>}
-              {point && <p role="status">{within ? 'Within range' : 'Outside the check-in area'} · {Math.round(distance)} m from the address · GPS accuracy ±{Math.round(point.accuracy)} m</p>}
+              <button disabled={!entry || busy} className="btn-outline min-h-11" onClick={() => run(async () => {
+                  const { data } = await api.get(path)
+                  updateSession(data)
+                  if (!hasConfirmedLessonLocation(data)) throw new Error('The parent must confirm the exact lesson address before you can check your location.')
+                  await locate()
+                })}>{point ? 'Refresh my location' : 'Check my location'}</button>
+              {point && distance != null && <p role="status">{within ? 'Within range' : 'Outside the check-in area'} · {Math.round(distance)} m from the address · GPS accuracy ±{Math.round(point.accuracy)} m</p>}
               <label className="block font-semibold">Check-in photo
                 <input className="input mt-1 min-h-11 w-full min-w-0 text-base" type="file" accept="image/jpeg,image/png" capture="environment" disabled={!entry || busy}
                   onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; run(() => takePhoto(file)) }} />

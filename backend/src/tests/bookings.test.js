@@ -73,8 +73,10 @@ describe('creating a booking request', () => {
 
   test('physical lessons need a tutor who offers them', async () => {
     const onlineOnly = await makeTutor({ physical: false })
-    const res = await api(parentA.token).post('/parent/bookings', request({ tutorId: onlineOnly.tutor.id, teachingMode: 'PHYSICAL', date: monday, startTime: '18:00' }))
+    const res = await api(parentA.token).post('/parent/bookings', request({ tutorId: onlineOnly.tutor.id, teachingMode: 'PHYSICAL', date: monday, startTime: '18:00',
+      lessonLocation: { address: '12 Jalan Test, Kuala Lumpur', latitude: 3.2, longitude: 101.6, confirmed: true } }))
     expect(res.status).toBe(400)
+    expect(res.message).toMatch(/does not offer physical/)
   })
 
   test('price must be positive', async () => {

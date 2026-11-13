@@ -21,7 +21,7 @@ export async function moderateReview(req, res) {
     const agg = await tx.review.aggregate({ where: { tutorId: current.tutorId, isHidden: false }, _avg: { rating: true }, _count: { _all: true } })
     await tx.tutorProfile.update({ where: { id: current.tutorId }, data: { ratingAvg: agg._avg.rating ?? 0, ratingCount: agg._count._all } })
     // This retains the action/reason for the author; the original review is never deleted or rewritten.
-    await tx.notification.create({ data: { userId: current.parent.userId, type: 'REVIEW_MODERATED', title: data.isHidden ? 'Your review was hidden' : 'Your review was restored', message: `${data.isHidden ? 'An administrator hid your review from the public tutor profile' : 'An administrator restored your review to the public tutor profile'}. Reason: ${data.reason}`, link: '/parent/bookings' } })
+    await tx.notification.create({ data: { userId: current.parent.userId, type: 'REVIEW_MODERATED', title: data.isHidden ? 'Your review was hidden' : 'Your review was restored', message: `${data.isHidden ? 'An administrator hid your review from the public tutor profile' : 'An administrator restored your review to the public tutor profile'}. Reason: ${data.reason}`, link: '/parent/bookings?tab=completed' } })
     return updated
   })
   res.json({ review: { id: review.id, isHidden: review.isHidden, moderationReason: review.moderationReason, moderatedAt: review.moderatedAt } })

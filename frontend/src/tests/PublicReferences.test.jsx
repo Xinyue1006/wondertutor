@@ -12,7 +12,7 @@ import { matchesRecordRef, recordRef, referenceInput } from '../lib/recordRef'
 vi.mock('../api/client', () => ({ default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn() }, errorMessage: e => e.message }))
 vi.mock('../assistant/MatchingContext', () => ({ useMatching: () => ({ catalog: { subjects: ['Mathematics'], subjectLevels: { Mathematics: ['PRIMARY'] } }, refreshChildren: async () => {}, applyChild: () => {} }) }))
 vi.mock('../components/PhotoPicker', () => ({ default: () => null, pickImage: vi.fn() }))
-vi.mock('../components/LessonDetails', () => ({ default: ({ booking }) => booking ? <div data-testid="lesson-details">{booking.publicId || booking.id}</div> : null }))
+vi.mock('../components/LessonDetails', () => ({ default: ({ booking, footer, children, actions }) => booking ? <div data-testid="lesson-details">{booking.publicId || booking.id}{footer}{children}{actions}</div> : null }))
 vi.mock('../components/ComplaintsReport', () => ({ default: () => null }))
 vi.mock('../components/WarnUser', () => ({ default: () => null }))
 

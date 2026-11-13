@@ -59,6 +59,11 @@ export default function ParentDashboard() {
         </div>
       </div>
 
+      {counts.needsAttention > 0 && <div role="status" className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+        <p className="min-w-0 flex-1 text-sm"><b>{counts.needsAttention} {counts.needsAttention === 1 ? 'lesson needs' : 'lessons need'} attention.</b> The lesson time has passed and the tutor has not completed the record. Check the details or report a problem.</p>
+        <Link to="/parent/bookings?tab=attention" className="btn-outline min-h-11 w-full px-4 sm:w-auto">Review lessons</Link>
+      </div>}
+
       <div className="grid gap-6 lg:grid-cols-[1.12fr_1fr]">
         {/* ───── left column ───── */}
         <div className="space-y-6">
@@ -106,7 +111,7 @@ export default function ParentDashboard() {
             </div>
           </SectionCard>
 
-          <SectionCard title="Recent Activity" action={<Link to="/parent/bookings" className="flex items-center gap-1 text-sm font-semibold text-brand-500 hover:underline">View All Activity <Icon name="arrow-right" className="h-4 w-4" /></Link>}>
+          <SectionCard title="Recent Activity" action={<Link to="/parent/bookings?tab=all" className="flex items-center gap-1 text-sm font-semibold text-brand-500 hover:underline">View All Activity <Icon name="arrow-right" className="h-4 w-4" /></Link>}>
             {activity.length === 0 && <p className="py-4 text-sm text-slate-500">Nothing yet. Your bookings and payments will show up here.</p>}
             <ul className="divide-y divide-slate-100">
               {activity.map((a) => {
@@ -136,7 +141,7 @@ export default function ParentDashboard() {
 
         {/* ───── right column ───── */}
         <div className="space-y-6">
-          <SectionCard title="Booking Summary" action={<Link to="/parent/bookings" className="flex items-center gap-1 text-sm font-semibold text-brand-500 hover:underline">View All Bookings <Icon name="arrow-right" className="h-4 w-4" /></Link>}>
+          <SectionCard title="Booking Summary" action={<Link to="/parent/bookings?tab=all" className="flex items-center gap-1 text-sm font-semibold text-brand-500 hover:underline">View All Bookings <Icon name="arrow-right" className="h-4 w-4" /></Link>}>
             <div className="grid gap-3 sm:grid-cols-3">
               {[
                 ['calendar', counts.upcoming, 'Upcoming', 'bg-brand-50', 'bg-brand-100 text-brand-500', 'upcoming'],
@@ -152,7 +157,7 @@ export default function ParentDashboard() {
             </div>
           </SectionCard>
 
-          <SectionCard title="Upcoming Lessons" action={<Link to="/parent/bookings" className="flex items-center gap-1 text-sm font-semibold text-brand-500 hover:underline">View All Bookings <Icon name="arrow-right" className="h-4 w-4" /></Link>}>
+          <SectionCard title="Upcoming Lessons" action={<Link to="/parent/bookings?tab=all" className="flex items-center gap-1 text-sm font-semibold text-brand-500 hover:underline">View All Bookings <Icon name="arrow-right" className="h-4 w-4" /></Link>}>
             {upcoming.length === 0 && <p className="py-4 text-sm text-slate-500">No upcoming lessons yet. Find a tutor and send a booking request.</p>}
             <div className="space-y-3">
               {upcoming.map((b) => (

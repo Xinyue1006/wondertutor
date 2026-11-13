@@ -54,7 +54,7 @@ export default function Login({ admin = false }) {
     setError('')
     try {
       const user = await googleLogin(newGoogle, role, true)
-      navigate(afterLogin(user, state?.from))
+      navigate(afterLogin(user, state?.from, state?.fromUserId), { replace: true, state: null })
     } catch (err) {
       // Google's credential is short-lived; if it has expired the person simply clicks the Google button again
       setNewGoogle(null)
@@ -104,7 +104,7 @@ export default function Login({ admin = false }) {
     setBusy(true)
     try {
       const user = await login(form.email, form.password, form.remember, captcha, ...(admin ? ['ADMIN'] : []))
-      navigate(afterLogin(user, state?.from))
+      navigate(afterLogin(user, state?.from, state?.fromUserId), { replace: true, state: null })
     } catch (err) {
       setError(errorMessage(err))
       // A reCAPTCHA token works once, so a failed attempt needs a fresh tick

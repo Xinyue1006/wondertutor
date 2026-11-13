@@ -43,6 +43,7 @@ test('a subject-specific past lesson query retains owner, child, dates, order an
   }))
   expect(result.result.filter).toEqual({ when: 'past', status: 'COMPLETED', subject: 'Mathematics', from: '2026-11-02', to: '2026-11-08', timezone: 'Asia/Kuala_Lumpur' })
   expect(result.result.bookings[0].subject).toBe('Mathematics')
+  expect(ctx.cards[0].link).toBe('/parent/bookings?tab=all')
   expect(ctx.cards[0].bookings[0].link).toContain(row.publicId)
   expect(ctx.evidence[0].items[0].subject).toBe('Mathematics')
 })

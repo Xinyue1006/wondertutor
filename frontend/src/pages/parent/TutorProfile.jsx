@@ -8,6 +8,7 @@ import { ErrorBox, Modal, ModePills, SelectBox, Spinner, Stars, VerifiedTick } f
 import { dateLabel, dayMonth, fmtShortDate, hhmmLabel, weekdayName } from '../../lib/format'
 import { gradeLabel } from '../../lib/education'
 import { bookingMode } from '../../lib/availability'
+import { childSubjects } from '../../lib/subjects'
 import { checkRinggit } from '../../lib/validation'
 import { matchesRecordRef, recordRef } from '../../lib/recordRef'
 
@@ -309,7 +310,7 @@ function ReportReview({ review, onClose, onDone }) {
 }
 
 // Right-hand "Book a Lesson" panel. "Continue Booking" carries the choices to the full booking page.
-function BookingPanel({ tutor, kids }) {
+export function BookingPanel({ tutor, kids }) {
   const navigate = useNavigate()
   const availableDays = useMemo(() => tutor.upcomingAvailability.filter((d) => d.slots.some((s) => s.status === 'available')), [tutor])
   const [date, setDate] = useState(availableDays[0]?.date || '')
@@ -339,7 +340,7 @@ function BookingPanel({ tutor, kids }) {
     if (badPrice) return setError(badPrice)
     if (lesson.conflict) return setError('Some of these hours are online only and some physical only. Send them as separate requests.')
     const lessons = selectedSlots.length ? selectedSlots : [current]
-    navigate(`/parent/tutors/${tutor.id}/book`, { state: { date: lessons[0].date, time: lessons[0].start, slots: lessons, childId: child ? recordRef(child) : childId, mode: lesson.mode, price, msg } })
+    navigate(`/parent/tutors/${tutor.id}/book`, { state: { date: lessons[0].date, time: lessons[0].start, slots: lessons, childId: child ? recordRef(child) : childId, subject: childSubjects(child).find(s => tutor.subjects.includes(s)) || tutor.subjects[0], mode: lesson.mode, price, msg } })
   }
 
   return (
@@ -371,7 +372,7 @@ function BookingPanel({ tutor, kids }) {
               <button type="button" className="btn-outline min-h-10 px-2" aria-label={'Remove ' + s.date + ' ' + s.start} onClick={() => setSelectedSlots(current => current.filter(x => x.date !== s.date || x.start !== s.start))}>Remove</button>
             </div>)}
           </div>}
-          <Link to={`/parent/tutors/${tutor.id}/book`} state={{ slots: selectedSlots, date: selectedSlots[0]?.date || date, time: selectedSlots[0]?.start || time, childId: child ? recordRef(child) : childId, mode: lesson.mode, price, msg }} className="inline-flex min-h-10 items-center text-sm font-semibold text-brand-500 hover:underline">Choose other dates on the full calendar →</Link>
+          <Link to={`/parent/tutors/${tutor.id}/book`} state={{ slots: selectedSlots, date: selectedSlots[0]?.date || date, time: selectedSlots[0]?.start || time, childId: child ? recordRef(child) : childId, subject: childSubjects(child).find(s => tutor.subjects.includes(s)) || tutor.subjects[0], mode: lesson.mode, price, msg }} className="inline-flex min-h-10 items-center text-sm font-semibold text-brand-500 hover:underline">Choose other dates on the full calendar →</Link>
           <label className="block"><span className="mb-1 block text-sm font-bold text-navy">Child <span className="text-red-500">*</span></span>
             {kids.length === 0 ? (
               <Link to="/parent/children?add=1" className="btn-outline w-full"><Icon name="plus" className="h-4 w-4" /> Add a child first</Link>
@@ -399,6 +400,7 @@ function BookingPanel({ tutor, kids }) {
           <label className="block"><span className="mb-1 block text-sm font-bold text-navy">Message to Tutor <span className="font-normal text-slate-500">(Optional)</span></span>
             <textarea rows={3} maxLength={200} className="input resize-none" placeholder="E.g. My child would like to focus on exam preparation. Thank you!" value={msg} onChange={(e) => setMsg(e.target.value)} />
             <span className="block text-right text-xs text-slate-400">{msg.length}/200</span></label>
+          {lesson.mode === 'PHYSICAL' && <p className="rounded-lg bg-brand-50 p-3 text-sm text-navy">Next, confirm the exact lesson address and entrance pin for these lessons.</p>}
           <button onClick={onContinue} disabled={!teachesChild} className="btn-primary h-12 w-full text-base">Continue Booking <Icon name="arrow-right" className="h-4 w-4" /></button>
         </div>
       </section>

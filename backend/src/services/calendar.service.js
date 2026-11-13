@@ -1,6 +1,7 @@
 // "Add to calendar": a confirmed lesson as an iCalendar (.ics) file, which Apple Calendar, Outlook and Google Calendar
 // all open. Written by hand (RFC 5545) because it is a small, fixed format and needs no extra library.
 import { publicReference } from '../utils/publicIds.js'
+import { hasConfirmedLessonLocation } from './lessonLocation.service.js'
 //
 // Everything here is a plain function of its input (no database, no clock unless passed in), so it is easy to test.
 
@@ -38,7 +39,7 @@ function describe(b, bookingUrl) {
     `Child: ${b.child.name}`,
     `Tutor: ${b.tutor.user.fullName}`,
     `Subject: ${b.subject}${b.isTrial ? ' (trial lesson)' : ''}`,
-    b.teachingMode === 'ONLINE' ? 'Online lesson' : 'Lesson at the agreed location',
+    b.teachingMode === 'ONLINE' ? 'Online lesson' : hasConfirmedLessonLocation(b) ? 'Lesson at the confirmed venue' : 'Exact lesson venue awaiting parent confirmation in My Bookings',
   ]
   if (b.teachingMode === 'ONLINE' && b.meetingLink) lines.push(`Meeting link: ${b.meetingLink}`)
   lines.push(`Booking details: ${bookingUrl}`)
@@ -48,7 +49,7 @@ function describe(b, bookingUrl) {
 // Where the lesson is: the meeting link for online lessons, otherwise the agreed address
 export function lessonLocation(b) {
   if (b.teachingMode === 'ONLINE') return b.meetingLink || 'Online lesson'
-  return b.location || 'Location agreed with the tutor'
+  return hasConfirmedLessonLocation(b) ? b.location : 'Lesson venue awaiting parent confirmation'
 }
 
 export function eventLines(b, { baseUrl }) {

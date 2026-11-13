@@ -8,7 +8,7 @@ import { uploadImage } from '../components/PhotoPicker'
 vi.mock('../api/client', () => ({ default: { get: vi.fn(), post: vi.fn() }, errorMessage: e => e.message }))
 vi.mock('../components/PhotoPicker', () => ({ uploadImage: vi.fn(), uploadError: e => e.message }))
 const time = '2026-11-13T06:00:00.000Z'
-const data = { id: 3, mode: 'PHYSICAL', radius: 150, latitude: 3, longitude: 101, address: 'Lesson address',
+const data = { id: 3, mode: 'PHYSICAL', radius: 150, latitude: 3, longitude: 101, address: 'Lesson address', locationConfirmedAt: time,
   student: 'Example student', subject: 'Mathematics', status: 'CONFIRMED', serverTime: time,
   startAt: '2026-11-13T05:45:00Z', endAt: '2026-11-13T06:45:00Z' }
 function show(session, reference = String(session.id)) {
@@ -84,4 +84,51 @@ test('an online check-in conflict can refresh the current attendance without rep
   expect(await screen.findByText(/Checked in at/)).toBeInTheDocument()
   expect(api.post).toHaveBeenCalledTimes(1)
   expect(api.post).toHaveBeenCalledWith('/tutor/bookings/3/session', { action: 'check-in' })
+})
+
+test('a legacy area point cannot collect GPS or photos; refreshing uses the newly confirmed entrance', async () => {
+  const publicId = '37847bb9-aea5-435a-9417-fdd59e952ddd'
+  const legacy = { ...data, publicId, locationConfirmedAt: null, locationNeedsConfirmation: true }
+  const exact = { ...data, publicId, latitude: 3.02, address: '17 Jalan Demo, 52000 Kuala Lumpur' }
+  const read = vi.fn().mockImplementationOnce(ok => ok({ coords: { latitude: 3, longitude: 101, accuracy: 10 } }))
+    .mockImplementation(ok => ok({ coords: { latitude: 3.02, longitude: 101, accuracy: 10 } }))
+  vi.stubGlobal('navigator', Object.assign(Object.create(navigator), { geolocation: { getCurrentPosition: read } }))
+  show(legacy, publicId)
+  expect(await screen.findByText(/An area centre cannot be used/)).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Check my location' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Check in', exact: true })).toBeDisabled()
+  expect(screen.getByLabelText('Check-in photo')).toBeDisabled()
+  expect(screen.queryByRole('link', { name: 'View lesson map' })).not.toBeInTheDocument()
+  expect(read).not.toHaveBeenCalled()
+  api.get.mockRejectedValueOnce(new Error('Refresh connection failed.')).mockResolvedValue({ data: exact })
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh session' }))
+  expect(await screen.findByText('Refresh connection failed.')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Check my location' })).toBeDisabled()
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh session' }))
+  expect(await screen.findByText('Lesson address: ' + exact.address)).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'View lesson map' })).toHaveAttribute('href', 'https://www.google.com/maps/search/?api=1&query=3.02%2C101')
+  fireEvent.click(screen.getByRole('button', { name: 'Check my location' }))
+  expect(await screen.findByText(/Outside the check-in area/)).toBeInTheDocument()
+  expect(screen.getByText(/2224 m from the address/)).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh my location' }))
+  expect(await screen.findByText(/Within range · 0 m from the address/)).toBeInTheDocument()
+  expect(api.post).not.toHaveBeenCalled()
+})
+
+test('a legacy check-in keeps its historical record and can check out and report without retroactive venue confirmation', async () => {
+  const legacy = { ...data, locationConfirmedAt: null, locationNeedsConfirmation: true, endAt: '2026-11-13T05:59:00Z', attendance: { checkInAt: data.startAt } }
+  api.post.mockResolvedValue({ data: { ...legacy, attendance: { ...legacy.attendance, checkOutAt: time } } })
+  show(legacy)
+  expect(await screen.findByText(/Existing attendance and session reports are kept/)).toBeInTheDocument()
+  expect(screen.queryByText(/Ask the parent to confirm/)).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Refresh session' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('link', { name: 'View lesson map' })).not.toBeInTheDocument()
+  const checkOut = screen.getByRole('button', { name: 'Check out' })
+  expect(checkOut).toBeEnabled()
+  fireEvent.click(checkOut)
+  await waitFor(() => expect(api.post).toHaveBeenCalledWith('/tutor/bookings/3/session', { action: 'check-out' }))
+  await screen.findByText(/Checked out at/)
+  fireEvent.change(screen.getByLabelText('What was covered'), { target: { value: 'Fractions' } })
+  fireEvent.change(screen.getByLabelText('Student progress'), { target: { value: 'Improved.' } })
+  expect(screen.getByRole('button', { name: 'Submit report and complete session' })).toBeEnabled()
 })

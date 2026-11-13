@@ -368,9 +368,10 @@ model Booking {
   startAt         DateTime
   endAt           DateTime
   teachingMode    TeachingMode  @default(PHYSICAL)
-  location        String?       // physical sessions
+  location        String?       // physical sessions: explicitly confirmed lesson address
   latitude        Float?
   longitude       Float?
+  locationConfirmedAt DateTime? // null for legacy area-centre locations; never inferred from a profile
   meetingLink     String?       // online sessions: tutor pastes Zoom/Meet link
   isTrial         Boolean       @default(false)
   messageToTutor  String?       @db.Text

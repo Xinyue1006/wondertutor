@@ -164,6 +164,29 @@ RELIABILITY WORK BEFORE REAL MONEY
 
 OPERATIONS
 
+PRECISE PHYSICAL LESSON VENUES (13 NOVEMBER 2026)
+
+- Release the frontend and API together. Run the normal reviewed backend
+  npm run db:deploy step; migration 20261113100000_confirmed_lesson_location
+  adds nullable Booking.locationConfirmedAt without marking old area centres
+  as confirmed. Existing data is not reset or seeded by this migration.
+- Physical booking clients must supply lessonLocation with address, latitude,
+  longitude and confirmed:true. Older clients cannot create a physical booking
+  until they refresh and confirm an actual venue. Online bookings are unaffected.
+- Legacy active physical bookings require parent confirmation in My Bookings
+  before tutor GPS check-in. Do not bulk-confirm approximate area coordinates.
+  Retained historic attendance can still check out and submit reports.
+- Parent matching areas remain separate. Exact venues belong to a booking and
+  are visible through authenticated, scoped booking/session pages, never public
+  tutor listings or assistant record tools. Include these fields in protected
+  backups and apply the existing account deletion/privacy procedures.
+- Venue tiles load only when the parent opens the map. Leaflet needs no API key;
+  OpenStreetMap tiles are best-effort third-party infrastructure. If adding a
+  frontend CSP, allow images from https://tile.openstreetmap.org and retain
+  visible attribution and an appropriate browser Referer. Do not proxy/cache
+  bulk tiles or prefetch/offline-download them. Manual coordinates and explicit
+  GPS at the venue remain available without opening the map. GPS needs HTTPS.
+
 - Keep dev, test, staging and production databases/credentials separate. Never run
   seed/reset/evaluation scripts against production. Prefer a completely separate
   database server/account for automated tests, not only a _test suffix.

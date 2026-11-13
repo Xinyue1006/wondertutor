@@ -109,6 +109,20 @@ describe('FAQ', () => {
     const text = FAQ.map((e) => e.answer).join(' ')
     expect(text).not.toMatch(/automatic(ally)? (full )?refund(ed)? (for|when) (every|any|all) (parent )?cancel/i)
   })
+  test('booking navigation FAQ describes the default view and mobile recovery routes', () => {
+    const entry = searchFaq('Where are my pending requests?')[0]
+    expect(entry.id).toBe('faq.my-bookings')
+    expect(entry.answer).toContain('Upcoming by default')
+    expect(entry.answer).toContain('Booking group dropdown')
+    expect(entry.answer).toContain('View Details')
+  })
+  test.each(['What happens if my paid lesson date has passed?', 'needs attention', '老师没来', 'kelas terlepas'])('missed-lesson FAQ stays truthful about unresolved paid lessons: %s', question => {
+    const entry = searchFaq(question)[0]
+    expect(entry.id).toBe('faq.missed-lesson')
+    expect(entry.answer).toContain('does not automatically expire')
+    expect(entry.answer).toContain('administrator-reviewed request')
+    expect(entry.answer).toContain('No automatic missed-lesson refund or grace period has been established')
+  })
 })
 
 describe('per-user message limit', () => {

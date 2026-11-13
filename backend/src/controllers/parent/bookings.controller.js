@@ -13,6 +13,7 @@ import { publicReference, recordReference, referenceWhere } from '../../utils/pu
 
 import { assertCanAccept, newPayBy } from '../../services/paymentWindow.js'
 import { escalateBooking } from '../../services/tutorBooking.service.js'
+import { canEditLessonLocation, hasConfirmedLessonLocation, lessonLocationSchema } from '../../services/lessonLocation.service.js'
 
 export async function negotiate(req, res) {
   const b = await ownBooking(req)
@@ -45,6 +46,7 @@ const createSchema = z.object({
   subject: z.enum(SUBJECTS, { message: 'Choose a subject from the list' }).optional(),
   messageToTutor: z.string().trim().max(200, 'Message must be 200 characters or fewer').optional(),
   isTrial: z.literal(false).optional(),
+  lessonLocation: lessonLocationSchema.optional(),
 })
 
 // Loads a booking only if it belongs to the logged-in parent
@@ -77,6 +79,8 @@ async function lockPaymentAndCountOpenRefunds(tx, paymentId) {
 // POST /parent/bookings: send a booking request (PENDING)
 export async function createBooking(req, res) {
   const data = createSchema.parse(req.body)
+  if (data.teachingMode === 'PHYSICAL' && !data.lessonLocation) throw new AppError(400, 'Confirm the full lesson address and map pin for physical lessons.')
+  if (data.teachingMode === 'ONLINE' && data.lessonLocation) throw new AppError(400, 'Online lessons do not need a physical lesson location.')
   if (data.slots && (data.date || data.startTime)) throw new AppError(400, 'Send slots or a single date and time')
   const slots = data.slots || (data.date && data.startTime ? [{ date: data.date, startTime: data.startTime }] : [])
   if (!slots.length) throw new AppError(400, 'Select at least one slot')
@@ -129,9 +133,10 @@ export async function createBooking(req, res) {
           startAt,
           endAt,
           teachingMode: data.teachingMode,
-          location: data.teachingMode === 'PHYSICAL' ? req.parent.address || tutor.location : null,
-          latitude: data.teachingMode === 'PHYSICAL' ? req.parent.latitude : null,
-          longitude: data.teachingMode === 'PHYSICAL' ? req.parent.longitude : null,
+          location: data.lessonLocation?.address ?? null,
+          latitude: data.lessonLocation?.latitude ?? null,
+          longitude: data.lessonLocation?.longitude ?? null,
+          locationConfirmedAt: data.lessonLocation ? new Date() : null,
           isTrial: false,
           messageToTutor: data.messageToTutor || null,
           proposedPrice: data.proposedPrice,
@@ -152,7 +157,7 @@ export async function createBooking(req, res) {
     type: 'BOOKING_SENT',
     title: `Booking request sent to ${tutor.user.fullName}`,
     message: `${subject} · ${child.educationLevel === 'SECONDARY' ? 'Form' : child.educationLevel === 'PRIMARY' ? 'Primary' : 'Kindergarten'} ${child.grade}`,
-    link: '/parent/bookings',
+    link: '/parent/bookings?tab=pending',
   })
 
   res.status(201).json({ booking: toBookingDto(bookings[0]), bookings: bookings.map(toBookingDto) })
@@ -165,12 +170,53 @@ export async function listBookings(req, res) {
     include: bookingInclude,
     orderBy: { startAt: 'desc' },
   })
-  res.json({ bookings: bookings.map(toBookingDto) })
+  res.json({ bookings: bookings.map(toBookingDto), serverTime: new Date().toISOString() })
 }
 
 // GET /parent/bookings/:id
 export async function getBooking(req, res) {
   res.json({ booking: toBookingDto(await ownBooking(req)) })
+}
+
+// An exact venue is separate from the parent's approximate tutor-matching area.
+// Lock the same booking row as tutor check-in so a stale browser cannot move a
+// lesson after attendance has started or overwrite another location correction.
+export async function updateLessonLocation(req, res) {
+  const data = lessonLocationSchema.extend({ version: z.iso.datetime() }).strict().parse(req.body)
+  const booking = await prisma.$transaction(async tx => {
+    await tx.$queryRaw`SELECT id FROM Booking WHERE id = ${Number(req.params.id)} AND parentId = ${req.parent.id} FOR UPDATE`
+    const b = await tx.booking.findFirst({
+      where: { id: Number(req.params.id), parentId: req.parent.id }, include: bookingInclude,
+    })
+    if (!b) throw new AppError(404, 'Booking not found')
+    if (b.updatedAt.toISOString() !== data.version) throw new AppError(409, 'This booking has changed. Refresh it before confirming the lesson location.')
+    if (!canEditLessonLocation(b)) throw new AppError(409,
+      hasConfirmedLessonLocation(b) && ['AWAITING_PAYMENT', 'CONFIRMED'].includes(b.status)
+        ? 'The accepted lesson location cannot be changed. Contact the tutor and arrange a new booking if the venue must change.'
+        : 'The lesson location cannot be changed for this booking or after check-in.')
+    const changed = !hasConfirmedLessonLocation(b) || b.location !== data.address || b.latitude !== data.latitude || b.longitude !== data.longitude
+    if (!changed) return b
+    const resetOffer = b.status === 'COUNTER_OFFERED'
+    const updated = await tx.booking.update({
+      where: { id: b.id },
+      data: {
+        location: data.address, latitude: data.latitude, longitude: data.longitude,
+        locationConfirmedAt: new Date(),
+        // Guarantee a new version even for corrections made in the same millisecond.
+        updatedAt: new Date(Math.max(Date.now(), b.updatedAt.getTime() + 1)),
+        ...(resetOffer ? { status: 'PENDING', counterPrice: null } : {}),
+      }, include: bookingInclude,
+    })
+    // Committed atomically with the venue; notifications contain no street or GPS data.
+    await tx.notification.create({ data: {
+      userId: b.tutor.userId, type: 'BOOKING_UPDATED', title: 'Lesson location confirmed',
+      message: resetOffer ? 'The parent confirmed the exact lesson location. Please review the booking and price again.'
+        : 'The parent confirmed the exact lesson location. Open the booking to view it.',
+      link: '/tutor/bookings?booking=' + publicReference(b),
+    } })
+    return updated
+  })
+  res.json({ booking: toBookingDto(booking) })
 }
 
 // POST /parent/bookings/:id/accept-counter: parent agrees to the tutor's price, then must pay

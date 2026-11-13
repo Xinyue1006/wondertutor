@@ -50,7 +50,8 @@ describe('download my data', () => {
     const p = await makeParent()
     const other = await makeParent()
     await prisma.child.update({ where: { id: p.child.id }, data: { preferredLanguage: 'Mandarin', goals: 'Improve fractions' } })
-    await makeBooking({ parent: p.parent, child: p.child, tutor: tutor.tutor, date: monday, start: '16:00', status: 'COMPLETED' })
+    const venue = { location: '12 Example Street, Kuala Lumpur 50480', latitude: 3.1823, longitude: 101.6701, locationConfirmedAt: new Date() }
+    await makeBooking({ parent: p.parent, child: p.child, tutor: tutor.tutor, date: monday, start: '16:00', status: 'COMPLETED', extra: venue })
     await makeBooking({ parent: other.parent, child: other.child, tutor: tutor.tutor, date: monday, start: '17:00', status: 'COMPLETED' })
     const res = await fetch(`${apiBase()}/parent/account/export`, { headers: authHeaders(p.token) })
     expect(res.status).toBe(200)
@@ -61,6 +62,7 @@ describe('download my data', () => {
     expect(data.children.map((c) => c.name)).toEqual(['Sarah'])
     expect(data.children[0]).toMatchObject({ preferredLanguage: 'Mandarin', goals: 'Improve fractions' })
     expect(data.bookings).toHaveLength(1)
+    expect(data.bookings[0]).toMatchObject({ ...venue, locationConfirmedAt: venue.locationConfirmedAt.toISOString() })
     expect(text).not.toContain('passwordHash')
     expect(text).not.toContain(other.user.email)
   })
@@ -101,7 +103,7 @@ describe('delete my account', () => {
     const p = await makeParent()
     await prisma.parentProfile.update({ where: { id: p.parent.id }, data: { latitude: 3.2, longitude: 101.6, preferences: { mode: 'ONLINE' } } })
     await prisma.child.update({ where: { id: p.child.id }, data: { notes: 'Struggles with fractions', goals: 'Sensitive family learning goal', preferredLanguage: 'Mandarin', photoUrl: 'https://res.cloudinary.com/demo/x.jpg' } })
-    const b = await makeBooking({ parent: p.parent, child: p.child, tutor: tutor.tutor, date: monday, start: '17:00', status: 'COMPLETED', extra: { location: 'Kepong, Kuala Lumpur', latitude: 3.2, longitude: 101.6, messageToTutor: 'Please call me' } })
+    const b = await makeBooking({ parent: p.parent, child: p.child, tutor: tutor.tutor, date: monday, start: '17:00', status: 'COMPLETED', extra: { location: '12 Example Street, Kepong, Kuala Lumpur', latitude: 3.2, longitude: 101.6, locationConfirmedAt: new Date(), messageToTutor: 'Please call me' } })
     await prisma.payment.create({ data: { bookingId: b.id, amount: 50, commissionRate: 10, commissionAmount: 5, status: 'PAID', paidAt: new Date() } })
     await prisma.notification.create({ data: { userId: p.user.id, type: 'X', title: 'x', message: 'x' } })
     await prisma.favouriteTutor.create({ data: { parentId: p.parent.id, tutorId: tutor.tutor.id } })
@@ -122,7 +124,7 @@ describe('delete my account', () => {
     expect(await prisma.child.findUnique({ where: { id: p.child.id } })).toMatchObject({ name: 'Child', notes: null, goals: null, preferredLanguage: null, photoUrl: null })
 
     // records the centre needs stay
-    expect(await prisma.booking.findUnique({ where: { id: b.id } })).toMatchObject({ status: 'COMPLETED', location: null, latitude: null, messageToTutor: null })
+    expect(await prisma.booking.findUnique({ where: { id: b.id } })).toMatchObject({ status: 'COMPLETED', location: null, latitude: null, longitude: null, locationConfirmedAt: null, messageToTutor: null })
     expect(await prisma.payment.count({ where: { bookingId: b.id } })).toBe(1)
 
     // what only served the person is gone
