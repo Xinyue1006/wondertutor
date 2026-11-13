@@ -23,6 +23,7 @@ export default function AdminDashboard() {
   return (
     <div>
       <PageTitle title="Admin Dashboard" subtitle="Things that need your attention." />
+      <Link to="/admin/reports" className="btn-outline mb-4 min-h-11">View revenue and tutor performance reports</Link>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {tiles.map(([icon, n, label, to, bg, tone]) => (
           <Link key={label} to={to} className={`flex items-center gap-4 rounded-2xl p-5 shadow-card transition hover:shadow-lg ${bg}`}>

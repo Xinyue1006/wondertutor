@@ -241,6 +241,7 @@ model TutorProfile {
   offersOnline          Boolean   @default(false)
   quickAdd              Json?     // the tutor's Quick add buttons on the availability page; null = the built-in ones
   commissionRate        Decimal?  @db.Decimal(5, 2) // per-tutor override; null = use platform base rate
+  rateHistory           TutorRateChange[]
   isVerified            Boolean   @default(false)
   verificationSubmittedAt DateTime? // set when the tutor submits the setup for Admin review; null = still a draft
   ratingAvg             Float     @default(0)
@@ -407,6 +408,21 @@ model RescheduleRequest {
   createdAt     DateTime      @default(now())
 }
 
+model TutorRateChange {
+  id        Int          @id @default(autoincrement())
+  tutorId   Int
+  tutor     TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  kind      String
+  previous  Decimal?     @db.Decimal(10, 2)
+  rate      Decimal      @db.Decimal(10, 2)
+  reason    String
+  changedBy String
+  adminId   Int?
+  createdAt DateTime     @default(now())
+
+  @@index([tutorId, createdAt])
+}
+
 model Payment {
   id               Int           @id @default(autoincrement())
   publicId         String?       @unique @default(uuid()) @db.Char(36)
@@ -435,6 +451,9 @@ model Refund {
   reviewedById Int?
   createdAt    DateTime      @default(now())
   reviewedAt   DateTime?
+  reviewNote   String?
+  issuedAt     DateTime?
+  transferRef  String? @unique
 }
 
 // ───────────── Session verification [YH writes, XY displays] ─────────────

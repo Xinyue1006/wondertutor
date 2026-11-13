@@ -33,6 +33,8 @@ const NAV = {
     ['/admin/users', 'Users'],
     ['/admin/bookings', 'Bookings'],
     ['/admin/finance', 'Finance'],
+    ['/admin/rates', 'Tutor rates'],
+    ['/admin/reports', 'Reports'],
     ['/admin/complaints', 'Complaints'],
     ['/admin/settings', 'Settings'],
   ],

@@ -42,7 +42,8 @@ export async function recomputeVerified(db, tutorId) {
   const isVerified = kinds.has('IDENTITY') && kinds.has('QUALIFICATION')
   if (isVerified) {
     const rate = await baseCommission(db)
-    await db.tutorProfile.updateMany({ where: { id: tutorId, isVerified: false, commissionRate: null }, data: { commissionRate: rate } })
+    const assigned = await db.tutorProfile.updateMany({ where: { id: tutorId, isVerified: false, commissionRate: null }, data: { commissionRate: rate } })
+    if (assigned.count) await db.tutorRateChange.create({ data: { tutorId, kind: 'COMMISSION', rate, reason: 'Base commission assigned on verification', changedBy: 'System' } })
   }
   await db.tutorProfile.update({ where: { id: tutorId }, data: { isVerified } })
   return isVerified

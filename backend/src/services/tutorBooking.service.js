@@ -9,7 +9,7 @@ const include = {
   parent: { select: { userId: true, user: { select: { id: true, fullName: true, email: true, createdAt: true } },
     _count: { select: { bookings: { where: { status: 'COMPLETED' } } } } } },
   tutor: { select: { userId: true } },
-  child: { select: { name: true, grade: true, educationLevel: true } },
+  child: { select: { id: true, name: true, grade: true, educationLevel: true } },
   reschedules: { orderBy: { createdAt: 'desc' }, take: 1 },
 }
 
@@ -54,7 +54,7 @@ export async function escalateBooking(tx, b, userId, reason) {
   if (await tx.complaint.findFirst({ where })) throw new AppError(409, 'Admin is already reviewing this issue.')
   await tx.complaint.create({ data: { bookingId: b.id, filedById: userId, category, description: reason } })
   const admins = await tx.user.findMany({ where: { role: 'ADMIN', status: 'ACTIVE' }, select: { id: true } })
-  if (admins.length) await tx.notification.createMany({ data: admins.map(a => ({ userId: a.id, type: 'BOOKING_ESCALATED', title: category + ' needs review', message: reason, link: '/admin/complaints' })) })
+  if (admins.length) await tx.notification.createMany({ data: admins.map(a => ({ userId: a.id, type: 'BOOKING_ESCALATED', title: category + ' needs review', message: reason, link: '/admin/bookings' })) })
 }
 
 export async function tutorAction(tutorId, id, input) {
