@@ -107,6 +107,7 @@ export default function App() {
           <Route path="setup" element={<ProfileSetup />} />
           {/* Verification now lives on My Profile; notifications already sent still link to this address */}
           <Route path="verification" element={<Navigate to="/tutor/setup" replace />} />
+          <Route path="profile" element={<ProfilePreview ownProfile />} />
           <Route path="preview" element={<ProfilePreview />} />
         </Route>
       </Route>

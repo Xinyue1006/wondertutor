@@ -2,13 +2,14 @@ import { privateAsset, unsignedReference } from '../../services/privateMedia.js'
 import { z } from 'zod'
 import { prisma } from '../../config/prisma.js'
 import { AppError } from '../../utils/AppError.js'
-import { CHARACTERISTICS, LANGUAGES, LOCATIONS, MAX_GRADE, SUBJECTS, SUBJECT_LEVELS } from '../../data/catalog.js'
+import { tutorHomeAreas } from '../../services/places.service.js'
+import { CHARACTERISTICS, LANGUAGES, MAX_GRADE, SUBJECTS, SUBJECT_LEVELS, isSubjectAtLevel } from '../../data/catalog.js'
 import { cloudinaryUrl, hourlyRate, optionalText, personName, phoneMY, yearsExperience } from '../../utils/validators.js'
 import * as setup from '../../services/tutorSetup.service.js'
 
 // GET /tutor/catalog: option lists for the setup wizard
 export function catalog(req, res) {
-  res.json({ subjects: SUBJECTS, subjectLevels: SUBJECT_LEVELS, locations: LOCATIONS.map((l) => l.name), characteristics: CHARACTERISTICS, languages: LANGUAGES, maxGrade: MAX_GRADE })
+  res.json({ subjects: SUBJECTS, subjectLevels: SUBJECT_LEVELS, locations: tutorHomeAreas, characteristics: CHARACTERISTICS, languages: LANGUAGES, maxGrade: MAX_GRADE })
 }
 
 // GET /tutor/profile: the setup draft, its verification status and what is still missing before submit
@@ -23,6 +24,7 @@ const subjectRow = z
     minGrade: z.number().int().min(1),
     maxGrade: z.number().int().min(1),
   })
+  .refine((s) => isSubjectAtLevel(s.subject, s.educationLevel), { message: 'Choose a subject offered at this education level', path: ['subject'] })
   .refine((s) => s.minGrade <= s.maxGrade, { message: 'The first grade must not be after the last grade', path: ['maxGrade'] })
   .refine((s) => s.maxGrade <= MAX_GRADE[s.educationLevel], { message: 'That grade does not exist for the chosen level', path: ['maxGrade'] })
 

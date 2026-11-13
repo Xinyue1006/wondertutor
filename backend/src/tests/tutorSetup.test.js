@@ -125,6 +125,9 @@ describe('profile setup', () => {
   test('rejects bad input: unknown area, own number as emergency contact, impossible grade, outside file links', async () => {
     const { token } = await signUpTutor()
     expect((await api(token).put('/tutor/profile', { location: 'Atlantis' })).status).toBe(400)
+    const physics = { subject: 'Physics', educationLevel: 'PRIMARY', minGrade: 1, maxGrade: 3 }
+    expect((await api(token).put('/tutor/profile', { subjects: [physics] })).status).toBe(400)
+    expect((await api(token).put('/tutor/profile', { subjects: [{ ...physics, educationLevel: 'SECONDARY' }] })).status).toBe(200)
     expect((await api(token).put('/tutor/profile', { emergencyContactPhone: '0123456789' })).status).toBe(400)
     const grade = await api(token).put('/tutor/profile', { subjects: [{ subject: 'Mathematics', educationLevel: 'SECONDARY', minGrade: 1, maxGrade: 6 }] })
     expect(grade.status).toBe(400)

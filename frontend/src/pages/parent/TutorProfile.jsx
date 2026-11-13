@@ -130,7 +130,7 @@ export default function TutorProfile() {
                   {tutor.qualifications.length === 0 && <div className="text-sm text-slate-500">Not provided yet</div>}
                   {tutor.qualifications.map((q) => (
                     <div key={q.id} className="mb-1 text-sm text-slate-600">
-                      {q.title}{q.status === 'PENDING' && <span className="ml-1 text-xs text-amber-700">(awaiting verification)</span>}<br />{q.institution}{q.year && <><br />Graduated: {q.year}</>}
+                      {q.title}{q.status === 'APPROVED' && <span className="ml-2 inline-block rounded-full bg-ok-50 px-2 py-1 text-xs font-semibold text-green-800">Verified qualification</span>}{q.status === 'PENDING' && <span className="ml-1 text-xs text-amber-700">(awaiting verification)</span>}<br />{q.institution}{q.year && <><br />Graduated: {q.year}</>}
                     </div>
                   ))}
                 </div>

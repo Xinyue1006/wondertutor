@@ -67,7 +67,7 @@ export function toTutorProfile(t, extra = {}) {
       grades.push(r.level === 'SECONDARY' ? `Form ${g}` : r.level === 'KINDERGARTEN' ? `Kindergarten ${g}` : `Primary ${g}`)
   // Approved qualifications first; ones still waiting for Admin are shown with their status. Rejected ones never are.
   const order = { APPROVED: 0, PENDING: 1 }
-  const quals = t.qualifications.filter((q) => q.status !== 'REJECTED').sort((a, b) => order[a.status] - order[b.status]).map((q) => ({
+  const quals = t.qualifications.filter((q) => q.kind === 'QUALIFICATION' && q.status !== 'REJECTED').sort((a, b) => order[a.status] - order[b.status]).map((q) => ({
     id: q.id, title: q.title, institution: q.institution, year: q.year, status: q.status,
   }))
   const startYear = new Date().getFullYear() - t.yearsExperience

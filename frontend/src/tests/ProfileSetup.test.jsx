@@ -86,6 +86,14 @@ describe('tutor profile setup', () => {
 })
 
 describe('verification on My Profile', () => {
+  test('a tutor can skip qualifications and finish without submitting for verification', async () => {
+    setup({ ...COMPLETE, documents: [] })
+    await userEvent.click(await screen.findByRole('button', { name: /Qualifications/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Skip for now' }))
+    await userEvent.click(screen.getByRole('button', { name: /Review and submit/ }))
+    expect(screen.getByRole('button', { name: 'Done' })).toBeEnabled()
+    expect(api.post).not.toHaveBeenCalled()
+  })
   test('a new tutor sees that nothing has been submitted', async () => {
     setup(NEW_TUTOR)
     expect(await screen.findByRole('heading', { name: 'Verification' })).toBeInTheDocument()

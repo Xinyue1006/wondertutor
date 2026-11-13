@@ -6,7 +6,7 @@ import { baseCommission } from './systemSettings.service.js'
 // the tutor gets the verified badge and is listed before unverified tutors in search and matching.
 import { prisma } from '../config/prisma.js'
 import { AppError } from '../utils/AppError.js'
-import { findLocation } from '../data/catalog.js'
+import { resolvePlace } from './places.service.js'
 import { notify } from './notification.service.js'
 import { isOwnUpload } from '../utils/validators.js'
 
@@ -116,7 +116,7 @@ export const loadSetup = (tutorId) => prisma.tutorProfile.findUnique({ where: { 
 // Partial save: only the fields sent are changed, so each wizard step can save a draft on its own
 export async function saveProfile(tutor, data) {
   const { fullName, phone, profilePhotoUrl, subjects, location, ...profile } = data
-  const area = location === undefined ? undefined : location ? findLocation(location) : null
+  const area = location === undefined ? undefined : location ? resolvePlace(location) : null
   if (location && !area) throw new AppError(400, 'Choose your home area from the list')
 
   await prisma.$transaction(async (tx) => {

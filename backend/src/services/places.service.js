@@ -72,6 +72,8 @@ for (const t of towns.values()) {
   })
 }
 
+export const tutorHomeAreas = entries.map(place => place.label).sort((a, b) => a.localeCompare(b))
+
 // 3. Postcodes: the most exact choice, at the postcode's own coordinates
 const postcodes = []
 for (const [postcode, city, state, lat, lng] of data.places) {

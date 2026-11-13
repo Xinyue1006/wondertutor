@@ -1,3 +1,4 @@
+import { subjectsForLevel } from '../../lib/subjects'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import api, { errorMessage } from '../../api/client'
@@ -110,7 +111,8 @@ function AccountProfileSetup() {
   const submitted = profile.status !== 'NOT_SUBMITTED'
   const idx = SETUP_STEPS.findIndex((s) => s.id === step)
   const done = (id) => id !== 'review' && !checkStep(id, form, profile)
-  const progress = Math.round((SETUP_STEPS.filter((s) => done(s.id)).length / (SETUP_STEPS.length - 1)) * 100)
+  const profileSteps = SETUP_STEPS.filter(s => s.id !== 'documents' && s.id !== 'review')
+  const progress = Math.round(100 * profileSteps.filter(s => done(s.id)).length / profileSteps.length)
   const update = (patch) => setForm((f) => ({ ...f, ...patch }))
 
   async function save(id = step) {
@@ -124,7 +126,7 @@ function AccountProfileSetup() {
 
   async function saveAndContinue(e) {
     e.preventDefault()
-    const problem = checkStep(step, form, profile)
+    const problem = step !== 'documents' && checkStep(step, form, profile)
     if (problem) return setError(problem)
     setError('')
     setBusy(true)
@@ -146,7 +148,7 @@ function AccountProfileSetup() {
     setBusy(true)
     try {
       if (!checkStep(step, form, profile)) await save()
-      navigate('/tutor')
+      navigate('/tutor/profile')
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -207,7 +209,7 @@ function AccountProfileSetup() {
                   <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs ${done(s.id) ? 'bg-ok text-white' : step === s.id ? 'bg-brand-500 text-white' : 'bg-slate-100 text-slate-600'}`}>
                     {done(s.id) ? <Icon name="check" className="h-3.5 w-3.5" strokeWidth={3} /> : i + 1}
                   </span>
-                  {s.label}
+                  {s.label}{s.id === 'documents' && ' (optional)'}
                   {done(s.id) && <span className="sr-only">(complete)</span>}
                 </button>
               </li>
@@ -223,6 +225,7 @@ function AccountProfileSetup() {
 
           {step === 'basic' && <BasicStep form={form} update={update} profile={profile} catalog={catalog} />}
           {step === 'teaching' && <TeachingStep form={form} update={update} catalog={catalog} />}
+          {step === 'documents' && <p className="mb-4 text-sm text-slate-600">Qualifications are optional. You can add them later to request a verified badge.</p>}
           {step === 'documents' && <DocumentsStep profile={profile} setProfile={setProfile} onStatus={(s) => updateUser({ tutorStatus: s })} />}
           {step === 'photo' && <PhotoStep profile={profile} setProfile={setProfile} name={form.fullName} />}
           {step === 'review' && <ReviewStep profile={profile} submitted={submitted} confirmed={confirmed} setConfirmed={setConfirmed} goTo={goTo} />}
@@ -232,9 +235,9 @@ function AccountProfileSetup() {
             <button type="button" disabled={idx === 0 || busy} onClick={() => goTo(SETUP_STEPS[idx - 1].id)} className="btn-outline min-h-11 px-5">Back</button>
             <span className="text-xs text-slate-500" aria-live="polite">{savedAt ? 'Draft saved just now' : ''}</span>
             {step !== 'review' ? (
-              <button disabled={busy} className="btn-primary ml-auto min-h-11 px-6">{busy ? 'Saving…' : 'Save and continue'}</button>
-            ) : submitted ? (
-              <button type="button" onClick={() => navigate('/tutor')} className="btn-primary ml-auto min-h-11 px-6">Done</button>
+              <button disabled={busy} className="btn-primary ml-auto min-h-11 px-6">{busy ? 'Saving…' : step === 'documents' && !profile.documents.length ? 'Skip for now' : 'Save and continue'}</button>
+            ) : submitted || !profile.documents.length ? (
+              <button type="button" onClick={() => navigate('/tutor/profile')} className="btn-primary ml-auto min-h-11 px-6">Done</button>
             ) : (
               <button type="button" onClick={submit} disabled={busy || !confirmed} className="btn-primary ml-auto min-h-11 px-6">
                 {busy ? 'Submitting…' : 'Submit for verification'}
@@ -315,20 +318,25 @@ function TeachingStep({ form, update, catalog }) {
         <legend className="mb-2 text-sm font-semibold text-navy">Subjects you teach <span className="text-red-600" aria-hidden="true">*</span></legend>
         <div className="space-y-3">
           {form.subjects.map((s, i) => {
+            const allowed = subjectsForLevel(catalog.subjects, catalog.subjectLevels, s.educationLevel)
             const max = catalog.maxGrade[s.educationLevel] || 6
             const grades = Array.from({ length: max }, (_, g) => g + 1)
             return (
               <div key={i} className="grid gap-2 rounded-xl bg-brand-25 p-3 sm:grid-cols-[1.4fr_1fr_1fr_1fr_auto] sm:items-end">
-                <label className="block text-xs font-semibold text-navy">Subject
-                  <select className="input mt-1 h-11" value={s.subject} onChange={(e) => setRow(i, { subject: e.target.value })}>
-                    <option value="">Choose…</option>
-                    {catalog.subjects.map((x) => <option key={x}>{x}</option>)}
-                  </select>
-                </label>
                 <label className="block text-xs font-semibold text-navy">Level
                   <select className="input mt-1 h-11" value={s.educationLevel}
-                    onChange={(e) => setRow(i, { educationLevel: e.target.value, minGrade: 1, maxGrade: catalog.maxGrade[e.target.value] })}>
+                    onChange={(e) => {
+                      const level = e.target.value
+                      const subjects = subjectsForLevel(catalog.subjects, catalog.subjectLevels, level)
+                      setRow(i, { educationLevel: level, subject: subjects.includes(s.subject) ? s.subject : '', minGrade: 1, maxGrade: catalog.maxGrade[level] })
+                    }}>
                     {LEVELS.map((l) => <option key={l.value} value={l.value}>{l.value === 'SECONDARY' ? 'Secondary (Form)' : l.label}</option>)}
+                  </select>
+                </label>
+                <label className="block text-xs font-semibold text-navy">Subject
+                  <select className="input mt-1 h-11" value={allowed.includes(s.subject) ? s.subject : ''} onChange={(e) => setRow(i, { subject: e.target.value })}>
+                    <option value="">Choose…</option>
+                    {allowed.map((x) => <option key={x}>{x}</option>)}
                   </select>
                 </label>
                 <label className="block text-xs font-semibold text-navy">From
@@ -609,16 +617,16 @@ function ReviewStep({ profile, submitted, confirmed, setConfirmed, goTo }) {
       </dl>
       {profile.missing.length > 0 && (
         <div role="status" className="rounded-xl bg-accent-50 p-4 text-sm text-amber-900">
-          <b>Still needed before you can submit:</b>
+          <b>Needed only to request the verified badge:</b>
           <ul className="mt-1 list-inside list-disc">{profile.missing.map((m) => <li key={m}>{m}</li>)}</ul>
         </div>
       )}
       {submitted ? (
         <p className="rounded-xl bg-brand-50 p-4 text-sm text-navy">Your profile was submitted for review. Saved changes apply straight away; new documents go to Admin automatically.</p>
-      ) : (
+      ) : profile.documents.length > 0 && (
         <label className="flex min-h-11 cursor-pointer items-start gap-2 text-sm text-navy">
           <input type="checkbox" className="mt-0.5 h-4 w-4 accent-brand-500" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
-          I confirm the information is true and the documents are my own. I understand Admin will check them before my profile goes live.
+          I confirm the information is true and the documents are my own. I understand Admin will check them before awarding the verified badge.
         </label>
       )}
     </div>

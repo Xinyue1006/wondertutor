@@ -9,7 +9,7 @@ import { gradeLabel } from '../../lib/education'
 
 // "Preview my profile": the public facts parents will see, built from the tutor's own setup data.
 // Private details (phone, emergency contact, identity document) are deliberately left out, as on the real profile.
-export default function ProfilePreview() {
+export default function ProfilePreview({ ownProfile = false }) {
   const [p, setP] = useState(null)
   const [error, setError] = useState('')
 
@@ -32,8 +32,8 @@ export default function ProfilePreview() {
   return (
     <div className="space-y-5">
       <TutorPageHeader
-        title="Preview of your profile"
-        subtitle="Check the teaching details parents see. Your contact details and identity documents stay private."
+        title={ownProfile ? 'My Profile' : 'Preview of your profile'}
+        subtitle={ownProfile ? undefined : 'Check the teaching details parents see. Your contact details and identity documents stay private.'}
         right={<Link to="/tutor/setup" className="btn-outline min-h-11 px-4"><Icon name="edit" className="h-4 w-4" /> Edit profile</Link>}
       />
 
@@ -69,10 +69,11 @@ export default function ProfilePreview() {
       <div className="grid gap-5 md:grid-cols-2">
         <section className="card p-6">
           <h2 className="font-display text-lg font-bold text-navy">Qualifications</h2>
+          {ownProfile && <Link className="inline-flex min-h-11 items-center text-sm font-semibold text-brand-600 underline" to="/tutor/setup" state={{ step: 'documents' }}>Manage qualifications</Link>}
           {quals.length ? (
             <ul className="mt-2 space-y-1 text-sm text-navy">
               {quals.map((q) => (
-                <li key={q.id}>{q.title}{q.institution ? `, ${q.institution}` : ''}{q.year ? ` (${q.year})` : ''}{q.status === 'PENDING' && <span className="text-slate-500"> · awaiting verification</span>}</li>
+                <li key={q.id}>{q.title}{q.institution ? `, ${q.institution}` : ''}{q.year ? ` (${q.year})` : ''}{q.status === 'APPROVED' && <span className="ml-2 rounded-full bg-ok-50 px-2 py-1 text-xs font-semibold text-green-800">Verified qualification</span>}{q.status === 'PENDING' && <span className="text-slate-500"> · awaiting verification</span>}</li>
               ))}
             </ul>
           ) : <p className="mt-2 text-sm text-slate-600">None uploaded yet.</p>}
