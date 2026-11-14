@@ -93,10 +93,15 @@ export async function decideBooking(id, adminId, input) {
       if (!['PENDING','COUNTER_OFFERED','AWAITING_PAYMENT','CONFIRMED'].includes(b.status) || b.startAt <= new Date()) throw stale()
       await tx.booking.update({ where: { id }, data: { status: 'CANCELLED', cancelledById: adminId, cancelReason: input.reason } })
       await tx.payment.updateMany({ where: { bookingId: id, status: 'PENDING' }, data: { status: 'FAILED' } })
-      if (b.payment?.status === 'PAID' && !await tx.refund.count({ where: { paymentId: b.payment.id, status: { in: ['PENDING','APPROVED'] } } })) {
-        await tx.refund.create({ data: { paymentId: b.payment.id, amount: b.payment.amount, type: 'ADMIN_REVIEW', reason: input.reason } })
+      if (['PAID', 'PARTIALLY_REFUNDED'].includes(b.payment?.status)) {
+        const refunds = await tx.refund.findMany({ where: { paymentId: b.payment.id } })
+        const reserved = refunds.filter(r => r.status === 'APPROVED').reduce((sum, r) => sum.plus(r.amount), zero)
+        const remaining = b.payment.amount.minus(reserved)
+        if (remaining.gt(0) && !refunds.some(r => ['PENDING', 'ESCALATED'].includes(r.status))) {
+          await tx.refund.create({ data: { paymentId: b.payment.id, amount: remaining, type: 'ADMIN_REVIEW', reason: input.reason } })
+        }
       }
-      await tx.rescheduleRequest.updateMany({ where: { bookingId: id, status: 'PENDING' }, data: { status: 'REJECTED' } })
+      await tx.rescheduleRequest.updateMany({ where: { bookingId: id, status: { in: ['PENDING', 'ESCALATED'] } }, data: { status: 'REJECTED' } })
       outcome = 'Booking cancelled'
     }
     const message = outcome + '. ' + input.reason
