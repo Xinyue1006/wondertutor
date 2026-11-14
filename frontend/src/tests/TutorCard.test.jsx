@@ -36,6 +36,12 @@ describe('TutorCard (browse)', () => {
     expect(screen.getByRole('link', { name: 'Book a Lesson' })).toHaveAttribute('href', '/parent/tutors/7/book')
   })
 
+  test('shows tutor initials when an old record still points at the AI demo photo', () => {
+    renderCard({ tutor: { ...tutor, photoUrl: '/img/people/daniel-tan.jpg' } })
+    expect(screen.getByText('DT')).toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: 'Daniel Tan' })).not.toBeInTheDocument()
+  })
+
   test('the recommended tag appears only when flagged', () => {
     renderCard({ tutor: { ...tutor, recommended: true } })
     expect(screen.getByText('Recommended for your child')).toBeInTheDocument()

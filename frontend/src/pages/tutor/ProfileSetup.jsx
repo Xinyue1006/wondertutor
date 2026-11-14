@@ -9,7 +9,7 @@ import TutorPageHeader from '../../components/TutorPageHeader'
 import Icon from '../../components/ui/Icon'
 import { ErrorBox, LoadError, Spinner } from '../../components/ui/Common'
 import { LEVELS, gradeLabel } from '../../lib/education'
-import { isOwnUpload, normalizePhone } from '../../lib/validation'
+import { normalizePhone } from '../../lib/validation'
 import { SETUP_STEPS, checkStep } from '../../lib/tutorSetup'
 
 // Tutor profile setup (mockup 06), step 4 of sign-up. Five steps, each saved to the server as a draft
@@ -111,7 +111,7 @@ function AccountProfileSetup() {
   const submitted = profile.status !== 'NOT_SUBMITTED'
   const idx = SETUP_STEPS.findIndex((s) => s.id === step)
   const done = (id) => id !== 'review' && !checkStep(id, form, profile)
-  const profileSteps = SETUP_STEPS.filter(s => s.id !== 'documents' && s.id !== 'review')
+  const profileSteps = SETUP_STEPS.filter(s => s.id === 'basic' || s.id === 'teaching')
   const progress = Math.round(100 * profileSteps.filter(s => done(s.id)).length / profileSteps.length)
   const update = (patch) => setForm((f) => ({ ...f, ...patch }))
 
@@ -554,8 +554,8 @@ function PhotoStep({ profile, setProfile, name }) {
   return (
     <div className="mt-4 space-y-6">
       <div>
-        <h3 className="mb-1 text-sm font-semibold text-navy">Profile photo <span className="text-red-600" aria-hidden="true">*</span></h3>
-        <p className="mb-3 text-xs text-slate-600">Required. A clear photo of your face helps parents recognise you at the first lesson.</p>
+        <h3 className="mb-1 text-sm font-semibold text-navy">Profile photo <span className="font-normal text-slate-600">(optional)</span></h3>
+        <p className="mb-3 text-xs text-slate-600">Your name initials are shown by default. You can upload a real photo if you prefer.</p>
         <PhotoPicker value={profile.profilePhotoUrl} name={name} onChange={setPhoto} />
       </div>
       <div>
@@ -602,7 +602,7 @@ function ReviewStep({ profile, submitted, confirmed, setConfirmed, goTo }) {
     ['teaching', 'Hourly rate', profile.hourlyRate ? `RM ${profile.hourlyRate.toFixed(2)}` : 'Missing'],
     ['teaching', 'Teaching mode', [profile.offersPhysical && 'Physical', profile.offersOnline && 'Online'].filter(Boolean).join(' and ') || 'Missing'],
     ['documents', 'Documents', `${profile.documents.filter((d) => d.status !== 'REJECTED').length} uploaded`],
-    ['photo', 'Profile photo', isOwnUpload(profile.profilePhotoUrl) ? 'Uploaded' : 'Missing'],
+    ['photo', 'Profile photo', profile.profilePhotoUrl ? 'Custom photo' : 'Name initials (default)'],
   ]
   return (
     <div className="mt-4 space-y-5">

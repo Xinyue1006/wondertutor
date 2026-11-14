@@ -15,6 +15,22 @@ describe('Avatar', () => {
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
   })
 
+  test.each([
+    '/img/people/daniel-tan.jpg',
+    'img/people/parent-tan-xin-yue.jpg',
+    'http://localhost:5173/img/people/sarah-tan.jpg',
+    'https://wondertutor.example/img/people/lee-xin-yi.jpg?version=1',
+  ])('uses name initials instead of the old AI demo portrait: %s', (src) => {
+    render(<Avatar src={src} name="Ms. Lee Xin Yi" />)
+    expect(screen.getByText('LX')).toBeInTheDocument()
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
+  })
+
+  test('still shows a real Google account photo', () => {
+    render(<Avatar src="https://lh3.googleusercontent.com/real-account" name="Xin Yue Tan" />)
+    expect(screen.getByRole('img', { name: 'Xin Yue Tan' })).toHaveAttribute('src', 'https://lh3.googleusercontent.com/real-account')
+  })
+
   test('falls back to the initials, not a broken-image icon, when the picture cannot be loaded', () => {
     render(<Avatar src="https://lh3.googleusercontent.com/blocked" name="Xin Yue Tan" />)
     fireEvent.error(screen.getByRole('img'))

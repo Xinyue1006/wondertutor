@@ -236,13 +236,29 @@ describe('verification', () => {
     expect((await api(token).get('/auth/me')).user.tutorStatus).toBe('VERIFIED')
   })
 
-  test('a photo that was not uploaded by the tutor (e.g. carried over from Google) does not count', async () => {
+  test('the default name avatar can be submitted without a profile photo; verification documents remain required', async () => {
     const { token, user } = await signUpTutor()
     await completeSetup(token)
-    await prisma.user.update({ where: { id: user.id }, data: { profilePhotoUrl: 'https://lh3.googleusercontent.com/a/photo' } })
+    const profile = await api(token).put('/tutor/profile', { profilePhotoUrl: null })
+    expect(profile.status).toBe(200)
+    expect(profile.profilePhotoUrl).toBeNull()
+    expect(profile.missing).toEqual([])
+
+    const tutor = await prisma.tutorProfile.findUnique({ where: { userId: user.id } })
+    await prisma.qualification.deleteMany({ where: { tutorId: tutor.id } })
+    const missing = await api(token).post('/tutor/submit-for-verification')
+    expect(missing.status).toBe(400)
+    expect(missing.message).toMatch(/Identity document/)
+    expect(missing.message).toMatch(/At least one qualification/)
+    expect(missing.message).not.toMatch(/Profile photo/)
+
+    await api(token).post('/tutor/documents', { kind: 'IDENTITY', title: 'NRIC', documentUrl: docUrl(token) })
+    await api(token).post('/tutor/documents', { kind: 'QUALIFICATION', title: 'BSc Mathematics', documentUrl: docUrl(token) })
     const res = await api(token).post('/tutor/submit-for-verification')
-    expect(res.status).toBe(400)
-    expect(res.message).toMatch(/Profile photo/)
+    expect(res.status).toBe(200)
+    expect(res.profilePhotoUrl).toBeNull()
+    expect(res.isVerified).toBe(false)
+    expect(res.submittedAt).toBeTruthy()
   })
 
   test('the tutor is told about a review on the verification status page', async () => {

@@ -8,7 +8,6 @@ import { prisma } from '../config/prisma.js'
 import { AppError } from '../utils/AppError.js'
 import { resolvePlace } from './places.service.js'
 import { notify } from './notification.service.js'
-import { isOwnUpload } from '../utils/validators.js'
 
 export const TUTOR_STATUS = {
   NOT_SUBMITTED: 'NOT_SUBMITTED', // setup still a draft
@@ -49,9 +48,6 @@ export async function recomputeVerified(db, tutorId) {
   return isVerified
 }
 
-// A photo the tutor uploaded themselves (FR 1.8), not one carried over from elsewhere
-const ownPhoto = (url) => isOwnUpload(url)
-
 // Status for the logged-in user (GET /auth/me, login), so the frontend can route a tutor without another call
 export async function tutorStatusForUser(user) {
   if (user.role !== 'TUTOR') return null
@@ -76,7 +72,8 @@ export function missingForSubmit(t) {
   if (!t.bio || t.bio.trim().length < 30) missing.push('About me (at least 30 characters)')
   if (!docs.some((d) => d.kind === 'IDENTITY')) missing.push('Identity document (NRIC or passport)')
   if (!docs.some((d) => d.kind === 'QUALIFICATION')) missing.push('At least one qualification')
-  if (!ownPhoto(t.user.profilePhotoUrl)) missing.push('Profile photo')
+  // Public profile photos are optional: a name avatar is the default. Verification
+  // still requires the separate identity document and qualification above.
   return missing
 }
 

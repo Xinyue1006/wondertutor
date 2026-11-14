@@ -83,6 +83,19 @@ describe('tutor profile setup', () => {
     await userEvent.click(submit)
     expect(api.post).toHaveBeenCalledWith('/tutor/submit-for-verification')
   })
+
+  test('a tutor can keep default initials, finish the photo step and submit for verification', async () => {
+    setup({ ...COMPLETE, profilePhotoUrl: null })
+    expect(await screen.findByRole('progressbar', { name: 'Setup progress' })).toHaveAttribute('aria-valuenow', '100')
+    await userEvent.click(screen.getByRole('button', { name: /Photo and portfolio/ }))
+    expect(screen.getByText(/Your name initials are shown by default/)).toBeInTheDocument()
+    expect(screen.getByText('DT')).toHaveAttribute('aria-label', 'Daniel Tan')
+    await userEvent.click(screen.getByRole('button', { name: 'Save and continue' }))
+    expect(await screen.findByText('Name initials (default)')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('checkbox', { name: /I confirm the information is true/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Submit for verification' }))
+    expect(api.post).toHaveBeenCalledWith('/tutor/submit-for-verification')
+  })
 })
 
 describe('verification on My Profile', () => {
@@ -157,9 +170,8 @@ describe('tutor profile setup: editing and documents', () => {
 })
 
 describe('setup step checks (mirror the server)', () => {
-  test('a photo that was not uploaded through WonderTutor does not count', () => {
-    expect(checkStep('photo', {}, { profilePhotoUrl: 'https://lh3.googleusercontent.com/a/photo' })).toMatch(/Upload a profile photo/)
-    expect(checkStep('photo', {}, COMPLETE)).toBe('')
+  test.each([null, 'https://lh3.googleusercontent.com/a/photo', COMPLETE.profilePhotoUrl])('a profile photo is optional: %s', (profilePhotoUrl) => {
+    expect(checkStep('photo', {}, { profilePhotoUrl })).toBe('')
   })
 
   const form = { fullName: 'Daniel Tan', phone: '0123456789', gender: 'MALE', emergencyContactName: 'Lisa Tan', emergencyContactPhone: '0123456789', location: 'Kepong, Kuala Lumpur' }

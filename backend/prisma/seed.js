@@ -1,4 +1,6 @@
-// Run with: npm run db:seed   (or `npx prisma migrate reset` to wipe + reseed from scratch)
+// Run with: npm run db:seed for an empty development database.
+// For an existing database, use npm run db:merge -- --source export.sql --target-db name
+// to preview a non-destructive merge; --apply also creates a backup. Do not reset to sync data.
 //
 // Seeds: system settings, the admin account, 16 sample Malaysian tutors (Klang Valley), review history,
 // and one demo parent with children + bookings in every state so every Parent Portal screen has data.
@@ -259,7 +261,7 @@ async function seedTutors(hash) {
         role: 'TUTOR',
         fullName: t.name,
         phone: '+60123456789',
-        profilePhotoUrl: ['ahmad-faiz', 'nurul-aisyah', 'kumar-raj', 'chen-mei-ling', 'rachel-lim'].includes(t.key) ? null : `/img/people/${t.key}.jpg`,
+        profilePhotoUrl: null, // Demo accounts use name initials, never generated portraits.
         isEmailVerified: true,
         tutor: {
           create: {
@@ -368,15 +370,15 @@ async function seedDemoParent(tutors, hash) {
       role: 'PARENT',
       fullName: 'Tan Xin Yue',
       phone: '+60123456780',
-      profilePhotoUrl: '/img/people/parent-tan-xin-yue.jpg',
+      profilePhotoUrl: null,
       isEmailVerified: true,
       parent: { create: { address: home.name, latitude: home.lat, longitude: home.lng } },
     },
     include: { parent: true },
   })
   const parentId = user.parent.id
-  const sarah = await prisma.child.create({ data: { parentId, name: 'Sarah Tan', educationLevel: 'PRIMARY', grade: 5, subject: 'Mathematics', subjects: ['Mathematics', 'Science', 'English'], photoUrl: '/img/people/sarah-tan.jpg' } })
-  const adam = await prisma.child.create({ data: { parentId, name: 'Adam Tan', educationLevel: 'PRIMARY', grade: 2, subject: 'English', subjects: ['English', 'Mathematics'], photoUrl: '/img/people/adam-tan.jpg' } })
+  const sarah = await prisma.child.create({ data: { parentId, name: 'Sarah Tan', educationLevel: 'PRIMARY', grade: 5, subject: 'Mathematics', subjects: ['Mathematics', 'Science', 'English'], photoUrl: null } })
+  const adam = await prisma.child.create({ data: { parentId, name: 'Adam Tan', educationLevel: 'PRIMARY', grade: 2, subject: 'English', subjects: ['English', 'Mathematics'], photoUrl: null } })
 
   const T = (key) => tutors[key]
   const rateOf = Object.fromEntries(TUTORS.map((t) => [t.key, t.rate]))
@@ -542,7 +544,7 @@ async function main() {
   }
 
   if (await prisma.user.findUnique({ where: { email: DEMO_PARENT.email } })) {
-    console.log('Demo data already seeded. Use `npx prisma migrate reset` to start from scratch.')
+    console.log('Demo data already exists. To merge a teammate export without resetting, use npm run db:merge -- --source export.sql --target-db your_database (preview only; add --apply after reviewing).')
     return
   }
 
