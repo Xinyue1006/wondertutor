@@ -157,3 +157,11 @@ test('a failed first load shows the error', async () => {
   render(<MemoryRouter><DateAvailability /></MemoryRouter>)
   expect(await screen.findByText('Network error')).toBeInTheDocument()
 })
+
+test('opening a date from the weekly preview loads the saved ranges for that date', async () => {
+  api.get.mockResolvedValue({ data: { exceptions: saved } })
+  render(<MemoryRouter initialEntries={['/tutor/availability/dates?date=2099-01-05']}><DateAvailability /></MemoryRouter>)
+  expect(await screen.findByLabelText('startTime 0')).toHaveValue('10:00')
+  expect(screen.getByLabelText('Exception date')).toHaveValue('2099-01-05')
+  expect(screen.getByLabelText('endTime 1')).toHaveValue('15:00')
+})

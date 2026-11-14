@@ -36,6 +36,10 @@ test('completed lessons use the historical fee; current rate, refunds and pendin
   const row = v.transactions.find(r => r.id === partial.id)
   expect(Number(row.commission)).toBe(8)
   expect(Number(row.originalCommission)).toBe(12)
+  expect(Number(row.originalShare)).toBe(88)
+  expect(Number(row.platformRefundShare)).toBe(4)
+  expect(Number(row.tutorRefundShare)).toBe(29.33)
+  expect(Number(row.net)).toBe(58.67)
   expect(v.transactions).toHaveLength(4)
 })
 

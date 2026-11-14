@@ -4,7 +4,7 @@ import { prisma } from '../config/prisma.js'
 import { AppError } from '../utils/AppError.js'
 import { addDays, mytParts, mytToDate, toMinutes } from '../utils/time.js'
 import { assertEditableWeek, currentWeekStart, fromDbDate, isEditableWeek, lastWeekStart, toDbDate, weekStartOf } from '../utils/week.js'
-import { SLOT_BLOCKING } from './booking.service.js'
+import { getTutorSlots, SLOT_BLOCKING } from './booking.service.js'
 import { paymentDeadline } from './paymentWindow.js'
 
 // First and last moment of the tutor's grid (frontend/src/lib/availability.js has the same two values)
@@ -179,23 +179,26 @@ async function changedWeeks(tutorId, db = prisma) {
 }
 
 export async function getWeekView(tutorId, weekStart) {
-  const [usual, row, booked, changed, tutor] = await Promise.all([
+  const [usual, row, booked, changed, tutor, parentDays, dated] = await Promise.all([
     usualSlots(tutorId),
     weekOverride(tutorId, weekStart),
     bookedHours(tutorId, { week: weekStart }),
     changedWeeks(tutorId),
     prisma.tutorProfile.findUnique({ where: { id: tutorId }, select: { offersOnline: true, offersPhysical: true, quickAdd: true } }),
+    getTutorSlots(tutorId, weekStart),
+    prisma.availabilityException.findMany({ where: { tutorId, date: { gte: weekStart, lte: addDays(weekStart, 6) } }, select: { date: true } }),
   ])
   const override = row ? normaliseSlots(row.slots) : null
-  const dated = booked.length ? await prisma.availabilityException.findMany({
-    where: { tutorId, date: { in: [...new Set(booked.map(h => h.date))] } }, select: { date: true },
-  }) : []
   const datedDays = new Set(dated.map(d => d.date))
   return {
     weekStart,
     usual,
     override,
     effective: override ?? usual,
+    parentDays: parentDays.map(({ date, slots }) => ({
+      date, source: datedDays.has(date) ? 'date' : row ? 'week' : 'usual',
+      slots: slots.filter(slot => slot.status === 'available'),
+    })),
     booked: booked.map(h => ({ ...h,
       ...(datedDays.has(h.date) && { affectsWeek: false }),
       ...((row || datedDays.has(h.date)) && { affectsUsual: false }),

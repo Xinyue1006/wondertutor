@@ -124,8 +124,8 @@ export default function Availability() {
     async function refreshHeld() {
       try {
         const { data } = await api.get('/tutor/availability', { params: { week: view.weekStart } })
-        if (!current || JSON.stringify([data.booked, data.changedWeeks]) === JSON.stringify([view.booked, view.changedWeeks])) return
-        const next = { ...view, booked: data.booked, changedWeeks: data.changedWeeks }
+        if (!current || JSON.stringify([data.booked, data.changedWeeks, data.parentDays]) === JSON.stringify([view.booked, view.changedWeeks, view.parentDays])) return
+        const next = { ...view, booked: data.booked, changedWeeks: data.changedWeeks, parentDays: data.parentDays }
         const update = (prev) => applyLockChanges(prev, lockedCells(view, scope), lockedCells(next, scope), rangesToCells(scopeHours(view, scope)))
         setView(next)
         setCells(update)
@@ -254,6 +254,8 @@ export default function Availability() {
     return (
       <div className="py-0.5 text-center">
         <div className="text-sm font-bold text-navy">{day.short} {arg.date.getUTCDate()}</div>
+        {view.parentDays?.some(d => d.date === arg.date.toISOString().slice(0, 10) && d.source === 'date') &&
+          <span className="block text-xs text-brand-700">Date-specific</span>}
         <button type="button" onClick={() => edit((prev) => clearHours(prev, locked, day.value))} aria-label={`Clear ${day.label}`} className="min-h-11 min-w-11 px-1 text-xs font-semibold text-brand-600 hover:underline"><span className="sm:hidden">Clear</span><span className="hidden sm:inline">Clear this day</span></button>
       </div>
     )
@@ -360,6 +362,8 @@ export default function Availability() {
             </div>
           )}
 
+          {view.parentDays && <ParentHours days={view.parentDays} offers={view.offers} today={now.date} />}
+
           <fieldset className="mt-3 flex min-w-0 flex-col gap-x-4 text-sm text-navy sm:flex-row sm:flex-wrap sm:items-center">
             <legend className="float-left mr-3 flex min-h-11 items-center font-semibold">Editing:</legend>
             {[['usual', 'My usual hours'], ['week', `This week only (${label})`]].map(([value, text]) => (
@@ -446,7 +450,7 @@ export default function Availability() {
             {saveError ? <ErrorBox>{saveError}</ErrorBox> : notice ? (
               <p role="status" className="flex items-center gap-2 rounded-lg bg-ok-50 px-3 py-2.5 text-sm text-green-800"><Icon name="check-circle" className="h-4 w-4 shrink-0" /> {notice}</p>
             ) : copyResult ? <CopyResult result={copyResult} /> : total === 0 ? (
-              <p role="status" className="rounded-lg bg-accent-50 px-3 py-2.5 text-sm text-amber-900">{weekScope ? "Parents can't book you this week." : "Parents can't book you until you add hours."}</p>
+              <p role="status" className="rounded-lg bg-accent-50 px-3 py-2.5 text-sm text-amber-900">{view.parentDays ? 'This editing scope has no hours. Check the saved parent view above for date-specific hours.' : weekScope ? "Parents can't book you this week." : "Parents can't book you until you add hours."}</p>
             ) : null}
           </div>
         </section>
@@ -468,6 +472,30 @@ export default function Availability() {
       {copyOpen && <CopyDialog weeks={nextWeeks} changed={view.changedWeeks} busy={busy} onClose={() => setCopyOpen(false)} onCopy={copyTo} />}
     </div>
   )
+}
+
+function ParentHours({ days, offers, today }) {
+  const datedCount = days.filter(day => day.source === 'date').length
+  return <details className="mt-3 min-w-0 rounded-xl border border-brand-200 px-3 py-1">
+    <summary className="min-h-11 cursor-pointer py-3 font-semibold text-navy">What parents can book{datedCount > 0 && <span className="ml-2 text-sm font-normal">{datedCount} date-specific {datedCount === 1 ? 'day' : 'days'}</span>}</summary>
+    <p className="pb-2 text-sm text-slate-600">Saved hours in Malaysia time. A date-specific schedule replaces that day’s hours, even when it is empty.</p>
+    <ul className="divide-y divide-brand-100">{days.map(day => {
+      const label = dayOf(dayOfDate(day.date)).label + ' ' + shortDate(day.date)
+      const ranges = []
+      for (const slot of day.slots) {
+        const mode = shownMode(slot.mode, offers)
+        const last = ranges.at(-1)
+        if (last && last.end === slot.start && last.mode === mode) last.end = slot.end
+        else ranges.push({ start: slot.start, end: slot.end, mode })
+      }
+      return <li key={day.date} className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 py-2 text-sm">
+        <div className="min-w-0 break-words"><strong>{label}</strong> · {{ date: 'Date-specific hours', week: 'This week’s hours', usual: 'Usual hours' }[day.source]}
+          <p>{ranges.length ? ranges.map(r => r.start + '–' + r.end + ' (' + MODE_LABELS[r.mode] + ')').join(', ') : 'No bookable hours'}</p>
+        </div>
+        {day.date >= today && <Link className="inline-flex min-h-11 items-center font-semibold text-brand-700 underline" to={'/tutor/availability/dates?date=' + day.date} aria-label={'Edit ' + label}>Edit date</Link>}
+      </li>
+    })}</ul>
+  </details>
 }
 
 function LockedHour({ hour }) {

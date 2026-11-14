@@ -18,8 +18,24 @@ const labels = { accept: 'Accept request', decline: 'Decline request', counter: 
 
 const groupFor = b => Object.keys(groups).find(g => groups[g].includes(b.status)) || 'History'
 
-function BookingDetails({ b, onUpdate, onReload }) {
-  const [form, setForm] = useState('')
+function BookingRowStatus({ booking: b }) {
+  let reply
+  if (b.status === 'PENDING') reply = 'Your reply needed'
+  if (b.status === 'COUNTER_OFFERED') reply = 'Waiting for parent to reply to your offer'
+  if (groups.Lessons.includes(b.status)) {
+    if (b.reschedule?.status === 'ESCALATED') reply = 'Admin reviewing time change'
+    if (b.reschedule?.status === 'PENDING') reply = b.reschedule.mine ? 'Waiting for parent to reply to time change' : 'Your reply needed on time change'
+  }
+  const paymentDue = b.status === 'AWAITING_PAYMENT' && b.payBy
+  return <span className="mt-1 block text-sm font-semibold text-navy">
+    {reply && <span className="block">{reply}</span>}
+    {paymentDue && <span className="block">Payment due {fmtDate(b.payBy)}, {fmtTime(b.payBy)} (MYT)</span>}
+    {!reply && !paymentDue && <span>{b.status[0] + b.status.slice(1).toLowerCase().replaceAll('_', ' ')}</span>}
+  </span>
+}
+
+function BookingDetails({ b, onUpdate, onReload, openLinkForm }) {
+  const [form, setForm] = useState(() => openLinkForm && b.teachingMode === 'ONLINE' && b.status === 'CONFIRMED' && Date.parse(b.endAt) > Date.now() ? 'link' : '')
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -151,10 +167,11 @@ export default function BookingRequests() {
       {!selected ? <div className="card p-6">No bookings in this section yet.</div> : <div className="grid min-w-0 items-start gap-4 lg:grid-cols-[minmax(15rem,1fr)_minmax(0,2fr)]">
         <div className={(mobileDetail ? 'hidden lg:block ' : '') + 'card min-w-0 space-y-2 p-3'}>{visible.map(b => <button key={b.id} aria-pressed={selected.id === b.id} className="block min-h-11 w-full break-words rounded-lg border border-brand-100 p-3 text-left aria-pressed:bg-brand-50" onClick={() => { setId(b.id); setMobileDetail(true) }}>
           <strong className="block text-navy">{b.subject} · {b.child.name}</strong><span className="text-sm">{fmtDate(b.startAt)}, {fmtTime(b.startAt)} · {b.parentName}</span>
+          <BookingRowStatus booking={b} />
         </button>)}</div>
         <div className={(mobileDetail ? '' : 'hidden lg:block ') + 'min-w-0 space-y-2'}>
           <button className="btn-outline min-h-11 lg:hidden" onClick={() => setMobileDetail(false)}>Back to list</button>
-          <BookingDetails key={selected.id} b={selected} onUpdate={updated} onReload={() => load(recordRef(selected))} />
+          <BookingDetails key={selected.id} b={selected} openLinkForm={params.get('action') === 'link' && matchesRecordRef(selected, params.get('booking'))} onUpdate={updated} onReload={() => load(recordRef(selected))} />
         </div>
       </div>}
     </>}

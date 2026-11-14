@@ -94,3 +94,20 @@ describe('students list', () => {
     expect((await api(t.token).get('/tutor/bookings')).bookings).toEqual([])
   })
 })
+
+test('teaching day uses Malaysia dates and links to the next lesson and unfinished report', async () => {
+  const { teachingDay } = await import('../services/tutorDashboard.service.js')
+  const t = await makeTutor(), p = await makeParent()
+  const base = { parent: p.parent, child: p.child, tutor: t.tutor, date: '2027-01-04', status: 'CONFIRMED' }
+  const ended = await makeBooking({ ...base, start: '08:00' })
+  await prisma.attendance.create({ data: { bookingId: ended.id, checkInAt: ended.startAt, checkOutAt: ended.endAt } })
+  const next = await makeBooking({ ...base, start: '14:00', extra: { teachingMode: 'ONLINE' } })
+  await makeBooking({ ...base, date: '2027-01-05', start: '00:00' })
+  const request = await makeBooking({ ...base, date: '2027-01-05', status: 'PENDING' })
+  const view = await teachingDay(t.tutor.id, new Date('2027-01-04T04:00:00Z'))
+  expect(view.nextLesson).toMatchObject({ student: 'Sarah', action: 'Add class link', to: '/tutor/bookings?booking=' + next.publicId + '&action=link' })
+  expect(view.todaySessions.map(b => b.ref)).toEqual([ended.publicId, next.publicId])
+  expect(view.actions).toMatchObject([{ ref: ended.publicId, action: 'Finish lesson report' }, { ref: request.publicId, action: 'Review booking request' }])
+  const live = await teachingDay(t.tutor.id, next.startAt)
+  expect(live.nextLesson).toMatchObject({ action: 'Open session', to: '/tutor/bookings/' + next.publicId + '/session' })
+})

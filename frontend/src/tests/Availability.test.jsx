@@ -983,3 +983,11 @@ describe('availability integration safeguards', () => {
     expect(button('Next')).toBeEnabled()
   })
 })
+
+test('the saved parent view identifies date hours and opens that date for editing', async () => {
+  const date = addDays(WEEK, 1)
+  await setup(changed({ parentDays: [{ date, source: 'date', slots: [{ start: '09:00', end: '10:00', mode: 'ONLINE' }] }] }))
+  fireEvent.click(screen.getByText('What parents can book'))
+  expect(screen.getByText('09:00–10:00 (Online)')).toBeVisible()
+  expect(screen.getByRole('link', { name: /^Edit Tuesday/ })).toHaveAttribute('href', '/tutor/availability/dates?date=' + date)
+})

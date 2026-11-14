@@ -45,3 +45,12 @@ test('lets the tutor retry a failed dashboard request', async () => {
   expect(await screen.findByText('4.8 / 5')).toBeInTheDocument()
   expect(api.get).toHaveBeenCalledTimes(2)
 })
+
+test('shows the next confirmed lesson with Malaysia time and its booking action', async () => {
+  const lesson = { ref: 'abc', subject: 'Mathematics', student: 'Alya', startAt: '2027-01-04T06:00:00Z', endAt: '2027-01-04T07:00:00Z', action: 'Add class link', to: '/tutor/bookings?booking=abc&action=link' }
+  api.get.mockResolvedValue({ data: { ...overview, nextLesson: lesson, todaySessions: [lesson], actions: [] } })
+  show()
+  expect(await screen.findAllByText('Mathematics · Alya')).toHaveLength(2)
+  expect(screen.getAllByText(/2:00 PM – 3:00 PM/)).toHaveLength(2)
+  expect(screen.getAllByRole('link', { name: 'Add class link' })[0]).toHaveAttribute('href', lesson.to)
+})

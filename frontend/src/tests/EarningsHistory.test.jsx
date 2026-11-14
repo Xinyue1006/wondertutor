@@ -58,11 +58,11 @@ test('a refused withdrawal shows the reason and reloads the balance', async () =
 })
 
 test('a lesson with a refund shows the refund and the original commission', async () => {
-  show({ ...view, transactions: [row(1, new Date().toISOString(), { refunded: '33.33', commission: '8.00', net: '58.67' })] })
+  show({ ...view, transactions: [row(1, new Date().toISOString(), { refunded: '33.33', originalShare: 88, tutorRefundShare: 29.33, platformRefundShare: 4, commission: '8.00', net: '58.67' })] })
   const item = (await screen.findByText('Mathematics · Sarah')).closest('li')
-  expect(within(item).getByText('Refund')).toBeInTheDocument()
+  expect(within(item).getByText('Refund to parent')).toBeInTheDocument()
   expect(within(item).getByText('RM 33.33')).toBeInTheDocument()
-  expect(within(item).getByText('Original commission')).toBeInTheDocument()
+  expect(within(item).getByText('RM 29.33')).toBeInTheDocument()
   expect(within(item).getByText('RM 58.67')).toBeInTheDocument()
   expect(within(item).getByText(/Booking #101/)).toBeInTheDocument()
 })
@@ -70,8 +70,8 @@ test('a lesson with a refund shows the refund and the original commission', asyn
 test('a lesson without a refund hides the refund lines', async () => {
   show({ ...view, transactions: [row(1, new Date().toISOString())] })
   const item = (await screen.findByText('Mathematics · Sarah')).closest('li')
-  expect(within(item).queryByText('Refund')).toBeNull()
-  expect(within(item).getByText('Commission (12%)')).toBeInTheDocument()
+  expect(within(item).queryByText('Refund to parent')).toBeNull()
+  expect(within(item).getByText('Saved commission (12%)')).toBeInTheDocument()
 })
 
 test('This month hides payments from earlier months', async () => {
@@ -103,7 +103,11 @@ test('withdrawal history shows each status and the rejection reason', async () =
   expect(await screen.findByText('RM 20.00 · Rejected')).toBeInTheDocument()
   expect(screen.getByText('Reason: Name does not match')).toBeInTheDocument()
   expect(screen.getByText('RM 10.00 · Approved')).toBeInTheDocument()
-  expect(screen.getByText('RM 5.00 · Bank change under review')).toBeInTheDocument()
+  const pending = within(screen.getByRole('heading', { name: 'Pending withdrawals' }).closest('section'))
+  expect(pending.getByText(/Bank change under review/)).toBeInTheDocument()
+  expect(pending.queryByText(/Approved/)).toBeNull()
+  const history = within(screen.getByRole('heading', { name: 'Withdrawal history' }).closest('section'))
+  expect(history.queryByText(/Bank change under review/)).toBeNull()
 })
 
 test('removing the bank account sends no details and confirms', async () => {

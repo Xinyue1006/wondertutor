@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import api, { errorMessage } from '../../api/client'
 import Avatar from '../../components/ui/Avatar'
 import Icon from '../../components/ui/Icon'
+import VerificationCard from '../../components/VerificationCard'
 import TutorPageHeader from '../../components/TutorPageHeader'
 import { LoadError, ModePills, Spinner, VerifiedTick } from '../../components/ui/Common'
 import { gradeLabel } from '../../lib/education'
@@ -51,6 +52,8 @@ export default function ProfilePreview({ ownProfile = false }) {
           <div className="text-xs text-slate-600">{p.yearsExperience} years of experience</div>
         </div>
       </section>
+
+      {ownProfile && <VerificationCard profile={p} />}
 
       <section className="card p-6">
         <h2 className="font-display text-lg font-bold text-navy">About</h2>
