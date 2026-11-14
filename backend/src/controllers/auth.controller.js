@@ -184,7 +184,11 @@ export async function resetPassword(req, res) {
   if (!user || user.status === 'DEACTIVATED') throw new AppError(400, 'Code expired, please request a new one')
   await checkOtp(email, code)
   // Proving access to the inbox also verifies the email (useful for an account that never finished signup)
-  await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await bcrypt.hash(newPassword, 12), isEmailVerified: true } })
+  const passwordHash = await bcrypt.hash(newPassword, 12)
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: user.id }, data: { passwordHash, isEmailVerified: true } }),
+    prisma.authSession.deleteMany({ where: { userId: user.id } }),
+  ])
   res.json({ message: 'Your password has been reset. You can now log in.' })
 }
 

@@ -90,6 +90,24 @@ test('Remember Me persists for seven days while ordinary sessions expire after t
   expect(normal.expiresAt.getTime() - normal.record.createdAt.getTime()).toBeCloseTo(12 * 3600000, -3)
 })
 
+test('a tutor password reset signs out ordinary and remembered browsers together', async () => {
+  const who = await makeTutor()
+  const ordinary = await login(who)
+  const remembered = await login(who, true)
+  const email = who.user.email
+  expect((await api().post('/auth/forgot-password', { email })).status).toBe(200)
+  await prisma.emailOtp.updateMany({ where: { email }, data: { codeHash: await bcrypt.hash('123456', 4) } })
+  const reset = code => api().post('/auth/reset-password', { email, code, newPassword: 'Replacement123' })
+  expect((await reset('000000')).status).toBe(400)
+  for (const { client } of [ordinary, remembered]) expect((await client.request('/tutor/profile')).status).toBe(200)
+  expect((await reset('123456')).status).toBe(200)
+  expect(await prisma.authSession.count({ where: { userId: who.user.id } })).toBe(0)
+  for (const { client } of [ordinary, remembered]) expect((await client.request('/tutor/profile')).status).toBe(401)
+  expect((await api(parent.token).get('/auth/me')).status).toBe(200)
+  expect((await api().post('/auth/login', loginBody(who))).status).toBe(401)
+  expect((await api().post('/auth/login', { email, password: 'Replacement123' })).status).toBe(200)
+})
+
 test('production cookies are host-bound, Secure and HttpOnly without requiring new environment secrets', async () => {
   const previous = env.nodeEnv
   try {
