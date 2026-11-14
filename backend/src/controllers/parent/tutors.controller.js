@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { prisma } from '../../config/prisma.js'
 import { AppError } from '../../utils/AppError.js'
 import { CHARACTERISTICS, LANGUAGES, LOCATIONS, MAX_CHILD_SUBJECTS, MAX_GRADE, SUBJECTS, SUBJECT_LEVELS, findLocation } from '../../data/catalog.js'
-import { rankTutors, distanceKm } from '../../services/matching.service.js'
+import { rankTutorGroups } from '../../services/tutorSearchScope.js'
 import { tutorInclude, toTutorCard, toTutorProfile } from '../../services/tutor.service.js'
 import { SLOT_BLOCKING, getTutorSlots } from '../../services/booking.service.js'
 import { effectiveSlots, slotAllows } from '../../services/availability.service.js'
@@ -50,12 +50,15 @@ const browseSchema = z.object({
 })
   .refine((q) => !q.grade || q.grade <= MAX_GRADE[q.level], { message: 'That grade does not exist for the chosen level', path: ['grade'] })
   .refine((q) => q.minPrice == null || q.maxPrice == null || q.minPrice <= q.maxPrice, { message: 'The minimum price cannot be more than the maximum', path: ['maxPrice'] })
+  .refine(q => !q.location || Boolean(findLocation(q.location)), { message: 'Choose a recognised area, town or postcode', path: ['location'] })
+  .refine(q => Boolean(q.date) === Boolean(q.time), { message: 'Choose both a date and a start time', path: ['date'] })
 
 // Tutors whose account is active and who teach the subject at the level (the DB-side part of the mandatory filter)
 export async function activeTutors(subject, level) {
   return prisma.tutorProfile.findMany({
     where: {
-      user: { status: 'ACTIVE' },
+      user: { status: 'ACTIVE', deletedAt: null },
+      hourlyRate: { gt: 0 },
       subjects: { some: { subject, educationLevel: level } },
     },
     include: tutorInclude,
@@ -112,41 +115,40 @@ export async function browseTutors(req, res) {
     grade: q.grade,
     lat: loc?.lat ?? req.parent.latitude ?? undefined,
     lng: loc?.lng ?? req.parent.longitude ?? undefined,
-    mode: q.mode || prefs.mode || 'EITHER',
+    mode: q.mode || 'EITHER',
+    location: loc?.name || req.parent.address || null,
+    maxDistance: q.maxDistance,
     days: explicitDays.length ? explicitDays : prefs.days || [],
     characteristics: explicitStyles.length ? explicitStyles : prefs.characteristics || [],
     budgetMax: q.maxPrice ?? prefs.budgetMax ?? null,
   }
 
-  const tutors = await activeTutors(q.subject, q.level)
-  // Mandatory filters (subject + level/grade) + weighted score, best match first
-  let ranked = rankTutors(tutors, criteria)
-
-  // Hard filters: only what the parent explicitly chose in the filter bar
-  ranked = ranked.filter(({ tutor }) => {
+  const candidates = await activeTutors(q.subject, q.level)
+  // Apply the same non-location filters to local results and online alternatives.
+  const tutors = candidates.filter(tutor => {
     const rate = Number(tutor.hourlyRate)
     if (q.minPrice != null && rate < q.minPrice) return false
     if (q.maxPrice != null && rate > q.maxPrice) return false
     if (q.minRating != null && tutor.ratingAvg < q.minRating) return false
-    if (q.mode === 'ONLINE' && !tutor.offersOnline) return false
-    if (q.mode === 'PHYSICAL' && !tutor.offersPhysical) return false
     if (explicitStyles.length && !explicitStyles.some((c) => (tutor.characteristics || []).includes(c))) return false
-    if (q.maxDistance != null && loc && tutor.offersPhysical && !tutor.offersOnline) {
-      const km = distanceKm(loc.lat, loc.lng, tutor.latitude, tutor.longitude)
-      if (km != null && km > q.maxDistance) return false
-    }
     return true
   })
 
-  if (explicitDays.length) {
-    const open = await openOnDays(ranked.map((r) => r.tutor), explicitDays, q.mode)
-    ranked = ranked.filter(({ tutor }) => open.has(tutor.id))
-  }
-
-  if (q.date && q.time) {
-    const free = await freeAt(ranked.map((r) => r.tutor), q.date, q.time, q.mode)
-    ranked = ranked.filter(({ tutor }) => free.has(tutor.id))
-  }
+  const available = {}
+  if (explicitDays.length || (q.date && q.time)) await Promise.all(['PHYSICAL', 'ONLINE'].map(async mode => {
+    let ids = new Set(tutors.map(tutor => tutor.id))
+    if (explicitDays.length) {
+      const open = await openOnDays(tutors, explicitDays, mode)
+      ids = new Set([...ids].filter(id => open.has(id)))
+    }
+    if (q.date && q.time) {
+      const free = await freeAt(tutors, q.date, q.time, mode)
+      ids = new Set([...ids].filter(id => free.has(id)))
+    }
+    available[mode] = ids
+  }))
+  const groups = rankTutorGroups(tutors, criteria, available)
+  let ranked = groups.tutors
 
   // "Recommended" keeps the score order; the other sorts re-order the same list (ties fall back to the score)
   const byFn = {
@@ -156,7 +158,8 @@ export async function browseTutors(req, res) {
     experience: (a, b) => b.tutor.yearsExperience - a.tutor.yearsExperience,
     nearest: (a, b) => (a.match.distanceKm ?? 999) - (b.match.distanceKm ?? 999),
   }[q.sort]
-  if (byFn) ranked = ranked.map((r, i) => ({ ...r, i })).sort((a, b) => byFn(a, b) || a.i - b.i)
+  const ordered = rows => byFn ? rows.map((r, i) => ({ ...r, i })).sort((a, b) => byFn(a, b) || a.i - b.i) : rows
+  ranked = ordered(ranked)
 
   // Page of results. A page past the end returns the last page instead of an empty list.
   const total = ranked.length
@@ -171,22 +174,27 @@ export async function browseTutors(req, res) {
   // Tell the parent what the order is based on (explainability)
   const p = req.parent.preferences
   const basis = []
-  if (loc) basis.push(`distance from ${q.location}`)
-  else if (req.parent.latitude != null && req.parent.address) basis.push(`distance from your home area (${req.parent.address})`)
+  if (groups.searchScope.mode === 'ONLINE') basis.push('online lessons across Malaysia')
+  else if (loc) basis.push(`nearby physical lessons within ${groups.searchScope.radiusKm} km of ${q.location}`)
+  else if (req.parent.latitude != null && req.parent.address) basis.push(`nearby physical lessons within ${groups.searchScope.radiusKm} km of your home area (${req.parent.address})`)
   if (p && (p.gender !== 'ANY' || p.characteristics?.length || p.days?.length || p.timePreset || p.budgetMax != null || p.mode !== 'EITHER')) basis.push('your saved preferences')
 
+  const cards = (rows, searchMode) => rows.map(({ tutor, match }) => ({
+    ...toTutorCard(tutor, q.subject), searchMode,
+    isFavourite: favourites.has(tutor.id), distanceKm: match.distanceKm,
+    match: { score: match.score, label: match.label, reasons: match.reasons },
+  }))
+  const alternatives = total === 0 ? ordered(groups.onlineAlternatives) : []
+  const alternativePages = Math.max(1, Math.ceil(alternatives.length / q.pageSize)), alternativePage = Math.min(q.page, alternativePages)
   res.json({
     total,
     page,
     pageSize: q.pageSize,
     totalPages,
     rankedBy: basis,
-    tutors: pageRows.map(({ tutor, match }) => ({
-      ...toTutorCard(tutor, q.subject),
-      isFavourite: favourites.has(tutor.id),
-      distanceKm: match.distanceKm,
-      match: { score: match.score, label: match.label, reasons: match.reasons },
-    })),
+    searchScope: groups.searchScope,
+    tutors: cards(pageRows, groups.searchScope.mode),
+    onlineAlternatives: { total: alternatives.length, page: alternativePage, totalPages: alternativePages, pageSize: q.pageSize, tutors: cards(alternatives.slice((alternativePage - 1) * q.pageSize, alternativePage * q.pageSize), 'ONLINE') },
   })
 }
 

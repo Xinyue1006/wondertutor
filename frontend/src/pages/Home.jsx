@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import api from '../api/client'
 import { useAuth } from '../context/AuthContext'
@@ -6,6 +6,8 @@ import Icon from '../components/ui/Icon'
 import Robot from '../components/ui/Robot'
 import Avatar from '../components/ui/Avatar'
 import ComboField from '../components/ComboField'
+import ParentReviewCarousel from '../components/ParentReviewCarousel'
+import useScrollReveal from '../hooks/useScrollReveal'
 
 const LEVELS = ['Kindergarten', 'Primary', 'Secondary']
 const SEARCH_KEY = 'wt-last-search' // remembered for the visit, so coming back from a profile does not empty the form
@@ -76,6 +78,8 @@ export default function Home() {
   const [home, setHome] = useState({ tutors: [], subjects: [], locations: [], loaded: false })
   const [search, setSearch] = useState(readSaved)
   const [errors, setErrors] = useState({})
+  const pageRef = useRef(null)
+  useScrollReveal(pageRef, home.loaded)
 
   // Public endpoint: the landing page works before anyone logs in. If it fails the page still renders.
   useEffect(() => {
@@ -98,9 +102,9 @@ export default function Home() {
   }, [search.location])
 
   const isParent = user?.role === 'PARENT'
-  // Finding a tutor needs an account (the matching and booking data is private), so guests go to Log In first
-  const findTutor = () => navigate(isParent ? '/parent/find-tutor' : '/login')
-  const openProfile = (id) => navigate(isParent ? `/parent/tutors/${id}` : '/login')
+  // Guests can explore public teaching details before creating a booking account.
+  const findTutor = () => navigate(isParent ? '/parent/find-tutor' : '/tutors')
+  const openProfile = (id) => navigate(isParent ? `/parent/tutors/${id}` : `/tutors/${id}`)
   const tryAssistant = () => navigate(isParent ? '/parent/find-tutor/match' : '/signup')
 
   const update = (field) => (value) => {
@@ -121,8 +125,7 @@ export default function Home() {
     return found
   }
 
-  // The hero search only asks for the three basics. Availability, budget, teaching mode and preferences are
-  // collected in the next step (the matching wizard), which picks these values up.
+  // Guests browse with these filters; signed-in parents can continue to personalised matching.
   const startSearch = (e) => {
     e.preventDefault()
     const found = validate()
@@ -132,7 +135,13 @@ export default function Home() {
       sessionStorage.setItem(SEARCH_KEY, JSON.stringify(search))
       sessionStorage.setItem(HANDOFF_KEY, JSON.stringify(search))
     } catch { /* storage blocked: the wizard just starts empty */ }
-    navigate(isParent ? '/parent/find-tutor/match' : '/login')
+    if (isParent) navigate('/parent/find-tutor/match')
+    else {
+      const subject = home.subjects.find(value => value.toLowerCase() === search.subject.trim().toLowerCase()) || search.subject.trim()
+      const params = new URLSearchParams({ subject, level: search.level.trim().toUpperCase() })
+      if (search.location.trim()) params.set('location', search.location.trim())
+      navigate(`/tutors?${params}`)
+    }
   }
 
   const errorList = Object.values(errors).filter(Boolean)
@@ -142,7 +151,7 @@ export default function Home() {
   const ready = search.subject.trim() && search.level.trim() && errorList.length === 0
 
   return (
-    <div className="relative isolate space-y-10 pt-4">
+    <div ref={pageRef} className="home-landing relative isolate space-y-10 pt-4">
       <SideDecor />
       {/* ── Hero: full width, no card border (breaks out of the page container) ── */}
       <section aria-labelledby="hero-title" className="relative left-1/2 z-10 -mt-4 w-screen -translate-x-1/2 overflow-x-clip bg-gradient-to-r from-brand-50 via-brand-50 to-brand-25">
@@ -151,22 +160,25 @@ export default function Home() {
           src="/img/art/hero-girl.jpg"
           alt=""
           aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0 right-0 hidden h-full w-[52%] object-cover object-[right_58%] lg:block"
+          className="home-hero-image pointer-events-none absolute inset-y-0 right-0 hidden h-full w-[52%] object-cover object-[right_58%] lg:block"
           style={{ maskImage: 'linear-gradient(to right, transparent 0%, rgba(0,0,0,0.35) 18%, rgba(0,0,0,0.8) 36%, #000 55%)', WebkitMaskImage: 'linear-gradient(to right, transparent 0%, rgba(0,0,0,0.35) 18%, rgba(0,0,0,0.8) 36%, #000 55%)' }}
         />
         <div className="relative mx-auto max-w-[81.25rem] px-4 py-8 md:px-8 md:py-10">
           <div className="lg:w-[50%] lg:pl-14">
-            <div className="eyebrow">Personalised tutor matching</div>
-            <h1 id="hero-title" className="mt-2 font-display text-4xl font-bold leading-[1.12] text-navy md:text-[2.5rem]">
-              Find the right tutor for your{' '}
-              <span className="relative inline-block">
-                child.
-                <span className="absolute -bottom-1 left-0 h-1 w-full rounded-full bg-accent" aria-hidden="true" />
-              </span>
-            </h1>
-            <p className="mt-3 max-w-md text-base text-slate-700">
-              Trusted tutors. Flexible booking. A safer and more supportive learning journey, all in one place.
-            </p>
+            {/* Animate the introduction alone: the form has no animated ancestor. */}
+            <div className="home-hero-copy">
+              <div className="eyebrow">Personalised tutor matching</div>
+              <h1 id="hero-title" className="mt-2 font-display text-4xl font-bold leading-[1.12] text-navy md:text-[2.5rem]">
+                Find the right tutor for your{' '}
+                <span className="relative inline-block">
+                  child.
+                  <span className="absolute -bottom-1 left-0 h-1 w-full rounded-full bg-accent" aria-hidden="true" />
+                </span>
+              </h1>
+              <p className="mt-3 max-w-md text-base text-slate-700">
+                Trusted tutors. Flexible booking. A safer and more supportive learning journey, all in one place.
+              </p>
+            </div>
 
             {/* One search component: the three basics + one clear action. Extra criteria come in the next step. */}
             <form onSubmit={startSearch} noValidate aria-label="Search for a tutor" className="relative mt-5 grid gap-1 rounded-2xl bg-white p-2.5 shadow-card md:grid-cols-3 lg:flex lg:w-[138%] lg:items-center">
@@ -211,15 +223,15 @@ export default function Home() {
             </button>
 
             {/* On phones and tablets the photo sits below the content instead of behind it */}
-            <img src="/img/art/hero-girl.jpg" alt="" aria-hidden="true" className="mt-6 h-48 w-full rounded-2xl object-cover object-right lg:hidden" />
+            <img src="/img/art/hero-girl.jpg" alt="" aria-hidden="true" className="home-hero-image mt-6 h-48 w-full rounded-2xl object-cover object-right lg:hidden" />
           </div>
         </div>
       </section>
 
       {/* ── Platform benefits ── */}
       <section id="for-parents" aria-label="Platform benefits" className="grid scroll-mt-24 gap-6 px-2 sm:grid-cols-2 lg:grid-cols-4">
-        {PERKS.map(([icon, title, text]) => (
-          <div key={title} className="flex items-start gap-3">
+        {PERKS.map(([icon, title, text], i) => (
+          <div key={title} className="home-reveal flex items-start gap-3" style={{ '--reveal-delay': `${i * 60}ms` }}>
             <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-navy text-white"><Icon name={icon} className="h-6 w-6" /></span>
             <div>
               <h2 className="card-title">{title}</h2>
@@ -231,7 +243,7 @@ export default function Home() {
 
       {/* ── Assistant + How it works: same height, padding and weight ── */}
       <section id="how-it-works" className="grid scroll-mt-24 gap-6 lg:grid-cols-[5fr_6fr]">
-        <div className="relative grid gap-6 overflow-hidden rounded-3xl border border-brand-100 bg-gradient-to-br from-accent-50 via-white to-brand-50 p-6 shadow-card sm:grid-cols-[1fr_12rem]">
+        <div className="home-reveal relative grid gap-6 overflow-hidden rounded-3xl border border-brand-100 bg-gradient-to-br from-accent-50 via-white to-brand-50 p-6 shadow-card sm:grid-cols-[1fr_12rem]">
           <Moon className="absolute left-1 top-1 h-8 w-8 -rotate-12" />
           <Sparkle className="absolute bottom-5 left-[46%] hidden h-4 w-4 sm:block" />
           <PaperPlane className="absolute bottom-3 right-4 h-9 w-9" />
@@ -265,11 +277,13 @@ export default function Home() {
           </p>
           <svg viewBox="0 0 90 70" className="absolute -right-2 top-24 hidden h-16 w-20 text-accent sm:block" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="4 5" strokeLinecap="round" aria-hidden="true"><path d="M86 4C60 2 70 40 40 38S10 56 4 66" /></svg>
           <Sparkle className="absolute bottom-4 right-5 hidden h-4 w-4 sm:block" />
-          <h2 className="section-title">How It Works</h2>
-          <p className="caption mt-1">Finding a tutor is simple and hassle-free.</p>
+          <div className="home-reveal">
+            <h2 className="section-title">How It Works</h2>
+            <p className="caption mt-1">Finding a tutor is simple and hassle-free.</p>
+          </div>
           <ol className="mt-5 grid gap-3 sm:grid-cols-2">
             {STEPS.map(([icon, title, text], i) => (
-              <li key={title} className="flex items-start gap-3 rounded-2xl bg-brand-50 p-3">
+              <li key={title} className="home-reveal flex items-start gap-3 rounded-2xl bg-brand-50 p-3" style={{ '--reveal-delay': `${i * 60}ms` }}>
                 <span className="relative mt-1 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand-100 text-brand-600">
                   <Icon name={icon} className="h-6 w-6" />
                   <span className="absolute -left-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[11px] font-bold text-navy" aria-hidden="true">{i + 1}</span>
@@ -286,16 +300,18 @@ export default function Home() {
 
       {/* ── Featured tutors ── */}
       <section aria-labelledby="featured-title">
-        <div className="eyebrow">Featured tutors</div>
-        <div className="mt-1 flex flex-wrap items-end justify-between gap-2">
-          <div>
-            <h2 id="featured-title" className="section-title">Learn from Trusted Tutors</h2>
-            <p className="caption mt-1">Explore some of our qualified and experienced tutors.</p>
-            <p className="mt-1 text-sm font-medium text-brand-700">Sample tutor profiles for demonstration.</p>
+        <div className="home-reveal">
+          <div className="eyebrow">Featured tutors</div>
+          <div className="mt-1 flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <h2 id="featured-title" className="section-title">Learn from Trusted Tutors</h2>
+              <p className="caption mt-1">Explore some of our qualified and experienced tutors.</p>
+              <p className="mt-1 text-sm font-medium text-brand-700">Sample tutor profiles for demonstration.</p>
+            </div>
+            <button onClick={findTutor} className="flex min-h-11 items-center gap-1 text-sm font-bold text-navy hover:text-brand-500">
+              View More Tutors <Icon name="arrow-right" className="h-4 w-4" />
+            </button>
           </div>
-          <button onClick={findTutor} className="flex min-h-11 items-center gap-1 text-sm font-bold text-navy hover:text-brand-500">
-            View More Tutors <Icon name="arrow-right" className="h-4 w-4" />
-          </button>
         </div>
 
         {!home.loaded && (
@@ -308,33 +324,37 @@ export default function Home() {
         )}
         {home.tutors.length > 0 && (
           <ul className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {home.tutors.map((t) => (
-              <li key={t.id} className="card flex flex-col p-4">
-                <div className="flex items-start gap-3">
-                  <Avatar src={t.photoUrl} name={t.name} className="h-24 w-20" rounded="rounded-xl" text="text-2xl" />
-                  <div className="min-w-0 flex-1">
-                    <h3 className="card-title">{t.name}</h3>
-                    <div className="mt-1 flex flex-wrap items-center gap-x-1 text-sm text-slate-700" aria-label={`Rated ${t.rating} out of 5 from ${t.reviewCount} reviews`}>
-                      <Icon name="star" fill className="h-4 w-4 text-accent-600" />
-                      <b>{t.rating}</b> <span className="text-slate-600">({t.reviewCount} reviews)</span>
+            {home.tutors.map((t, i) => (
+              <li key={t.id} className="home-reveal" style={{ '--reveal-delay': `${i * 60}ms` }}>
+                <article className="home-tutor-card card flex h-full flex-col p-4">
+                  <div className="flex items-start gap-3">
+                    <Avatar src={t.photoUrl} name={t.name} className="h-24 w-20" rounded="rounded-xl" text="text-2xl" />
+                    <div className="min-w-0 flex-1">
+                      <h3 className="card-title">{t.name}</h3>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-1 text-sm text-slate-700" aria-label={`Rated ${t.rating} out of 5 from ${t.reviewCount} reviews`}>
+                        <Icon name="star" fill className="h-4 w-4 text-accent-600" />
+                        <b>{t.rating}</b> <span className="text-slate-600">({t.reviewCount} reviews)</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-                <ul className="mt-4 space-y-2 text-[15px] leading-snug text-slate-700">
-                  <li className="flex items-start gap-2"><Icon name="book" className="mt-0.5 h-4 w-4 shrink-0 text-brand-500" /><span>{t.mainSubject}</span></li>
-                  <li className="flex items-start gap-2"><Icon name="cap" className="mt-0.5 h-4 w-4 shrink-0 text-brand-500" /><span>{t.levels}</span></li>
-                  <li className="flex items-start gap-2"><Icon name="pin" className="mt-0.5 h-4 w-4 shrink-0 text-brand-500" /><span>{t.location}</span></li>
-                </ul>
-                <div className="mt-auto pt-4 text-lg font-bold text-navy">RM {t.hourlyRate} / hour</div>
-                <button onClick={() => openProfile(t.id)} aria-label={`View profile of ${t.name}`} className="btn-outline mt-3 min-h-11 w-full">View Profile</button>
+                  <ul className="mt-4 space-y-2 text-[15px] leading-snug text-slate-700">
+                    <li className="flex items-start gap-2"><Icon name="book" className="mt-0.5 h-4 w-4 shrink-0 text-brand-500" /><span>{t.mainSubject}</span></li>
+                    <li className="flex items-start gap-2"><Icon name="cap" className="mt-0.5 h-4 w-4 shrink-0 text-brand-500" /><span>{t.levels}</span></li>
+                    <li className="flex items-start gap-2"><Icon name="pin" className="mt-0.5 h-4 w-4 shrink-0 text-brand-500" /><span>{t.location}</span></li>
+                  </ul>
+                  <div className="mt-auto pt-4 text-lg font-bold text-navy">RM {t.hourlyRate} / hour</div>
+                  <button onClick={() => openProfile(t.id)} aria-label={`View profile of ${t.name}`} className="btn-outline mt-3 min-h-11 w-full">View Profile</button>
+                </article>
               </li>
             ))}
           </ul>
         )}
       </section>
 
+      <ParentReviewCarousel reviews={home.reviews || []} />
+
       {/* ── Trust and safety ── */}
-      <section id="for-tutors" aria-labelledby="trust-title" className="grid scroll-mt-24 items-center gap-5 rounded-3xl bg-brand-50/80 p-7 shadow-card lg:grid-cols-[1fr_1.4fr]">
+      <section id="for-tutors" aria-labelledby="trust-title" className="home-reveal grid scroll-mt-24 items-center gap-5 rounded-3xl bg-brand-50/80 p-7 shadow-card lg:grid-cols-[1fr_1.4fr]">
         <div>
           <h2 id="trust-title" className="font-display text-xl font-bold text-navy">A Safer and More Reliable Learning Experience</h2>
           <p className="caption mt-2">We provide the tools and systems to ensure a safe, transparent and trustworthy platform for both parents and tutors.</p>
@@ -358,7 +378,7 @@ export default function Home() {
         <p className="pointer-events-none absolute right-[8%] top-1/2 hidden -translate-y-1/2 -rotate-6 text-center font-hand text-xl leading-5 text-white/55 lg:block" aria-hidden="true">
           Learn<br />Grow<br />Belong<br /><span className="text-accent/70">♡</span>
         </p>
-        <div className="relative mx-auto flex max-w-[81.25rem] flex-wrap items-center justify-between gap-5 px-4 py-9 md:px-8 lg:pl-28 lg:pr-48">
+        <div className="home-reveal relative mx-auto flex max-w-[81.25rem] flex-wrap items-center justify-between gap-5 px-4 py-9 md:px-8 lg:pl-28 lg:pr-48">
           <div>
             <h2 id="cta-title" className="font-display text-2xl font-bold md:text-3xl">Ready to Start Your Child's Learning Journey?</h2>
             <p className="mt-1 text-base text-white/90">Join learners and tutors in building a brighter future together.</p>

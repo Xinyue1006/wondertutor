@@ -9,6 +9,12 @@ export default function ProtectedRoute({ roles }) {
   const location = useLocation()
   if (loading) return <div className="p-10 text-center text-slate-500">Loading...</div>
   if (!user && sessionError) return <LoadError message={sessionError} onRetry={refreshSession} />
+  // Previously shared profile links now have a safe public equivalent. Booking,
+  // family and payment routes still follow the normal authentication guard.
+  const publicTutor = !user && roles?.length === 1 && roles[0] === 'PARENT'
+    ? location.pathname.match(/^\/parent\/tutors\/([1-9]\d*)\/?$/)
+    : null
+  if (publicTutor) return <Navigate to={`/tutors/${publicTutor[1]}${location.search}`} replace />
   if (!user) return <Navigate to={roles?.length === 1 && roles[0] === 'ADMIN' ? '/admin/login' : '/login'} replace
     state={sessionEnd?.reason === 'logout' ? null : { from: location.pathname + location.search, ...(sessionEnd?.userId != null && { fromUserId: sessionEnd.userId }) }} />
   if (roles && !roles.includes(user.role)) return <Navigate to={homeFor(user.role)} replace />

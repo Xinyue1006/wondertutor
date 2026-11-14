@@ -20,7 +20,7 @@ export const messageRequestSchema = z
 
 // ───────────── tool arguments ─────────────
 const BOOKING_STATUSES = ['PENDING', 'COUNTER_OFFERED', 'AWAITING_PAYMENT', 'CONFIRMED', 'COMPLETED', 'REJECTED', 'CANCELLED', 'DISPUTED']
-const CRITERIA_FIELDS = ['grade', 'days', 'timeStart', 'timeEnd', 'mode', 'location', 'budgetMin', 'budgetMax', 'gender', 'language', 'characteristics']
+const CRITERIA_FIELDS = ['grade', 'days', 'timeStart', 'timeEnd', 'mode', 'location', 'maxDistance', 'budgetMin', 'budgetMax', 'gender', 'language', 'characteristics']
 
 export const toolArgs = {
   finish_lookup: z.object({}).strict(),
@@ -38,6 +38,7 @@ export const toolArgs = {
       timeEnd: time.optional(),
       mode: z.enum(['ONLINE', 'PHYSICAL', 'EITHER']).optional(),
       location: z.string().trim().min(2).max(100).optional(),
+      maxDistance: z.number().positive().max(30).optional(),
       budgetMin: z.number().min(0).max(1000).optional(),
       budgetMax: z.number().min(0).max(1000).optional(),
       gender: z.enum(['MALE', 'FEMALE', 'ANY']).optional(),
@@ -129,6 +130,7 @@ export const cardSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('faq'), entries: z.array(z.object({ id: str(60), topic: str(120), answer: str(1200) }).strict()).max(5) }).strict(),
   z.object({
     type: z.literal('tutor_results'),
+    onlineAlternative: z.boolean().optional(), needsLocation: z.boolean().optional(), radiusKm: z.number().positive().max(30).nullable().optional(),
     searchRef: REF('search'), total: z.number().int(), link: route, temporary: z.literal(true),
     criteriaSummary: z.array(str(120)).max(20),
     tutors: z.array(z.object({
@@ -140,6 +142,7 @@ export const cardSchema = z.discriminatedUnion('type', [
   }).strict(),
   z.object({
     type: z.literal('match_explanation'),
+    onlineAlternative: z.boolean().optional(),
     name: str(120), score: z.number().int().min(0).max(100), label: str(40), reasons: z.array(str(160)).max(10),
     rank: z.number().int().positive(), total: z.number().int(), verified: z.boolean(), link: route,
   }).strict(),

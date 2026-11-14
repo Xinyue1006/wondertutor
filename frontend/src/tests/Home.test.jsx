@@ -22,6 +22,8 @@ const setup = (data) => {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<div>LOGIN PAGE</div>} />
+        <Route path="/tutors" element={<div>PUBLIC TUTORS</div>} />
+        <Route path="/tutors/:id" element={<div>PUBLIC TUTOR PROFILE</div>} />
         <Route path="/signup" element={<div>SIGNUP PAGE</div>} />
         <Route path="/parent/find-tutor/match" element={<div>WIZARD</div>} />
       </Routes>
@@ -33,6 +35,27 @@ const full = { tutors: [tutor], subjects: ['Mathematics', 'English'], locations:
 beforeEach(() => { auth = { user: null }; vi.clearAllMocks(); sessionStorage.clear() })
 
 describe('landing page', () => {
+  test('search works immediately while the tutor catalogue is still loading', async () => {
+    api.get.mockReturnValue(new Promise(() => {}))
+    render(
+      <MemoryRouter>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<div>LOGIN PAGE</div>} />
+          <Route path="/tutors" element={<div>PUBLIC TUTORS</div>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    const subject = screen.getByRole('combobox', { name: /Subject/ })
+    expect(subject).toBeEnabled()
+    expect(subject).toBeVisible()
+    await userEvent.type(subject, 'Mathematics')
+    await userEvent.type(screen.getByRole('combobox', { name: /Education Level/ }), 'Primary')
+    await userEvent.click(screen.getByRole('button', { name: /Search Tutors/ }))
+    expect(await screen.findByText('PUBLIC TUTORS')).toBeInTheDocument()
+    expect(JSON.parse(sessionStorage.getItem('wt-home-search'))).toMatchObject({ subject: 'Mathematics', level: 'Primary' })
+  })
+
   test('shows real tutors from the API and marks them as sample data', async () => {
     setup(full)
     expect(await screen.findByText('Daniel Tan')).toBeInTheDocument()
@@ -62,7 +85,7 @@ describe('landing page', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Pick a subject from the list.')
   })
 
-  test('typing narrows the suggestions and a valid search goes on (guests to Log In) and is remembered', async () => {
+  test('typing narrows the suggestions and a valid guest search opens public browsing and is remembered', async () => {
     setup(full)
     await screen.findByText('Daniel Tan')
     await userEvent.type(screen.getByRole('combobox', { name: /Subject/ }), 'mat')
@@ -71,7 +94,7 @@ describe('landing page', () => {
     await userEvent.click(await screen.findByRole('option', { name: 'Primary' }))
     expect(screen.getByText('Selected: Mathematics · Primary')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /Search Tutors/ }))
-    expect(await screen.findByText('LOGIN PAGE')).toBeInTheDocument()
+    expect(await screen.findByText('PUBLIC TUTORS')).toBeInTheDocument()
     expect(JSON.parse(sessionStorage.getItem('wt-home-search'))).toMatchObject({ subject: 'Mathematics', level: 'Primary' })
   })
 
@@ -81,6 +104,22 @@ describe('landing page', () => {
     await screen.findByText('Daniel Tan')
     await userEvent.click(screen.getByRole('button', { name: /Try AI Matching/ }))
     expect(await screen.findByText('WIZARD')).toBeInTheDocument()
+  })
+
+  test('a guest can open a featured tutor profile without logging in', async () => {
+    setup(full)
+    await screen.findByText('Daniel Tan')
+    await userEvent.click(screen.getByRole('button', { name: 'View profile of Daniel Tan' }))
+    expect(await screen.findByText('PUBLIC TUTOR PROFILE')).toBeInTheDocument()
+    expect(screen.queryByText('LOGIN PAGE')).not.toBeInTheDocument()
+  })
+
+  test('stored parent reviews link to public tutor profiles without a sample caption', async () => {
+    setup({ ...full, reviews: [{ id: 31, parentName: 'Parent S.H.', rating: 5, comment: 'Patient explanations helped my child understand the exercises.', tutorId: 7, tutorName: 'Daniel Tan' }] })
+    expect(await screen.findByRole('heading', { name: 'What Parents Say' })).toBeInTheDocument()
+    expect(screen.getByText('Patient explanations helped my child understand the exercises.')).toBeInTheDocument()
+    expect(screen.queryByText('Sample parent reviews for demonstration.')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: "View Daniel Tan's profile" })).toHaveAttribute('href', '/tutors/7')
   })
 
   test('the earlier search is restored when the visitor comes back', async () => {
@@ -94,7 +133,7 @@ describe('landing page', () => {
     api.get.mockImplementation(async (url, opts) => (url === '/public/places'
       ? { data: { popular: false, results: opts?.params?.q ? [{ label: 'Kota Kinabalu, Sabah', kind: 'town', state: 'Sabah' }] : [{ label: 'Kepong, Kuala Lumpur', kind: 'area', state: 'Kuala Lumpur' }] } }
       : { data: full }))
-    render(<MemoryRouter><Routes><Route path="/" element={<Home />} /><Route path="/login" element={<div>LOGIN PAGE</div>} /></Routes></MemoryRouter>)
+    render(<MemoryRouter><Routes><Route path="/" element={<Home />} /><Route path="/login" element={<div>LOGIN PAGE</div>} /><Route path="/tutors" element={<div>PUBLIC TUTORS</div>} /></Routes></MemoryRouter>)
     await screen.findByText('Daniel Tan')
     await userEvent.type(screen.getByRole('combobox', { name: /Subject/ }), 'Mathematics')
     await userEvent.type(screen.getByRole('combobox', { name: /Education Level/ }), 'Primary')
@@ -102,7 +141,7 @@ describe('landing page', () => {
     await userEvent.click(await screen.findByRole('option', { name: 'Kota Kinabalu, Sabah' }))
     expect(screen.getByDisplayValue('Kota Kinabalu, Sabah')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /^Search Tutors/ }))
-    expect(await screen.findByText('LOGIN PAGE')).toBeInTheDocument() // a visitor is asked to log in first
+    expect(await screen.findByText('PUBLIC TUTORS')).toBeInTheDocument()
     expect(JSON.parse(sessionStorage.getItem('wt-home-search'))).toMatchObject({ location: 'Kota Kinabalu, Sabah' })
   })
 

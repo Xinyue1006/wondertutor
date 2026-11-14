@@ -7,6 +7,7 @@ import { EmptyState, ErrorBox, LoadError, PageTitle, Spinner } from '../../compo
 import TutorCard from '../../components/TutorCard'
 import { CompareBar, useCompare } from '../../components/Compare'
 import FilterChips, { NO_EXTRA, applyExtra } from '../../components/FilterChips'
+import TutorSearchNotice, { OnlineTutorAlternatives } from '../../components/TutorSearchNotice'
 
 const SORTS = [
   ['recommended', 'Recommended'],
@@ -20,8 +21,12 @@ const SORTS = [
 export default function MatchResults() {
   const compare = useCompare() // up to 3 tutors ticked for the side-by-side comparison
   const navigate = useNavigate()
-  const { result, setResult, setCriteria } = useMatching()
-  const [loading, setLoading] = useState(!result)
+  const { result: originalResult, setResult, setCriteria } = useMatching()
+  const [scopedResult, setScopedResult] = useState(null)
+  const result = scopedResult || originalResult
+  const [loading, setLoading] = useState(!originalResult)
+  const [scopeBusy, setScopeBusy] = useState(false)
+  const scopeRequest = useRef(0)
   const [extra, setExtra] = useState(NO_EXTRA)
   const [sort, setSort] = useState('recommended')
   const [loadError, setLoadError] = useState('')
@@ -42,6 +47,24 @@ export default function MatchResults() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  async function changeFilters(next) {
+    const previous = extra
+    setExtra(next)
+    if (next.mode === previous.mode && next.maxDistance === previous.maxDistance) return
+    const request = ++scopeRequest.current
+    setScopeBusy(true)
+    setSaveError('')
+    try {
+      const response = await api.post('/parent/matching/preview', { criteria: {
+        ...originalResult.criteria, mode: next.mode || originalResult.criteria.mode || 'EITHER',
+        maxDistance: next.maxDistance ? Number(next.maxDistance) : null,
+      } })
+      if (request === scopeRequest.current) setScopedResult({ ...originalResult, ...response.data })
+    } catch (error) {
+      if (request === scopeRequest.current) { setExtra(current => ({ ...current, mode: previous.mode, maxDistance: previous.maxDistance })); setSaveError(errorMessage(error)) }
+    } finally { if (request === scopeRequest.current) setScopeBusy(false) }
+  }
+
   // Save / unsave from the results, the same heart as on Find a Tutor (a second click waits for the first)
   async function toggleSave(t) {
     if (saving.current.has(t.id)) return
@@ -49,7 +72,11 @@ export default function MatchResults() {
     setSaveError('')
     try {
       const r = await api.post(`/parent/favourites/${t.id}`)
-      setResult((res) => ({ ...res, tutors: res.tutors.map((x) => (x.id === t.id ? { ...x, isFavourite: r.data.isFavourite } : x)) }))
+      const update = res => ({ ...res, tutors: res.tutors.map(x => x.id === t.id ? { ...x, isFavourite: r.data.isFavourite } : x),
+        ...(res.onlineAlternatives && { onlineAlternatives: { ...res.onlineAlternatives, tutors: res.onlineAlternatives.tutors.map(x => x.id === t.id ? { ...x, isFavourite: r.data.isFavourite } : x) } }),
+      })
+      setResult(update)
+      setScopedResult(current => current ? update(current) : current)
     } catch (err) {
       setSaveError(errorMessage(err))
     } finally {
@@ -67,6 +94,12 @@ export default function MatchResults() {
       nearest: (a, b) => (a.match.distanceKm ?? 999) - (b.match.distanceKm ?? 999),
     }[sort]
     return by ? [...list].sort(by) : list // "recommended" keeps the server's score order
+  }, [result, extra, sort])
+  const alternatives = useMemo(() => {
+    if (!result || extra.mode === 'ONLINE') return []
+    const list = applyExtra(result.onlineAlternatives?.tutors || [], { ...extra, mode: 'ONLINE', maxDistance: '' })
+    const by = { price_asc: (a, b) => a.hourlyRate - b.hourlyRate, price_desc: (a, b) => b.hourlyRate - a.hourlyRate, rating: (a, b) => b.rating - a.rating }[sort]
+    return by ? [...list].sort(by) : list
   }, [result, extra, sort])
 
   if (loading) return <Spinner />
@@ -102,7 +135,7 @@ export default function MatchResults() {
       </div>
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <FilterChips extra={extra} setExtra={setExtra} locationName={result.criteria.location} />
+        <FilterChips extra={extra} setExtra={changeFilters} locationName={result.criteria.location} />
         <label className="flex items-center gap-2 text-sm font-semibold text-navy">
           Sort by:
           <select value={sort} onChange={(e) => setSort(e.target.value)} className="input h-10 w-44 font-medium">
@@ -112,15 +145,22 @@ export default function MatchResults() {
       </div>
 
       <ErrorBox className="mb-4">{saveError}</ErrorBox>
-      {tutors.length === 0 ? (
+      {scopeBusy && <p role="status" className="mb-4 text-sm text-slate-600">Updating tutor results…</p>}
+      {!scopeBusy && <TutorSearchNotice scope={result.searchScope} hasResults={tutors.length > 0} />}
+      {!scopeBusy && tutors.length === 0 && result.searchScope?.mode !== 'PHYSICAL' ? (
         <div className="card"><EmptyState icon="search" title={result.total === 0 ? 'No eligible tutors yet' : 'No tutors match these filters'}>
           {result.total === 0 ? 'No tutor currently teaches this subject at your child\'s level. Try changing the subject or level.' : 'Try removing some filters.'}
         </EmptyState></div>
-      ) : (
+      ) : !scopeBusy && (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {tutors.map((t) => <TutorCard key={t.id} tutor={t} match={t.match} saved={t.isFavourite} onToggleSave={toggleSave} compare={compare} />)}
         </div>
       )}
+      {!scopeBusy && tutors.length === 0 && <OnlineTutorAlternatives total={alternatives.length}>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {alternatives.map(t => <TutorCard key={t.id} tutor={t} match={t.match} saved={t.isFavourite} onToggleSave={toggleSave} compare={compare} />)}
+        </div>
+      </OnlineTutorAlternatives>}
       <CompareBar compare={compare} />
     </div>
   )

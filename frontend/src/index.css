@@ -113,6 +113,62 @@ body {
   50% { transform: rotate(10deg); }
 }
 
+/* Landing-page motion is progressive enhancement: without the observer or a
+   motion preference, every section remains visible. The hero form is outside
+   the animated copy, and these effects never change layout or hit targets. */
+@keyframes home-hero-enter {
+  from { opacity: 0; transform: translateY(var(--home-enter-distance, 12px)); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes home-hero-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .home-hero-copy {
+    animation: home-hero-enter 550ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .home-hero-image {
+    animation: home-hero-fade 650ms ease-out both;
+  }
+  .home-tutor-card {
+    transition: transform 180ms ease-out;
+  }
+  .home-reveal {
+    transition: opacity 450ms ease-out, transform 450ms cubic-bezier(0.22, 1, 0.36, 1);
+    transition-delay: var(--reveal-delay, 0ms);
+  }
+  .home-reveal[data-reveal-state="pending"] {
+    opacity: 0;
+    transform: translateY(var(--home-enter-distance, 12px));
+  }
+  .home-reveal[data-reveal-state="visible"] {
+    opacity: 1;
+    transform: none;
+  }
+  /* A keyboard user must see a section as soon as one of its controls is focused. */
+  .home-reveal:focus-within {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+@media (max-width: 767px) and (prefers-reduced-motion: no-preference) {
+  .home-hero-copy, .home-reveal { --home-enter-distance: 8px; }
+  .home-reveal { transition-delay: 0ms; }
+}
+
+/* Touch screens keep the card stationary; hover lift is for a precise pointer. */
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .home-tutor-card:not([data-reveal-state="pending"]):hover {
+    transform: translateY(-3px);
+    border-color: var(--color-brand-200);
+    box-shadow: 0 10px 30px rgba(26, 109, 255, 0.12);
+  }
+}
+
 
 /* ── Typography tokens (one scale for headings, so pages stay consistent) ── */
 @utility eyebrow {
@@ -138,6 +194,13 @@ body {
 /* Respect "reduce motion" settings: no floating mascot, no smooth scrolling */
 @media (prefers-reduced-motion: reduce) {
   .float-y { animation: none; }
+  .home-hero-copy, .home-hero-image, .home-reveal, .home-tutor-card {
+    animation: none !important;
+    transition: none !important;
+    transition-delay: 0ms !important;
+    transform: none !important;
+  }
+  .home-reveal[data-reveal-state] { opacity: 1 !important; }
   html { scroll-behavior: auto; }
   * { transition-duration: 0.01ms !important; }
 }

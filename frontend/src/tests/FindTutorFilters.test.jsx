@@ -53,3 +53,33 @@ test('Clear filters clears optional search fields and extra filters and restores
   expect(screen.getByRole('combobox', { name: /Subject/ })).toHaveValue('Chemistry')
   await waitFor(() => expect(api.get.mock.lastCall[1].params).toEqual({ subject: 'Chemistry', level: 'SECONDARY', grade: 5, sort: 'recommended', page: 1, pageSize: 9 }))
 })
+
+const remoteTutor = { id: 18, name: 'Remote English Tutor', photoUrl: null, rating: 4.5, reviewCount: 2, hourlyRate: 55, mainSubject: 'English', levels: 'Primary 1–6', offersOnline: true, offersPhysical: true, location: 'Bayan Lepas, Pulau Pinang', availableDays: ['Mon'], characteristics: [], searchMode: 'ONLINE', match: { score: 90, label: 'Highly suitable', reasons: ['Offers online lessons'], distanceKm: null } }
+
+test('no nearby result shows online alternatives separately and carries Online into booking', async () => {
+  api.get.mockResolvedValue({ data: { total: 0, tutors: [], page: 1, totalPages: 1,
+    searchScope: { mode: 'PHYSICAL', location: 'Kuala Terengganu, Terengganu', radiusKm: 30 },
+    onlineAlternatives: { total: 1, tutors: [remoteTutor], page: 1, totalPages: 1 },
+  } })
+  open()
+  expect(await screen.findByText('No nearby tutors found')).toBeVisible()
+  const alternatives = screen.getByRole('region', { name: 'Online alternatives' })
+  expect(within(alternatives).getByRole('heading', { name: remoteTutor.name })).toBeVisible()
+  expect(within(alternatives).getByText('Online')).toBeVisible()
+  expect(within(alternatives).queryByText('Physical')).not.toBeInTheDocument()
+  expect(within(alternatives).getByRole('link', { name: 'Book a Lesson' })).toHaveAttribute('href', '/parent/tutors/18/book?mode=ONLINE')
+})
+
+test('selecting Online reruns the search and replaces the local fallback with nationwide primary results', async () => {
+  api.get.mockImplementation(async (_, options) => ({ data: options.params.mode === 'ONLINE'
+    ? { total: 1, tutors: [remoteTutor], page: 1, totalPages: 1, searchScope: { mode: 'ONLINE' } }
+    : { total: 0, tutors: [], page: 1, totalPages: 1, searchScope: { mode: 'PHYSICAL', radiusKm: 30, location: 'Kuala Lumpur' }, onlineAlternatives: { total: 1, tutors: [remoteTutor], page: 1, totalPages: 1 } },
+  }))
+  open()
+  await screen.findByText('No nearby tutors found')
+  fireEvent.click(screen.getByRole('button', { name: 'Teaching Mode' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Online', exact: true }))
+  expect(await screen.findByText('Online lessons across Malaysia. Distance does not limit these results.')).toBeVisible()
+  expect(screen.queryByRole('region', { name: 'Online alternatives' })).not.toBeInTheDocument()
+  expect(api.get.mock.lastCall[1].params.mode).toBe('ONLINE')
+})

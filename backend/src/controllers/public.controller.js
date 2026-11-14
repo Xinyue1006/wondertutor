@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { prisma } from '../config/prisma.js'
-import { SUBJECTS, SUBJECT_LEVELS, LOCATIONS } from '../data/catalog.js'
-import { tutorInclude, toTutorCard } from '../services/tutor.service.js'
+import { SUBJECTS, SUBJECT_LEVELS, LOCATIONS, findLocation } from '../data/catalog.js'
+import { publicTutorWhere, publicTutorInclude, publicTutorCard, publicTutorPage, publicTutorProfile, publicTutorReviews, landingParentReviews } from '../services/publicTutor.service.js'
 import { STATES, placesInfo, searchPlaces } from '../services/places.service.js'
 import { FAQ, FAQ_VERSION } from '../services/assistant/faq.js'
 
@@ -14,18 +14,37 @@ export function faqData(req, res) {
 // GET /public/home: data for the landing page (no login needed). Only public facts:
 // the top-rated active tutors (same card shape as the browse page) plus the dropdown lists.
 export async function homeData(req, res) {
-  const rows = await prisma.tutorProfile.findMany({
-    where: { user: { status: 'ACTIVE' }, ratingCount: { gt: 0 } },
-    include: tutorInclude,
+  const [rows, reviews, areas] = await Promise.all([prisma.tutorProfile.findMany({
+    where: { ...publicTutorWhere, ratingCount: { gt: 0 } },
+    include: publicTutorInclude,
     orderBy: [{ ratingAvg: 'desc' }, { ratingCount: 'desc' }],
     take: 4,
-  })
+  }), landingParentReviews(), prisma.tutorProfile.findMany({
+    where: publicTutorWhere,
+    select: { location: true },
+    distinct: ['location'],
+  })])
   res.json({
-    tutors: rows.map((t) => toTutorCard(t)),
+    tutors: rows.map(t => publicTutorCard(t)),
+    reviews,
     subjects: SUBJECTS,
     subjectLevels: SUBJECT_LEVELS,
-    locations: LOCATIONS.map((l) => l.name),
+    // Include the regions tutors actually serve, using recognised area labels
+    // only. Never turn an imported private street address into a public option.
+    locations: [...new Set([...LOCATIONS.map(location => location.name), ...areas.map(area => findLocation(area.location)?.name).filter(Boolean).sort()])],
   })
+}
+
+export async function browsePublicTutors(req, res) {
+  res.json(await publicTutorPage(req.query))
+}
+
+export async function getPublicTutor(req, res) {
+  res.json({ tutor: await publicTutorProfile(Number(req.params.id)) })
+}
+
+export async function getPublicTutorReviews(req, res) {
+  res.json(await publicTutorReviews(Number(req.params.id), req.query))
 }
 
 // GET /public/places?q=kepong&state=Selangor&limit=8: the area picker. Search by town, neighbourhood or postcode; with

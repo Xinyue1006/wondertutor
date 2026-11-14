@@ -60,11 +60,11 @@ const T = {
     complaintsNone: () => ["I couldn't find any complaints matching that."],
     complaints: (e) => [`You have ${e.items.length} complaint${plural(e.items.length, '', 's')} matching that:`, ...e.items.slice(0, 5).map((c) => `• ${c.category}, filed ${c.filedDate}: ${status('en', c.status)}`)],
     notifications: (e) => [`You have ${e.unread} unread notification${plural(e.unread, '', 's')}. The latest ones are shown below.`],
-    tutorsNone: () => ['No tutors match these criteria yet. Try removing a preference such as budget, days or area.'],
-    tutors: (e) => [`I found ${e.total} matching tutor${plural(e.total, '', 's')}${e.top.length ? '. Top results:' : '.'}`,
+    tutorsNone: (e) => [e.needsLocation ? 'Which area, town or postcode should I use to find physical tutors within 30 km?' : 'No tutors match these criteria yet. Try changing the lesson mode, area or other preferences.'],
+    tutors: (e) => [e.onlineAlternative ? `No nearby physical tutor matches these criteria. Here are ${e.total} online alternatives across Malaysia:` : `I found ${e.total} matching tutor${plural(e.total, '', 's')}${e.top.length ? '. Top results:' : '.'}`,
       ...e.top.slice(0, 3).map((t, i) => `${i + 1}. [[${t.tutorRef}]]: ${t.score}% compatibility${t.verified ? ', verified' : ''}`),
       'The match % is a compatibility score from fixed rules, not a prediction of results. Verified tutors are listed first.'],
-    match: (e) => [`[[${e.tutorRef}]] is ranked ${e.rank} of ${e.total} with a ${e.score}% compatibility score (${e.label}). The reasons are listed below.`],
+    match: (e) => [`${e.onlineAlternative ? 'For online lessons, ' : ''}[[${e.tutorRef}]] is ranked ${e.rank} of ${e.total} with a ${e.score}% compatibility score (${e.label}). The reasons are listed below.`],
     missing: (e) => [e.reason === 'no_children' ? "You don't have any child profiles yet, so I can't look that up." : e.reason === 'invalid_range' ? 'The date range looks wrong (the start is after the end). Please give it again.' : "I couldn't find a matching record in your account for that."],
     noEvidence: () => ["I can help you look things up in WonderTutor, but I can't book, cancel, pay or change records. What would you like to check: lessons, payments, learning progress or tutors?"],
     askSubject: () => 'Which subject and education level do you need (for example Mathematics for Primary 4)?',
@@ -95,11 +95,11 @@ const T = {
     complaintsNone: () => ['Saya tidak menjumpai sebarang aduan yang sepadan.'],
     complaints: (e) => [`Anda mempunyai ${e.items.length} aduan yang sepadan:`, ...e.items.slice(0, 5).map((c) => `• ${c.category}, difailkan ${c.filedDate}: ${status('ms', c.status)}`)],
     notifications: (e) => [`Anda mempunyai ${e.unread} notifikasi belum dibaca. Notifikasi terkini dipaparkan di bawah.`],
-    tutorsNone: () => ['Belum ada tutor yang sepadan dengan kriteria ini. Cuba buang satu pilihan seperti bajet, hari atau kawasan.'],
-    tutors: (e) => [`Saya menjumpai ${e.total} tutor yang sepadan${e.top.length ? '. Keputusan teratas:' : '.'}`,
+    tutorsNone: (e) => [e.needsLocation ? 'Kawasan, bandar atau poskod mana untuk mencari tutor fizikal dalam lingkungan 30 km?' : 'Belum ada tutor yang sepadan. Cuba ubah mod kelas, kawasan atau pilihan lain.'],
+    tutors: (e) => [e.onlineAlternative ? `Tiada tutor fizikal berdekatan yang sepadan. Berikut ${e.total} alternatif dalam talian di seluruh Malaysia:` : `Saya menjumpai ${e.total} tutor yang sepadan${e.top.length ? '. Keputusan teratas:' : '.'}`,
       ...e.top.slice(0, 3).map((t, i) => `${i + 1}. [[${t.tutorRef}]]: keserasian ${t.score}%${t.verified ? ', disahkan' : ''}`),
       'Peratus padanan ialah skor keserasian berdasarkan peraturan tetap, bukan ramalan keputusan. Tutor yang disahkan disenaraikan dahulu.'],
-    match: (e) => [`[[${e.tutorRef}]] berada di kedudukan ${e.rank} daripada ${e.total} dengan skor keserasian ${e.score}% (${e.label}). Sebab-sebabnya disenaraikan di bawah.`],
+    match: (e) => [`${e.onlineAlternative ? 'Untuk kelas dalam talian, ' : ''}[[${e.tutorRef}]] berada di kedudukan ${e.rank} daripada ${e.total} dengan skor keserasian ${e.score}% (${e.label}). Sebab-sebabnya disenaraikan di bawah.`],
     missing: (e) => [e.reason === 'no_children' ? 'Anda belum mempunyai profil anak, jadi saya tidak dapat menyemaknya.' : e.reason === 'invalid_range' ? 'Julat tarikh nampaknya salah (tarikh mula selepas tarikh akhir). Sila beri semula.' : 'Saya tidak menjumpai rekod yang sepadan dalam akaun anda.'],
     noEvidence: () => ['Saya boleh membantu menyemak maklumat WonderTutor, tetapi tidak boleh menempah, membatalkan, membayar atau mengubah rekod. Apa yang anda ingin semak: kelas, bayaran, perkembangan pembelajaran atau tutor?'],
     askSubject: () => 'Subjek dan tahap pendidikan yang manakah (contohnya Matematik untuk Darjah 4)?',
@@ -130,11 +130,11 @@ const T = {
     complaintsNone: () => ['没有找到符合条件的投诉。'],
     complaints: (e) => [`找到 ${e.items.length} 条符合条件的投诉：`, ...e.items.slice(0, 5).map((c) => `• ${c.category}，提交于 ${c.filedDate}：${status('zh', c.status)}`)],
     notifications: (e) => [`您有 ${e.unread} 条未读通知，最新通知见下方。`],
-    tutorsNone: () => ['目前没有符合这些条件的老师。可以试着放宽预算、日期或地区等偏好。'],
-    tutors: (e) => [`找到 ${e.total} 位符合条件的老师${e.top.length ? '，排名靠前的是：' : '。'}`,
+    tutorsNone: (e) => [e.needsLocation ? '请提供地区、城镇或邮编，以寻找30公里内的实体课老师。' : '目前没有符合条件的老师，可以尝试更改上课方式、地区或其他偏好。'],
+    tutors: (e) => [e.onlineAlternative ? `附近没有符合条件的实体课老师。以下是全马 ${e.total} 位线上课老师作为替代选择：` : `找到 ${e.total} 位符合条件的老师${e.top.length ? '，排名靠前的是：' : '。'}`,
       ...e.top.slice(0, 3).map((t, i) => `${i + 1}. [[${t.tutorRef}]]：匹配度 ${t.score}%${t.verified ? '，已认证' : ''}`),
       '匹配度是按固定规则计算的契合分数，不是对学习结果的预测。已认证的老师排在前面。'],
-    match: (e) => [`[[${e.tutorRef}]] 在 ${e.total} 位老师中排第 ${e.rank}，匹配度 ${e.score}%（${e.label}）。原因见下方。`],
+    match: (e) => [`${e.onlineAlternative ? '在线上课替代选择中，' : ''}[[${e.tutorRef}]] 在 ${e.total} 位老师中排第 ${e.rank}，匹配度 ${e.score}%（${e.label}）。原因见下方。`],
     missing: (e) => [e.reason === 'no_children' ? '您还没有孩子档案，所以无法查询。' : e.reason === 'invalid_range' ? '日期范围似乎有误（开始日期晚于结束日期），请重新告诉我。' : '在您的账户中没有找到对应的记录。'],
     noEvidence: () => ['我可以帮你查询 WonderTutor 的信息，但不能预约、取消、付款或修改记录。你想查看课程、付款、学习进度，还是寻找老师？'],
     askSubject: () => '您需要哪个科目和年级（例如小四数学）？',
@@ -164,7 +164,7 @@ export function composeFromEvidence(ctx, lang = 'en') {
       case 'refunds': lines.push(...(e.items.length ? t.refunds(e) : t.refundsNone())); break
       case 'complaints': lines.push(...(e.items.length ? t.complaints(e) : t.complaintsNone())); break
       case 'notifications': lines.push(...t.notifications(e)); break
-      case 'tutors': lines.push(...(e.total ? t.tutors(e) : t.tutorsNone())); break
+      case 'tutors': lines.push(...(e.total ? t.tutors(e) : t.tutorsNone(e))); break
       case 'match': lines.push(...t.match(e)); break
       case 'faq': lines.push(e.entries[0].answer); break // approved policy text, English only
       case 'missing': lines.push(...t.missing(e)); break

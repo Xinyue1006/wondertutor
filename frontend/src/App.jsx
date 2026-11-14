@@ -29,6 +29,7 @@ const FindTutor = lazy(() => import('./pages/parent/FindTutor'))
 const MatchingWizard = lazy(() => import('./pages/parent/MatchingWizard'))
 const MatchResults = lazy(() => import('./pages/parent/MatchResults'))
 const TutorProfile = lazy(() => import('./pages/parent/TutorProfile'))
+const PublicTutors = lazy(() => import('./pages/PublicTutors'))
 const BookLesson = lazy(() => import('./pages/parent/BookLesson'))
 const MyBookings = lazy(() => import('./pages/parent/MyBookings'))
 const MyChildren = lazy(() => import('./pages/parent/MyChildren'))
@@ -63,6 +64,8 @@ export default function App() {
       {/* Public */}
       <Route element={<PublicLayout />}>
         <Route path="/" element={<Home />} />
+        <Route path="/tutors" element={<PublicTutors />} />
+        <Route path="/tutors/:id" element={<TutorProfile publicView />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/faq" element={<Help />} />
         <Route path="/login" element={<GuestOnly><Login /></GuestOnly>} />

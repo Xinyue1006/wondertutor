@@ -52,7 +52,9 @@ export default function Signup() {
   const { saveSession } = useAuth()
   const [draft] = useState(loadDraft)
   // Sent here from Log In with an unverified account: a new code was just emailed, so start on the code screen
-  const verifyEmail = useLocation().state?.verifyEmail
+  const { state } = useLocation()
+  const verifyEmail = state?.verifyEmail
+  const returnState = { from: state?.from, fromUserId: state?.fromUserId }
   const [step, setStep] = useState(verifyEmail ? 2 : 0)
   const [role, setRole] = useState(draft?.role || 'PARENT')
   const [section, setSection] = useState(SECTIONS[draft?.role || 'PARENT'][0].id)
@@ -198,8 +200,8 @@ export default function Signup() {
       try { sessionStorage.removeItem(DRAFT_KEY) } catch { /* ignore */ }
       saveSession(res.data.user, res.data.csrfToken)
       // A new tutor goes on to the profile setup (step 4, "Complete profile"); they may leave it and use the portal
-      // straight away. A parent goes to their dashboard.
-      navigate(res.data.user.role === 'TUTOR' ? '/tutor/setup' : afterLogin(res.data.user))
+      // straight away. Parents resume a requested booking, otherwise their dashboard.
+      navigate(res.data.user.role === 'TUTOR' ? '/tutor/setup' : afterLogin(res.data.user, state?.from, state?.fromUserId), { replace: true, state: null })
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -234,7 +236,7 @@ export default function Signup() {
     <div className="relative mx-auto max-w-[81.25rem] px-4 md:px-8">
       <div className="relative">
         {step < 2 && (
-          <button onClick={() => (step === 1 ? setStep(0) : navigate('/login'))} className="flex min-h-11 items-center gap-2 text-sm font-semibold text-brand-600 hover:underline md:absolute md:left-0 md:top-0">
+          <button onClick={() => (step === 1 ? setStep(0) : navigate('/login', { state: returnState }))} className="flex min-h-11 items-center gap-2 text-sm font-semibold text-brand-600 hover:underline md:absolute md:left-0 md:top-0">
             <Icon name="arrow-left" className="h-4 w-4" /> {step === 1 ? 'Back' : 'Back to login'}
           </button>
         )}
@@ -268,7 +270,7 @@ export default function Signup() {
           <p className="mt-2 text-xs text-slate-600">By continuing you agree to the <Link to="/privacy" target="_blank" className="font-semibold text-brand-600 underline">Terms of Use and Privacy Notice</Link>.</p>
           {error && <p role="alert" className="mt-2 text-sm text-red-700">{error}</p>}
           <p className="mt-3 text-sm text-slate-700">
-            Already have an account? <Link to="/login" className="inline-flex min-h-11 items-center font-semibold text-brand-600 hover:underline">Log in</Link>
+            Already have an account? <Link to="/login" state={returnState} className="inline-flex min-h-11 items-center font-semibold text-brand-600 hover:underline">Log in</Link>
           </p>
         </div>
       )}

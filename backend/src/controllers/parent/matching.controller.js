@@ -4,7 +4,8 @@ import { CHARACTERISTICS, LANGUAGES, MAX_GRADE, SUBJECTS } from '../../data/cata
 import { hhmm as hhmmRule, optionalText } from '../../utils/validators.js'
 import { recordReference, referenceWhere } from '../../utils/publicIds.js'
 import { AppError } from '../../utils/AppError.js'
-import { runMatchingForParent } from '../../services/matchingApp.service.js'
+import { tutorRecommendationsForParent } from '../../services/matchingApp.service.js'
+import { withSavedTutorLocation } from '../../services/tutorSearchScope.js'
 
 const hhmm = hhmmRule()
 
@@ -20,6 +21,7 @@ export const criteriaSchema = z.object({
   timeEnd: hhmm.optional().nullable(),
   mode: z.enum(['ONLINE', 'PHYSICAL', 'EITHER']).default('EITHER'),
   location: z.string().trim().max(100).optional().nullable(),
+  maxDistance: z.number().positive().max(30).optional().nullable(),
   budgetMin: z.number().min(0).max(1000, 'Budget cannot be more than RM1000').optional().nullable(),
   budgetMax: z.number().min(0).max(1000, 'Budget cannot be more than RM1000').optional().nullable(),
   gender: z.enum(['MALE', 'FEMALE', 'ANY']).default('ANY'),
@@ -33,7 +35,19 @@ export const criteriaSchema = z.object({
   .refine((c) => c.budgetMin == null || c.budgetMax == null || c.budgetMin <= c.budgetMax, { message: 'The minimum budget cannot be more than the maximum', path: ['budgetMax'] })
 
 // The retrieval + ranking lives in services/matchingApp.service.js so the AI assistant can reuse it without saving
-const runMatching = (criteria, parentId) => runMatchingForParent(criteria, parentId)
+const runMatching = (criteria, parentId) => tutorRecommendationsForParent(criteria, parentId)
+
+// A parent changing result filters reruns the same engine without saving a
+// MatchingRequest, including when those results originated in the read-only AI.
+export async function previewMatching(req, res) {
+  const raw = z.object({ criteria: criteriaSchema }).parse(req.body).criteria
+  const childId = raw.childId
+    ? (await prisma.child.findFirst({ where: { ...referenceWhere(raw.childId), parentId: req.parent.id } }))?.id ?? null
+    : null
+  if (raw.childId && !childId) throw new AppError(404, 'Child not found')
+  const criteria = withSavedTutorLocation({ ...raw, childId }, req.parent)
+  res.json({ criteria, ...await runMatching(criteria, req.parent.id) })
+}
 
 // POST /parent/matching: run the matching and save the search for traceability (MatchingRequest)
 export async function createMatching(req, res) {
@@ -47,7 +61,7 @@ export async function createMatching(req, res) {
     : null
   if (raw.childId && !childId) throw new AppError(404, 'Child not found')
   // Matching and saved criteria keep numeric foreign keys internally.
-  const criteria = { ...raw, childId }
+  const criteria = withSavedTutorLocation({ ...raw, childId }, req.parent)
 
   const results = await runMatching(criteria, req.parent.id)
   const saved = await prisma.matchingRequest.create({
@@ -56,10 +70,10 @@ export async function createMatching(req, res) {
       childId,
       source,
       criteria,
-      results: results.map((r) => ({ tutorId: r.id, score: r.match.score, reasons: r.match.reasons })),
+      results: (results.total ? results.tutors : results.onlineAlternatives.tutors).map((r) => ({ tutorId: r.id, score: r.match.score, reasons: r.match.reasons, mode: r.searchMode, onlineAlternative: !results.total })),
     },
   })
-  res.status(201).json({ id: saved.id, criteria, total: results.length, tutors: results })
+  res.status(201).json({ id: saved.id, criteria, ...results })
 }
 
 // GET /parent/matching/latest: "Continue where you left off" (re-run so ratings/availability are fresh)
@@ -68,6 +82,6 @@ export async function latestMatching(req, res) {
   if (!last) return res.json({ matching: null })
   const criteria = criteriaSchema.safeParse(last.criteria)
   if (!criteria.success) return res.json({ matching: null })
-  const tutors = await runMatching(criteria.data, req.parent.id)
-  res.json({ matching: { id: last.id, criteria: criteria.data, total: tutors.length, tutors, createdAt: last.createdAt } })
+  const results = await runMatching(criteria.data, req.parent.id)
+  res.json({ matching: { id: last.id, criteria: criteria.data, ...results, createdAt: last.createdAt } })
 }

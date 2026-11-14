@@ -4,11 +4,11 @@ import Logo from '../components/Logo'
 import { useAuth } from '../context/AuthContext'
 import { homeFor } from '../components/ProtectedRoute'
 
-// Public nav (matches the login / signup mockups). "Find a Tutor" needs an account, so it leads to Log In.
+// Public browsing stays open; only account actions require a signed-in parent.
 const footerLink = 'inline-flex min-h-9 items-center text-slate-700 hover:text-brand-600 hover:underline'
 
 const LINKS = [
-  ['Find a Tutor', '/login'],
+  ['Find a Tutor', '/tutors'],
   ['How It Works', '/#how-it-works'],
   ['For Parents', '/#for-parents'],
   ['For Tutors', '/#for-tutors'],
@@ -32,8 +32,9 @@ export default function PublicLayout() {
   // The login page is a single screen: no footer, and the page fills the window height so nothing needs scrolling
   const isLogin = pathname === '/login'
   const [menuOpen, setMenuOpen] = useState(false)
-  // Only the in-page sections can be "current"; "Find a Tutor" just leads to Log In and must not light up on that page
-  const isActive = (to) => to.startsWith('/#') && pathname === '/' && hash === to.slice(1)
+  const isActive = (to) => to === '/tutors'
+    ? pathname === '/tutors' || pathname.startsWith('/tutors/')
+    : to.startsWith('/#') && pathname === '/' && hash === to.slice(1)
   return (
     <div className={"flex min-h-screen flex-col overflow-x-clip"}>
       {/* Plain full-width bar (no box or border), like the landing mockup */}
@@ -52,8 +53,8 @@ export default function PublicLayout() {
               <Link to={homeFor(user.role)} className="btn-primary min-h-11 px-4 sm:px-5">My Dashboard</Link>
             ) : (
               <>
-                <Link to="/login" aria-current={pathname === '/login' ? 'page' : undefined} className={`btn-outline min-h-11 px-4 sm:px-5 ${pathname === '/login' ? 'bg-brand-50' : ''}`}>Log In</Link>
-                <Link to="/signup" aria-current={pathname === '/signup' ? 'page' : undefined} className="btn-accent min-h-11 px-4 sm:px-5">Sign Up</Link>
+                <Link to="/login" aria-current={pathname === '/login' ? 'page' : undefined} className={`btn-outline min-h-11 whitespace-nowrap px-3 sm:px-5 ${pathname === '/login' ? 'bg-brand-50' : ''}`}>Log In</Link>
+                <Link to="/signup" aria-current={pathname === '/signup' ? 'page' : undefined} className="btn-accent min-h-11 whitespace-nowrap px-3 sm:px-5">Sign Up</Link>
               </>
             )}
             <button
@@ -96,7 +97,7 @@ export default function PublicLayout() {
             <nav aria-label="Platform">
               <h2 className="mb-2 font-display text-base font-bold text-navy">Platform</h2>
               <ul className="space-y-1">
-                <li><Link to="/login" className={footerLink}>Find a Tutor</Link></li>
+                <li><Link to="/tutors" className={footerLink}>Find a Tutor</Link></li>
                 <li><a href="/#how-it-works" className={footerLink}>How It Works</a></li>
                 <li><a href="/#for-parents" className={footerLink}>For Parents</a></li>
                 <li><a href="/#for-tutors" className={footerLink}>For Tutors</a></li>

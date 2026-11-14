@@ -63,22 +63,22 @@ export default function FilterChips({ extra, setExtra, locationName, onClear, sh
         </div>
       </FilterDropdown>
 
-      <FilterDropdown label="Location" active={!!extra.maxDistance} width="w-60">
+      {extra.mode !== 'ONLINE' && <FilterDropdown label="Location" active={!!extra.maxDistance} width="w-60">
         {(close) => (
           <>
             <div className="mb-1 px-3 text-xs text-slate-500">Distance from {locationName || 'your area'}</div>
-            {[['', 'Any distance'], [5, 'Within 5 km'], [10, 'Within 10 km'], [20, 'Within 20 km']].map(([v, l]) => (
+            {[['', 'Within 30 km (default)'], [5, 'Within 5 km'], [10, 'Within 10 km'], [20, 'Within 20 km']].map(([v, l]) => (
               <button key={l} disabled={!locationName && v !== ''} onClick={() => { setExtra({ ...extra, maxDistance: v }); close() }}
                 className={`block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-brand-50 disabled:opacity-40 ${extra.maxDistance === v ? 'font-bold text-brand-500' : 'text-navy'}`}>{l}</button>
             ))}
             {!locationName && <div className="px-3 pt-1 text-xs text-slate-500">Choose a location first.</div>}
           </>
         )}
-      </FilterDropdown>
+      </FilterDropdown>}
 
       <FilterDropdown label="Teaching Mode" active={!!extra.mode} width="w-52">
         {(close) => [['', 'Online or Physical'], ['ONLINE', 'Online'], ['PHYSICAL', 'Physical']].map(([v, l]) => (
-          <button key={l} onClick={() => { setExtra({ ...extra, mode: v }); close() }}
+          <button key={l} onClick={() => { setExtra({ ...extra, mode: v, maxDistance: v === 'ONLINE' ? '' : extra.maxDistance }); close() }}
             className={`block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-brand-50 ${extra.mode === v ? 'font-bold text-brand-500' : 'text-navy'}`}>{l}</button>
         ))}
       </FilterDropdown>
@@ -103,9 +103,13 @@ export function applyExtra(tutors, x) {
     if (x.minRating && t.rating < Number(x.minRating)) return false
     if (x.mode === 'ONLINE' && !t.offersOnline) return false
     if (x.mode === 'PHYSICAL' && !t.offersPhysical) return false
+    if (x.mode === 'PHYSICAL' && t.searchMode === 'ONLINE') return false
     if (x.days.length && !x.days.some((d) => t.availableDays.includes(DAY_SHORT[d]))) return false
     if (x.characteristics.length && !x.characteristics.some((c) => t.characteristics.includes(c))) return false
-    if (x.maxDistance && t.offersPhysical && !t.offersOnline && t.match?.distanceKm != null && t.match.distanceKm > Number(x.maxDistance)) return false
+    if (x.maxDistance && x.mode !== 'ONLINE' && t.searchMode !== 'ONLINE') {
+      const km = t.distanceKm ?? t.match?.distanceKm
+      if (km == null || km > Number(x.maxDistance)) return false
+    }
     return true
   })
 }

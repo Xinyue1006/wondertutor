@@ -5,6 +5,13 @@ import AiCard from '../assistant/AiCards'
 const lesson = { type: 'lesson_detail', subject: 'Mathematics', childName: 'Synthetic Child', tutorName: 'Synthetic Tutor', date: '2026-11-13', time: '17:00', mode: 'ONLINE', status: 'COMPLETED', summary: null, link: '/parent/bookings', checkIn: { recorded: true, checkInTime: '17:02', checkOutTime: '18:00' } }
 const show = card => render(<MemoryRouter><AiCard card={card} /></MemoryRouter>)
 
+test('AI recommendations explicitly label nationwide online alternatives', () => {
+  show({ type: 'tutor_results', total: 1, onlineAlternative: true, criteriaSummary: ['English', 'Primary 5'], tutors: [{ id: 7, name: 'Online Tutor', link: '/parent/tutors/7?mode=ONLINE', score: 92, label: 'Highly suitable', hourlyRate: 50, rating: 0, reviewCount: 0, reasons: ['Offers online lessons'] }] })
+  expect(screen.getByText('Online alternatives')).toBeVisible()
+  expect(screen.getByText('No nearby physical tutor matched. These tutors offer online lessons across Malaysia.')).toBeVisible()
+  expect(screen.getByRole('link', { name: 'Online Tutor' })).toHaveAttribute('href', '/parent/tutors/7?mode=ONLINE')
+})
+
 test('actual online attendance times are shown in the assistant lesson card', () => {
   show(lesson)
   expect(screen.getByText('Checked in 17:02, out 18:00')).toBeInTheDocument()

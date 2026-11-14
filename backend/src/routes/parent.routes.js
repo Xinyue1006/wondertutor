@@ -55,6 +55,7 @@ router.get('/favourites', tutors.listFavourites)
 router.post('/favourites/:tutorId', tutors.toggleFavourite)
 
 router.post('/matching', matching.createMatching)
+router.post('/matching/preview', matching.previewMatching)
 router.get('/matching/latest', matching.latestMatching)
 
 router.post('/bookings', bookings.createBooking)

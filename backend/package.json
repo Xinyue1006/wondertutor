@@ -8,6 +8,7 @@
     "jobs:run": "node scripts/run-housekeeping.js",
     "db:migrate": "prisma migrate dev",
     "db:seed": "node prisma/seed.js",
+    "db:demo-tutors": "node scripts/add-demo-tutors.js",
     "db:merge": "node scripts/merge-database-dump.js",
     "db:deploy": "prisma migrate deploy && prisma generate && node scripts/backfill-public-ids.js",
     "db:backfill-public-ids": "node scripts/backfill-public-ids.js",

@@ -152,7 +152,8 @@ export default function AiCard({ card, onChooseChild, onOpenResults, busy }) {
       )
     case 'tutor_results':
       return (
-        <Box title={card.total ? `${card.total} matching tutor${card.total === 1 ? '' : 's'}` : 'No tutors match yet'}>
+        <Box title={card.needsLocation ? 'Choose a location for physical lessons' : card.onlineAlternative ? 'Online alternatives' : card.total ? `${card.total} matching tutor${card.total === 1 ? '' : 's'}` : 'No tutors match yet'}>
+          {card.onlineAlternative && <p className="mb-2 text-xs text-slate-600">No nearby physical tutor matched. These tutors offer online lessons across Malaysia.</p>}
           <div className="mb-1.5 flex flex-wrap gap-1">{card.criteriaSummary.map((c) => <span key={c} className="rounded-full bg-brand-50 px-2 py-0.5 text-xs text-navy">{c}</span>)}</div>
           <ul className="divide-y divide-slate-100">
             {card.tutors.slice(0, 5).map((t) => (
@@ -178,6 +179,7 @@ export default function AiCard({ card, onChooseChild, onOpenResults, busy }) {
     case 'match_explanation':
       return (
         <Box title={`${card.name}: ${card.score}% (${card.label})`} link={card.link} linkText="View tutor">
+          {card.onlineAlternative && <p className="mb-2 text-xs text-slate-600">Online alternative across Malaysia.</p>}
           <Row label="Rank">{card.rank} of {card.total}{card.verified ? ' · verified' : ''}</Row>
           <ul className="mt-1 list-disc pl-5">{card.reasons.map((r) => <li key={r}>{r}</li>)}</ul>
         </Box>

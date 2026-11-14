@@ -3,7 +3,13 @@
 import { jest } from '@jest/globals'
 
 const matching = jest.fn(async () => [])
-jest.unstable_mockModule('../services/matchingApp.service.js', () => ({ runMatchingForParent: matching }))
+jest.unstable_mockModule('../services/matchingApp.service.js', () => ({
+  runMatchingForParent: matching,
+  tutorRecommendationsForParent: async (...args) => {
+    const tutors = await matching(...args)
+    return { tutors, total: tutors.length, onlineAlternatives: { total: 0, tutors: [] }, searchScope: { mode: 'ANY', needsLocation: false } }
+  },
+}))
 const { handleMessage } = await import('../services/assistant/orchestrator.js')
 const { setProvider } = await import('../services/assistant/provider.js')
 const { QUICK_QUESTIONS, approvedQuickQuestion } = await import('../services/assistant/quickQuestions.js')

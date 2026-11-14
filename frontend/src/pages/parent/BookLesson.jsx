@@ -19,7 +19,9 @@ import { lessonLocationError, lessonLocationPayload } from '../../lib/lessonLoca
 export default function BookLesson() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const prefill = useLocation().state || {}
+  const bookingLocation = useLocation()
+  const prefill = bookingLocation.state || {}
+  const requestedMode = prefill.mode || new URLSearchParams(bookingLocation.search).get('mode')
   const { kids, kidsLoaded, loadError, reloadShared } = useMatching()
 
   const [tutor, setTutor] = useState(null)
@@ -29,7 +31,7 @@ export default function BookLesson() {
   const [calendarError, setCalendarError] = useState('')
   const [selectedSlots, setSelectedSlots] = useState(prefill.slots?.length ? prefill.slots : prefill.date && prefill.time ? [{ date: prefill.date, start: prefill.time }] : [])
   const [childId, setChildId] = useState(prefill.childId || '')
-  const [mode, setMode] = useState(prefill.mode || '')
+  const [mode, setMode] = useState(['ONLINE', 'PHYSICAL'].includes(requestedMode) ? requestedMode : '')
   const [subject, setSubject] = useState(prefill.subject || '')
   const [price, setPrice] = useState(prefill.price || '')
   const [msg, setMsg] = useState(prefill.msg || '')

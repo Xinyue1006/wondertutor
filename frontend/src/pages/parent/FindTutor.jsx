@@ -13,6 +13,7 @@ import { ErrorBox, FilterDropdown, LoadError, PageTitle, SelectBox, Spinner, Emp
 import { GRADE_GROUPS, parseGrade } from '../../lib/education'
 import { subjectsForLevel } from '../../lib/subjects'
 import { hhmmLabel, todayYmd } from '../../lib/format'
+import TutorSearchNotice, { OnlineTutorAlternatives } from '../../components/TutorSearchNotice'
 
 const SORTS = [
   ['recommended', 'Recommended'],
@@ -120,7 +121,9 @@ export default function FindTutor() {
     setSaving((s) => new Set(s).add(t.id))
     try {
       const r = await api.post(`/parent/favourites/${t.id}`)
-      setData((d) => ({ ...d, tutors: d.tutors.map((x) => (x.id === t.id ? { ...x, isFavourite: r.data.isFavourite } : x)) }))
+      setData(d => ({ ...d, tutors: d.tutors.map(x => x.id === t.id ? { ...x, isFavourite: r.data.isFavourite } : x),
+        ...(d.onlineAlternatives && { onlineAlternatives: { ...d.onlineAlternatives, tutors: d.onlineAlternatives.tutors.map(x => x.id === t.id ? { ...x, isFavourite: r.data.isFavourite } : x) } }),
+      }))
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -218,18 +221,24 @@ export default function FindTutor() {
 
       <div className="mt-4">
         {loading && !data ? <Spinner /> : null}
-        {data && data.tutors.length === 0 && !loading && (
+        <TutorSearchNotice scope={data?.searchScope} hasResults={data?.total > 0} />
+        {data && data.tutors.length === 0 && !loading && data.searchScope?.mode !== 'PHYSICAL' && (
           <div className="card"><EmptyState icon="search" title="No tutors match these filters">Try another subject or level, or remove some filters.</EmptyState></div>
         )}
         <div className={`grid gap-4 md:grid-cols-2 xl:grid-cols-3 ${loading ? 'opacity-60' : ''}`}>
           {data?.tutors.map((t) => <TutorCard key={t.id} tutor={t} match={t.match} saved={t.isFavourite} onToggleSave={toggleSave} compare={compare} />)}
         </div>
+        {data?.total === 0 && <OnlineTutorAlternatives total={data.onlineAlternatives?.total}>
+          <div className={`grid gap-4 md:grid-cols-2 xl:grid-cols-3 ${loading ? 'opacity-60' : ''}`}>
+            {data.onlineAlternatives?.tutors.map(t => <TutorCard key={t.id} tutor={t} match={t.match} saved={t.isFavourite} onToggleSave={toggleSave} compare={compare} />)}
+          </div>
+        </OnlineTutorAlternatives>}
         <CompareBar compare={compare} />
         {data && (
           <div className="mt-6">
             <Pagination
-              page={data.page}
-              totalPages={data.totalPages}
+              page={data.total === 0 && data.onlineAlternatives?.total ? data.onlineAlternatives.page : data.page}
+              totalPages={data.total === 0 && data.onlineAlternatives?.total ? data.onlineAlternatives.totalPages : data.totalPages}
               onChange={(p) => { setPage(p); resultsTop.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }}
               label="Tutor results pages"
             />
@@ -243,7 +252,7 @@ export default function FindTutor() {
 // "Showing 1–9 of 11 tutors" / "Showing 1 tutor" / "No tutors found"
 export function resultsHeading(data) {
   if (!data) return 'Searching…'
-  if (data.total === 0) return 'No tutors found'
+  if (data.total === 0) return data.searchScope?.mode === 'PHYSICAL' ? 'Nearby tutor results' : 'No tutors found'
   const from = (data.page - 1) * data.pageSize + 1
   const to = from + data.tutors.length - 1
   if (data.total === 1) return 'Showing 1 tutor'

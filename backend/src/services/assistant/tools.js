@@ -8,7 +8,8 @@
 import { prisma } from '../../config/prisma.js'
 import { CHARACTERISTICS, LANGUAGES, MAX_GRADE, SUBJECTS, SUBJECT_LEVELS } from '../../data/catalog.js'
 import { criteriaSchema } from '../../controllers/parent/matching.controller.js'
-import { runMatchingForParent } from '../matchingApp.service.js'
+import { tutorRecommendationsForParent } from '../matchingApp.service.js'
+import { withSavedTutorLocation } from '../tutorSearchScope.js'
 import { buildChildReport } from '../progress.service.js'
 import { parentPaymentSummary } from '../paymentSummary.service.js'
 import { distanceBand } from '../matching.service.js'
@@ -98,11 +99,11 @@ function getCatalog() {
     languages: LANGUAGES,
     characteristics: CHARACTERISTICS,
     genders: ['MALE', 'FEMALE', 'ANY'],
-    note: 'location accepts a Malaysian area, town or postcode name; it only affects the 15% location score.',
+    note: 'Location accepts a Malaysian area, town or postcode. Physical matches must be within 30 km. Online lessons can be nationwide; alternatives are labelled separately when no nearby physical tutor matches.',
   }
 }
 
-const DEFAULTS = { grade: null, days: [], timeStart: null, timeEnd: null, mode: 'EITHER', location: null, budgetMin: null, budgetMax: null, gender: 'ANY', language: null, characteristics: [] }
+const DEFAULTS = { grade: null, days: [], timeStart: null, timeEnd: null, mode: 'EITHER', location: null, maxDistance: null, budgetMin: null, budgetMax: null, gender: 'ANY', language: null, characteristics: [] }
 
 // Plain-English lines describing the criteria (shown on the results card so the parent sees what was searched)
 function describe(c) {
@@ -145,10 +146,12 @@ async function searchTutors(ctx, args) {
 
   const parsed = criteriaSchema.safeParse({ ...c, notes: null })
   if (!parsed.success) return { error: 'invalid_criteria', message: parsed.error.issues[0]?.message || 'Invalid criteria' }
-  const criteria = parsed.data
+  const criteria = withSavedTutorLocation(parsed.data, ctx.parent)
 
   // Same engine and ordering as the wizard, but NOTHING is saved (no MatchingRequest in Phase 1)
-  const results = await runMatchingForParent(criteria, ctx.parent.id, ctx.db)
+  const groups = await tutorRecommendationsForParent(criteria, ctx.parent.id, ctx.db)
+  const onlineAlternative = groups.total === 0 && groups.onlineAlternatives.total > 0
+  const results = onlineAlternative ? groups.onlineAlternatives.tutors : groups.tutors
   const searchRef = refFor(s, 'search', `${Date.now()}-${s.counters.search + 1}`)
   s.searches.set(searchRef, { criteria, at: Date.now() })
   s.lastCriteria = criteria
@@ -158,23 +161,32 @@ async function searchTutors(ctx, args) {
     type: 'tutor_results',
     searchRef,
     total: results.length,
+    onlineAlternative,
+    needsLocation: groups.searchScope.needsLocation,
+    radiusKm: groups.searchScope.radiusKm,
     link: '/parent/find-tutor/results',
     temporary: true,
     criteriaSummary: describe(criteria),
     tutors: top.map(({ t, ref }) => ({
       id: t.id, ref, name: t.name, photoUrl: t.photoUrl ?? null, verified: Boolean(t.verified), score: t.match.score, label: t.match.label,
       reasons: t.match.reasons.slice(0, 6), hourlyRate: t.hourlyRate, rating: t.rating, reviewCount: t.reviewCount,
-      offersOnline: t.offersOnline, offersPhysical: t.offersPhysical, location: t.location ?? null, link: `/parent/tutors/${t.id}`,
+      offersOnline: t.offersOnline, offersPhysical: t.offersPhysical, location: t.location ?? null, link: `/parent/tutors/${t.id}${t.searchMode === 'ONLINE' ? '?mode=ONLINE' : ''}`,
     })),
   })
-  evid(ctx, { kind: 'tutors', total: results.length, top: top.slice(0, 3).map(({ t, ref }) => ({ tutorRef: ref, score: t.match.score, verified: Boolean(t.verified) })) })
+  evid(ctx, { kind: 'tutors', total: results.length, onlineAlternative, needsLocation: groups.searchScope.needsLocation, radiusKm: groups.searchScope.radiusKm, top: top.slice(0, 3).map(({ t, ref }) => ({ tutorRef: ref, score: t.match.score, verified: Boolean(t.verified) })) })
   source(ctx, 'search', searchRef, `Tutor search: ${describe(criteria).slice(0, 2).join(', ')}`, '/parent/find-tutor/results')
-  ctx.matchResult = { temporary: true, criteria, total: results.length, tutors: results.slice(0, 30) }
+  ctx.matchResult = { temporary: true, criteria, ...groups, tutors: groups.tutors.slice(0, 30), onlineAlternatives: { total: groups.onlineAlternatives.total, tutors: groups.onlineAlternatives.tutors.slice(0, 30) } }
 
   const { childId, ...rest } = criteria
   return {
     searchRef,
-    total: results.length,
+    total: groups.total,
+    onlineAlternativeTotal: groups.onlineAlternatives.total,
+    onlineAlternative,
+    needsLocation: groups.searchScope.needsLocation,
+    scope: groups.searchScope.mode,
+    radiusKm: groups.searchScope.radiusKm,
+    note: onlineAlternative ? 'No nearby physical tutor matches. The listed tutors are ONLINE alternatives across Malaysia, not nearby physical matches.' : groups.searchScope.needsLocation ? 'Ask for a recognised area, town or postcode before finding physical tutors.' : 'Listed tutors meet the requested lesson mode and location scope.',
     prefilledFromChild: prefilled,
     criteria: { ...rest, childRef: childId ? refFor(s, 'child', childId) : null },
     ordering: 'Verified tutors first, then match score, then approved qualifications, then experience.',
@@ -199,15 +211,17 @@ async function explainTutorMatch(ctx, { searchRef, tutorRef }) {
   const tutorId = resolveRef(ctx.session, 'tutor', tutorRef)
   if (!search || !tutorId) return NOT_FOUND
   // Recomputed from the stored criteria so ratings/availability are current; never estimated by the model
-  const results = await runMatchingForParent(search.criteria, ctx.parent.id, ctx.db)
+  const groups = await tutorRecommendationsForParent(search.criteria, ctx.parent.id, ctx.db)
+  const onlineAlternative = groups.total === 0 && groups.onlineAlternatives.total > 0
+  const results = onlineAlternative ? groups.onlineAlternatives.tutors : groups.tutors
   const idx = results.findIndex((t) => t.id === tutorId)
   if (idx < 0) return { error: 'not_in_results', message: 'This tutor is no longer in the results for that search.' }
   const t = results[idx]
-  ctx.cards.push({ type: 'match_explanation', name: t.name, score: t.match.score, label: t.match.label, reasons: t.match.reasons.slice(0, 8), rank: idx + 1, total: results.length, verified: Boolean(t.verified), link: `/parent/tutors/${t.id}` })
-  evid(ctx, { kind: 'match', tutorRef, rank: idx + 1, total: results.length, score: t.match.score, label: t.match.label })
+  ctx.cards.push({ type: 'match_explanation', onlineAlternative, name: t.name, score: t.match.score, label: t.match.label, reasons: t.match.reasons.slice(0, 8), rank: idx + 1, total: results.length, verified: Boolean(t.verified), link: `/parent/tutors/${t.id}` })
+  evid(ctx, { kind: 'match', onlineAlternative, tutorRef, rank: idx + 1, total: results.length, score: t.match.score, label: t.match.label })
   source(ctx, 'tutor', tutorRef, 'Tutor match details', `/parent/tutors/${t.id}`)
   return {
-    tutorRef, searchRef, score: t.match.score, label: t.match.label, reasons: t.match.reasons, rank: idx + 1, total: results.length, verified: Boolean(t.verified),
+    tutorRef, searchRef, onlineAlternative, score: t.match.score, label: t.match.label, reasons: t.match.reasons, rank: idx + 1, total: results.length, verified: Boolean(t.verified),
     note: 'The score uses fixed weights: subject 30, level 20, availability 15, location 15, characteristics 10, fee 5, rating 5. Verified tutors are listed before unverified ones regardless of score.',
   }
 }
@@ -442,7 +456,7 @@ export const TOOLS = {
       properties: {
         newSearch: S('BOOLEAN'), childRef: childRefP, subject: S('STRING', { enum: SUBJECTS }), level: S('STRING', { enum: ['KINDERGARTEN', 'PRIMARY', 'SECONDARY'] }),
         grade: S('INTEGER', { description: 'Year within the education level. Always include the number stated in Primary/Standard/Darjah/Tahun or Secondary/Form/Tingkatan, including Chinese school years. Do not omit a stated year.' }), days: S('ARRAY', { items: S('INTEGER'), description: '0=Sunday..6=Saturday' }), timeStart: S('STRING', { description: 'HH:mm' }), timeEnd: S('STRING', { description: 'HH:mm' }),
-        mode: S('STRING', { enum: ['ONLINE', 'PHYSICAL', 'EITHER'] }), location: S('STRING'), budgetMin: S('NUMBER'), budgetMax: S('NUMBER'),
+        mode: S('STRING', { enum: ['ONLINE', 'PHYSICAL', 'EITHER'] }), location: S('STRING'), maxDistance: S('NUMBER'), budgetMin: S('NUMBER'), budgetMax: S('NUMBER'),
         gender: S('STRING', { enum: ['MALE', 'FEMALE', 'ANY'] }), language: S('STRING', { enum: LANGUAGES }), characteristics: S('ARRAY', { items: S('STRING', { enum: CHARACTERISTICS }) }),
         clear: S('ARRAY', { items: S('STRING', { enum: Object.keys(DEFAULTS) }) }),
       },

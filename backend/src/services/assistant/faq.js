@@ -3,10 +3,18 @@
 // Every entry was checked against the CODE that enforces it (source = file/function) on the review date. When the
 // project documents (CLAUDE.md, reports) say more than the code does, the answer sticks to what the code does and the
 // gap is recorded in OPEN_POLICY_QUESTIONS for the project owner. Bump FAQ_VERSION whenever an answer changes.
-export const FAQ_VERSION = '2026-11-13.4'
+export const FAQ_VERSION = '2026-11-14.1'
 const REVIEWED = '2026-11-09'
 
 export const FAQ = [
+  {
+    id: 'faq.tutor-location',
+    topic: 'Nearby physical tutors and nationwide online lessons',
+    keywords: ['nearby', 'location', 'distance', 'physical', 'online', 'area', 'state', '30 km', 'berdekatan', 'lokasi', 'dalam talian', '附近', '地区', '线上', '实体课'],
+    answer: 'Physical tutor searches use a recognised area, town or postcode and show eligible tutors within 30 km, or a smaller distance you select. A tutor offering both online and physical lessons must still meet the distance limit for a physical result. Tutors with unknown coordinates are not claimed to be nearby. Online lessons can use eligible tutors throughout Malaysia. When a location is supplied and no lesson mode is selected, nearby physical tutors are shown first. If no nearby tutor matches the subject, level and other filters, online alternatives are shown separately. These alternatives are for online lessons, not nearby physical matches. Match percentages describe overall compatibility, not distance alone. Area distances are approximate; the actual physical lesson address is confirmed when booking.',
+    source: 'backend/src/services/tutorSearchScope.js; backend/src/controllers/parent/tutors.controller.js; backend/src/services/matchingApp.service.js',
+    reviewed: '2026-11-14',
+  },
   {
     id: 'faq.my-bookings',
     topic: 'Finding and managing bookings',

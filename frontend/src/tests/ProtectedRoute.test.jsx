@@ -102,3 +102,32 @@ describe('tutors without verification', () => {
     expect(afterLogin({ role: 'TUTOR', tutorStatus: 'VERIFIED' })).toBe('/tutor')
   })
 })
+
+describe('public tutor profile migration', () => {
+  function renderParentLink(path, user = null) {
+    auth = { user, loading: false }
+    return render(<MemoryRouter initialEntries={[path]}><Routes>
+      <Route path="/login" element={<LoginStub />} />
+      <Route path="/tutors/:id" element={<div>PUBLIC TUTOR PROFILE</div>} />
+      <Route element={<ProtectedRoute roles={['PARENT']} />}>
+        <Route path="/parent/tutors/:id" element={<div>PARENT TUTOR PROFILE</div>} />
+        <Route path="/parent/tutors/:id/book" element={<div>PRIVATE BOOKING</div>} />
+        <Route path="/parent/children" element={<div>PRIVATE CHILDREN</div>} />
+        <Route path="/parent/payments" element={<div>PRIVATE PAYMENTS</div>} />
+      </Route>
+    </Routes></MemoryRouter>)
+  }
+  test('a previously shared profile link opens its public equivalent for a guest', () => {
+    renderParentLink('/parent/tutors/7')
+    expect(screen.getByText('PUBLIC TUTOR PROFILE')).toBeInTheDocument()
+    expect(screen.queryByText('PARENT TUTOR PROFILE')).not.toBeInTheDocument()
+  })
+  test.each(['/parent/tutors/7/book', '/parent/children', '/parent/payments'])('the private path %s still requires login', path => {
+    renderParentLink(path)
+    expect(screen.getByText(`LOGIN PAGE ${path}`)).toBeInTheDocument()
+  })
+  test('signed-in parents retain their full account profile view', () => {
+    renderParentLink('/parent/tutors/7', { id: 1, role: 'PARENT' })
+    expect(screen.getByText('PARENT TUTOR PROFILE')).toBeInTheDocument()
+  })
+})

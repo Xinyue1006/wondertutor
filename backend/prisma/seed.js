@@ -2,13 +2,14 @@
 // For an existing database, use npm run db:merge -- --source export.sql --target-db name
 // to preview a non-destructive merge; --apply also creates a backup. Do not reset to sync data.
 //
-// Seeds: system settings, the admin account, 16 sample Malaysian tutors (Klang Valley), review history,
+// Seeds: system settings, the admin account, 28 fictional Malaysian tutors across states, review history,
 // and one demo parent with children + bookings in every state so every Parent Portal screen has data.
 // Safe to run more than once: the demo block is skipped if the demo parent already exists.
 import bcrypt from 'bcrypt'
 import { PrismaClient } from '@prisma/client'
 import { addDays, mytParts, mytToDate, todayMyt } from '../src/utils/time.js'
 import { findLocation } from '../src/data/catalog.js'
+import { addDemoTutors } from './demoTutors.js'
 
 // Topics shown on the demo lesson summaries
 const SEED_TOPICS = {
@@ -544,7 +545,7 @@ async function main() {
   }
 
   if (await prisma.user.findUnique({ where: { email: DEMO_PARENT.email } })) {
-    console.log('Demo data already exists. To merge a teammate export without resetting, use npm run db:merge -- --source export.sql --target-db your_database (preview only; add --apply after reviewing).')
+    console.log('Demo data already exists. Add the expanded tutors with npm run db:demo-tutors -- --target-db your_database (preview only; add --apply to insert). To merge a teammate export, use npm run db:merge -- --source export.sql --target-db your_database. Neither command resets existing data.')
     return
   }
 
@@ -552,6 +553,7 @@ async function main() {
   const hash = await bcrypt.hash(TUTOR_PASSWORD, 10)
   const parentHash = await bcrypt.hash(DEMO_PARENT.password, 10)
   const tutors = await seedTutors(hash)
+  await addDemoTutors(prisma, hash)
   await seedReviewHistory(tutors, hash)
   await seedDemoParent(tutors, parentHash)
   await recomputeRatings()

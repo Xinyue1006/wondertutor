@@ -9,7 +9,10 @@ import { ModePills, VerifiedTick } from './ui/Common'
 // With a `match` it also shows the match % badge and the "why we recommend this tutor" reasons.
 // With `onToggleSave` it also shows a heart button to save / unsave the tutor.
 export default function TutorCard({ tutor, match, query = '', saved = false, onToggleSave, compare }) {
-  const distance = distanceLabel(tutor.distanceKm ?? match?.distanceKm)
+  const distance = tutor.searchMode === 'ONLINE' ? null : distanceLabel(tutor.distanceKm ?? match?.distanceKm)
+  const params = new URLSearchParams(query.replace(/^\?/, ''))
+  if (['ONLINE', 'PHYSICAL'].includes(tutor.searchMode)) params.set('mode', tutor.searchMode)
+  const search = params.size ? `?${params}` : ''
   const [more, setMore] = useState(false)
   const reasons = match?.reasons || []
   const shown = more ? reasons : reasons.slice(0, 3)
@@ -32,9 +35,9 @@ export default function TutorCard({ tutor, match, query = '', saved = false, onT
       <div className="flex gap-4">
         <Avatar src={tutor.photoUrl} name={tutor.name} className="h-[116px] w-[92px]" rounded="rounded-xl" text="text-2xl" />
         <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="flex min-w-0 items-center gap-1.5 text-lg font-extrabold text-navy">
-              <span className="truncate">{tutor.name}</span>
+          <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
+            <h3 className="flex min-w-0 basis-full items-start gap-1.5 text-lg font-extrabold text-navy">
+              <span className="min-w-0 break-words">{tutor.name}</span>
               {tutor.verified && <VerifiedTick />}
             </h3>
             <span className="shrink-0 pt-0.5 font-extrabold text-navy">RM {tutor.hourlyRate} <span className="text-xs font-semibold text-slate-500">/ hour</span></span>
@@ -48,10 +51,10 @@ export default function TutorCard({ tutor, match, query = '', saved = false, onT
             <Icon name="book" className="h-4 w-4 shrink-0 text-brand-500" />
             <span className="truncate">{tutor.mainSubject} <span className="text-slate-300">|</span> {tutor.levels}</span>
           </div>
-          <div className="mt-2"><ModePills online={tutor.offersOnline} physical={tutor.offersPhysical} /></div>
+          <div className="mt-2"><ModePills online={tutor.searchMode !== 'PHYSICAL' && tutor.offersOnline} physical={tutor.searchMode !== 'ONLINE' && tutor.offersPhysical} /></div>
           <div className="mt-2 flex items-center gap-1.5 text-xs text-slate-600">
             <Icon name="pin" className="h-3.5 w-3.5 shrink-0 text-brand-500" />
-            <span className="truncate">{tutor.location}{distance && tutor.offersPhysical ? ` · ${distance}` : ''}</span>
+            <span className="min-w-0 break-words">{tutor.location}{distance && tutor.offersPhysical ? ` · ${distance}` : ''}</span>
           </div>
           {!match && (
             <div className="mt-1 flex items-center gap-1.5 text-xs text-emerald-700">
@@ -93,8 +96,8 @@ export default function TutorCard({ tutor, match, query = '', saved = false, onT
             <Icon name="heart" fill={saved} className="h-5 w-5" />
           </button>
         )}
-        <Link to={`/parent/tutors/${tutor.id}${query}`} className="btn-outline">View Profile</Link>
-        <Link to={`/parent/tutors/${tutor.id}/book${query}`} className="btn-primary">Book a Lesson</Link>
+        <Link to={`/parent/tutors/${tutor.id}${search}`} className="btn-outline">View Profile</Link>
+        <Link to={`/parent/tutors/${tutor.id}/book${search}`} className="btn-primary">Book a Lesson</Link>
       </div>
       {compare && (
         <label className={`flex items-center gap-2 text-sm ${!compare.has(tutor) && compare.full ? 'cursor-not-allowed text-slate-400' : 'cursor-pointer text-slate-600'}`}>

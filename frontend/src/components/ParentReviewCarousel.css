@@ -1,0 +1,33 @@
+.parent-reviews { min-width: 0; padding-block: .5rem; }
+.parent-reviews-heading { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 1rem; margin-bottom: 1.25rem; }
+.parent-reviews-heading .section-title { margin-top: .3rem; }
+.parent-reviews-viewport { position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; min-width: 0; }
+.parent-reviews-track { grid-column: 1 / -1; display: grid; grid-auto-flow: column; grid-auto-columns: 100%; gap: 1rem; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; padding: .2rem 0 1rem; margin: 0; list-style: none; scrollbar-width: thin; scrollbar-color: #bcd6ff transparent; }
+/* Touch arrows sit below the cards, leaving the full review and native swipe area clear. */
+.parent-reviews-edge { grid-row: 2; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; min-width: 44px; min-height: 44px; padding: 0; border: 1px solid #dbe9ff; border-radius: 50%; color: #0f5ae0; background: rgb(255 255 255 / 96%); box-shadow: 0 3px 12px rgb(11 42 111 / 8%); cursor: pointer; touch-action: manipulation; }
+.parent-reviews-edge--left { grid-column: 1; justify-self: start; }
+.parent-reviews-edge--right { grid-column: 2; justify-self: end; }
+.parent-reviews-edge:disabled { opacity: .4; cursor: default; box-shadow: none; }
+.parent-review-card { display: flex; min-width: 0; flex-direction: column; gap: 1rem; scroll-snap-align: start; padding: 1.25rem; border: 1px solid #dbe9ff; border-radius: 1.25rem; background: linear-gradient(145deg, #fff, #f6faff); }
+.parent-review-author { display: flex; align-items: center; gap: .75rem; }
+.parent-review-author h3 { color: #0b2a6f; font-size: .9rem; font-weight: 700; overflow-wrap: anywhere; }
+.parent-review-card blockquote { margin: 0; flex: 1; color: #475569; font-size: .9rem; line-height: 1.7; overflow-wrap: anywhere; white-space: pre-wrap; }
+.parent-review-tutor { display: inline-flex; align-items: center; gap: .4rem; min-height: 44px; color: #0f5ae0; font-size: .8rem; font-weight: 600; overflow-wrap: anywhere; }
+@media (min-width: 768px) { .parent-reviews-track { grid-auto-columns: calc((100% - 1rem) / 2); } }
+@media (min-width: 1100px) { .parent-reviews-track { grid-auto-columns: calc((100% - 2rem) / 3); } }
+@media (hover: hover) and (pointer: fine) {
+  .parent-reviews-viewport { gap: 0; }
+  .parent-reviews-edge { position: absolute; top: calc(50% - .5rem); z-index: 1; transform: translateY(-50%); }
+  .parent-reviews-edge--left { left: -.4rem; }
+  .parent-reviews-edge--right { right: -.4rem; }
+  /* The edge affordance has its own breathing room, outside the readable copy. */
+  .parent-review-card { padding-inline: 2.5rem; }
+  .parent-reviews-edge:not(:disabled):hover { background: #eef5ff; border-color: #bcd6ff; }
+  .parent-review-card:hover { border-color: #bcd6ff; }
+  .parent-review-tutor:hover { text-decoration: underline; }
+}
+/* Desktop playback can pause at its current position; phones retain native snap. */
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .parent-reviews-track { scroll-snap-type: none; }
+}
+@media (prefers-reduced-motion: reduce) { .parent-reviews, .parent-reviews * { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }

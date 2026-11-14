@@ -143,7 +143,7 @@ Every tool that returns account data also records a small **evidence** object (c
 |---|---|---|
 | `list_children` | none | Child references, level and grade, saved subjects, preferred language. Learning preferences and goals are redacted and capped at 200 characters |
 | `get_matching_catalog` | none | Subjects, levels, maximum grades, modes, languages, teaching styles |
-| `search_tutors` | Canonical criteria, `childRef`, `newSearch`, `clear[]` | Same engine and ordering as the wizard. The top 5 go to the model; up to 10 go to the card and up to 30 to the results page. **Nothing is saved** |
+| `search_tutors` | Canonical criteria, `childRef`, `newSearch`, `clear[]` | Same engine and ordering as the wizard, including physical radius and separate online alternatives. The top 5 go to the model; up to 10 go to the card and up to 30 per group to the results page. **Nothing is saved** |
 | `explain_tutor_match` | `searchRef`, `tutorRef` | Recomputed score, label, reasons and rank from the stored criteria |
 | `list_bookings` | `childRef?`, `subject?`, `when?`, `status?`, `from/to?` (inclusive Malaysian dates), `limit ≤ 10` | Owned bookings with Malaysian date/time, status, mode and hourly price. Subject is filtered in the ownership-scoped database query. Default: upcoming CONFIRMED |
 | `get_lesson_details` | `bookingRef` | Status, check-in/out **times only** (no photo, GPS or gateway data), and what the tutor recorded (redacted and capped) |
@@ -175,7 +175,9 @@ Every tool follows the same rules:
 - A follow-up keeps the previous assistant search's criteria.
 - Fields the parent states replace the old values.
 - `clear` resets a field to "no preference".
-- The prompt tells the model to ask for a budget when the parent says "cheaper", rather than inventing one. It also explains that location is a fixed 15% weight instead of promising "closer" results.
+- The prompt tells the model to ask for a budget when the parent says "cheaper", rather than inventing one. Location retains its fixed 15% score weight. Separately, physical searches require a recognised area and a tutor within 30 km, or a smaller explicit `maxDistance`. A recognised saved home area can supply a missing physical search location; otherwise the server asks for one. Online searches are nationwide. With an area and EITHER mode, nearby physical results come first; when none match, cards and server-written answers label online alternatives explicitly. A far-away distance never appears as a recommendation strength.
+
+`matchResult` includes `searchScope` and an `onlineAlternatives: { total, tutors }` group. Its primary `total` can be zero while an online-alternative card has a positive total: these counts describe different lesson scopes. Wizard result filter changes call the authenticated read-only `/parent/matching/preview` endpoint without saving a MatchingRequest. Online profile and booking links retain `mode=ONLINE` through login/signup.
 
 **Results page:** clicking "See all results" puts the temporary results into `MatchingContext` with `temporary: true`. `MatchResults` shows a "not saved" note. A refresh falls back to the last saved search, as it already did.
 

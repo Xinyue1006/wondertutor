@@ -17,6 +17,15 @@ const match = {
 
 const renderCard = (props) => render(<MemoryRouter><TutorCard tutor={tutor} {...props} /></MemoryRouter>)
 
+test('an online alternative hides physical-distance claims and preserves its booking mode', () => {
+  renderCard({ tutor: { ...tutor, searchMode: 'ONLINE', distanceKm: 1500 }, match })
+  expect(screen.getByText('Online')).toBeVisible()
+  expect(screen.queryByText('Physical')).not.toBeInTheDocument()
+  expect(screen.queryByText(/Over 30 km/)).not.toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Book a Lesson' })).toHaveAttribute('href', '/parent/tutors/7/book?mode=ONLINE')
+  expect(screen.getByRole('link', { name: 'View Profile' })).toHaveAttribute('href', '/parent/tutors/7?mode=ONLINE')
+})
+
 describe('TutorCard (browse)', () => {
   test('shows the key facts from the mockup', () => {
     renderCard()

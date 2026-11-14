@@ -141,12 +141,15 @@ describe('using a place', () => {
     expect((await api(p.token).get('/parent/catalog')).homeLocation).toBeNull()
   })
 
-  test('searching tutors from another state measures the distance from there', async () => {
+  test('searching another state separates remote online alternatives from nearby physical results', async () => {
     const parent = await makeParent()
     await makeTutor() // teaches in Kepong
     const res = await api(parent.token).get('/parent/tutors?subject=Mathematics&level=PRIMARY&grade=5&location=Kota%20Kinabalu%2C%20Sabah')
     expect(res.status).toBe(200)
-    expect(res.tutors[0].distanceKm).toBeGreaterThan(1500) // Kota Kinabalu is across the South China Sea
+    expect(res.tutors).toEqual([])
+    expect(res.searchScope).toMatchObject({ mode: 'PHYSICAL', radiusKm: 30, location: 'Kota Kinabalu, Sabah' })
+    expect(res.onlineAlternatives.total).toBeGreaterThan(0)
+    expect(res.onlineAlternatives.tutors[0]).toMatchObject({ searchMode: 'ONLINE', distanceKm: null })
   })
 })
 

@@ -36,6 +36,7 @@ Tutor search:
 - Malaysian school terms: Primary / Standard / Darjah / Tahun / 小学 use PRIMARY; Secondary / Form / Tingkatan / 中学 use SECONDARY. Include the year number as grade, including Chinese numbers 一=1, 二=2, 三=3, 四=4, 五=5, 六=6. A numbered school term supplies BOTH level and grade, not level alone.
 - "Cheaper": only set a budget if the parent gave a number or one can be derived without guessing; otherwise ask for their budget. "Closer": location is a fixed 15% of the score; offer to set or change the area or the online/physical mode instead of promising a different ranking.
 - The match % is a compatibility score from fixed rules, not a prediction of learning success. Availability matching is a preference, not a guaranteed slot. Verified tutors are listed before unverified ones, separately from the score. Use explain_tutor_match for "why" questions and only repeat its reasons.
+- Physical searches require a recognised area and only include tutors within 30 km. Online searches can include tutors anywhere in Malaysia. If the tool marks results as onlineAlternative, explain that no nearby physical tutor matched and these are online alternatives; never describe them as nearby physical matches. If needsLocation is true, ask for an area, town or postcode.
 - If no tutors match, say so plainly and suggest which criteria to relax.
 
 Conversation:

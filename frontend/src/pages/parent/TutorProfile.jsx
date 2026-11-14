@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import api, { errorMessage } from '../../api/client'
 import { useMatching } from '../../assistant/MatchingContext'
+import { useAuth } from '../../context/AuthContext'
+import PublicBookingActions, { PublicBookLink } from '../../components/PublicBookingActions'
 import Avatar from '../../components/ui/Avatar'
 import Icon from '../../components/ui/Icon'
 import { ErrorBox, Modal, ModePills, SelectBox, Spinner, Stars, VerifiedTick } from '../../components/ui/Common'
@@ -25,11 +27,16 @@ export function mergeSlots(slots) {
   return out
 }
 
-export default function TutorProfile() {
+export default function TutorProfile({ publicView = false }) {
   const { id } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  const { kids, kidsLoaded } = useMatching()
+  const matching = useMatching()
+  const { user } = useAuth() || {}
+  const kids = publicView ? [] : matching?.kids || []
+  const kidsLoaded = publicView || matching?.kidsLoaded
+  const apiPrefix = publicView ? '/public' : '/parent'
+  const browsePath = publicView ? '/tutors' : '/parent/find-tutor'
   const [tutor, setTutor] = useState(null)
   const [error, setError] = useState('')
   const [favError, setFavError] = useState('')
@@ -38,11 +45,20 @@ export default function TutorProfile() {
   const refs = { about: useRef(), teaching: useRef(), availability: useRef(), reviews: useRef() }
 
   useEffect(() => {
-    setTutor(null)
-    api.get(`/parent/tutors/${id}`).then((r) => setTutor(r.data.tutor)).catch((e) => setError(errorMessage(e)))
-  }, [id])
+    // Public browse cards can be far down the page. Start a newly opened profile
+    // at its name and booking action instead of retaining the results scroll.
+    if (publicView) window.scrollTo(0, 0)
+  }, [publicView, id])
 
-  if (error) return <div className="card p-8 text-center text-red-600">{error} <Link to="/parent/find-tutor" className="ml-2 font-semibold text-brand-500">Back to Find Tutors</Link></div>
+  useEffect(() => {
+    let cancelled = false
+    setError('')
+    setTutor(null)
+    api.get(`${apiPrefix}/tutors/${id}`).then((r) => { if (!cancelled) setTutor(r.data.tutor) }).catch((e) => { if (!cancelled) setError(errorMessage(e)) })
+    return () => { cancelled = true }
+  }, [id, apiPrefix])
+
+  if (error) return <div className="card p-8 text-center text-red-600">{error} <Link to={browsePath} className="ml-2 font-semibold text-brand-500">Back to Find Tutors</Link></div>
   if (!tutor || !kidsLoaded) return <Spinner />
 
   async function toggleFav() {
@@ -59,11 +75,17 @@ export default function TutorProfile() {
     }
   }
   // Opened from a link or a new tab there is no previous page in the app, so "Back" goes to the search instead
-  const goBack = () => (location.key === 'default' ? navigate('/parent/find-tutor') : navigate(-1))
+  const goBack = () => {
+    if (publicView) {
+      const back = location.state?.fromSearch
+      return navigate(typeof back === 'string' && (back === '/tutors' || back.startsWith('/tutors?')) ? back : '/tutors')
+    }
+    return location.key === 'default' ? navigate(browsePath) : navigate(-1)
+  }
   const goTab = (key) => { setTab(key); refs[key].current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
 
   return (
-    <div>
+    <div className={publicView ? 'py-6' : undefined}>
       <button onClick={goBack} className="mb-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-brand-600 hover:underline">
         <Icon name="arrow-left" className="h-4 w-4" /> Back to Find Tutors
       </button>
@@ -78,9 +100,9 @@ export default function TutorProfile() {
                 <h1 className="min-w-0 break-words text-2xl font-extrabold text-navy sm:text-3xl">{tutor.name} {tutor.verified && <VerifiedTick className="inline-block h-6 w-6" />}</h1>
                 <div className="flex shrink-0 items-center gap-3">
                   <span className="whitespace-nowrap text-xl font-extrabold text-navy">RM {tutor.hourlyRate} / hour</span>
-                  <button onClick={toggleFav} disabled={favBusy} aria-pressed={tutor.isFavourite} aria-label={tutor.isFavourite ? `Remove ${tutor.name} from saved tutors` : `Save ${tutor.name}`} className={`flex h-11 w-11 items-center justify-center rounded-lg border ${tutor.isFavourite ? 'border-red-300 bg-red-50 text-red-500' : 'border-slate-200 text-brand-500'} hover:bg-brand-50`}>
+                  {!publicView && <button onClick={toggleFav} disabled={favBusy} aria-pressed={tutor.isFavourite} aria-label={tutor.isFavourite ? `Remove ${tutor.name} from saved tutors` : `Save ${tutor.name}`} className={`flex h-11 w-11 items-center justify-center rounded-lg border ${tutor.isFavourite ? 'border-red-300 bg-red-50 text-red-500' : 'border-slate-200 text-brand-500'} hover:bg-brand-50`}>
                     <Icon name="heart" fill={tutor.isFavourite} className="h-5 w-5" />
-                  </button>
+                  </button>}
                 </div>
               </div>
               {favError && <p role="alert" className="mt-1 text-sm text-red-700">{favError}</p>}
@@ -94,6 +116,7 @@ export default function TutorProfile() {
                 {tutor.experienceText.headline} teaching {tutor.subjects.join(', ')}. Offers {[tutor.offersOnline && 'online', tutor.offersPhysical && 'physical'].filter(Boolean).join(' and ')} lessons
                 {tutor.characteristics.length > 0 && <> with a {tutor.characteristics.join(', ').toLowerCase()} style</>}.
               </p>
+              {publicView && (!user || user.role === 'PARENT') && <div className="mt-4"><PublicBookLink tutorId={tutor.id} className="btn-primary min-h-11 w-full sm:w-auto" /></div>}
             </div>
           </section>
 
@@ -176,7 +199,9 @@ export default function TutorProfile() {
             <section ref={refs.availability} className="card scroll-mt-40 p-5">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div><h2 className="flex items-center gap-2 text-lg font-bold text-navy"><Icon name="calendar" className="h-5 w-5 shrink-0 text-brand-500" /> Availability</h2><p className="mt-1 text-xs text-slate-500">Upcoming week · Malaysia time (MYT)</p></div>
-                <Link to={`/parent/tutors/${tutor.id}/book`} className="inline-flex min-h-10 items-center gap-1 whitespace-nowrap text-sm font-semibold text-brand-500 hover:underline">View Full Availability <Icon name="arrow-right" className="h-3.5 w-3.5 shrink-0" /></Link>
+                {publicView
+                  ? (!user || user.role === 'PARENT') && <PublicBookLink tutorId={tutor.id} className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-brand-500 hover:underline">Choose Dates &amp; Book <Icon name="arrow-right" className="h-3.5 w-3.5 shrink-0" /></PublicBookLink>
+                  : <Link to={`/parent/tutors/${tutor.id}/book`} className="inline-flex min-h-10 items-center gap-1 whitespace-nowrap text-sm font-semibold text-brand-500 hover:underline">View Full Availability <Icon name="arrow-right" className="h-3.5 w-3.5 shrink-0" /></Link>}
               </div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 md:grid-cols-7">
                 {tutor.upcomingAvailability.map((d) => {
@@ -193,16 +218,16 @@ export default function TutorProfile() {
             </section>
           </div>
 
-          <Reviews tutor={tutor} reference={refs.reviews} />
+          <Reviews key={`${apiPrefix}/${tutor.id}`} tutor={tutor} reference={refs.reviews} publicView={publicView} />
         </div>
 
-        <BookingPanel tutor={tutor} kids={kids} />
+        {publicView ? <PublicBookingActions tutor={tutor} /> : <BookingPanel tutor={tutor} kids={kids} />}
       </div>
     </div>
   )
 }
 
-function Reviews({ tutor, reference }) {
+function Reviews({ tutor, reference, publicView = false }) {
   const [sort, setSort] = useState('recent')
   const [page, setPage] = useState(1)
   const [list, setList] = useState([])
@@ -218,13 +243,13 @@ function Reviews({ tutor, reference }) {
     setError('')
     setLoading(true)
     if (page === 1) setList([])
-    api.get(`/parent/tutors/${tutor.id}/reviews`, { params: { sort, page } }).then((r) => {
+    api.get(`/${publicView ? 'public' : 'parent'}/tutors/${tutor.id}/reviews`, { params: { sort, page } }).then((r) => {
       if (cancelled) return
       setList((prev) => (page === 1 ? r.data.reviews : [...prev, ...r.data.reviews]))
       setMore(r.data.hasMore)
     }).catch((e) => { if (!cancelled) setError(errorMessage(e)) }).finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [tutor.id, sort, page, retry])
+  }, [tutor.id, sort, page, retry, publicView])
 
   const total = tutor.ratingDistribution.reduce((s, d) => s + d.count, 0) || 1
 
@@ -263,16 +288,16 @@ function Reviews({ tutor, reference }) {
             <Avatar name={r.parentName} className="h-11 w-11" text="text-base" />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center justify-between gap-x-3">
-                <div><span className="font-bold text-navy">{r.parentName}</span> <span className="ml-1 text-xs text-slate-500">Parent of {r.parentOf}</span></div>
+                <div><span className="font-bold text-navy">{r.parentName}</span>{!publicView && <span className="ml-1 text-xs text-slate-500">Parent of {r.parentOf}</span>}</div>
                 <div className="flex items-center gap-2 text-xs text-slate-400"><Stars value={r.rating} size="h-3.5 w-3.5" /> {fmtShortDate(r.createdAt)}</div>
               </div>
               {r.comment && <p className="mt-1 break-words whitespace-pre-wrap text-sm text-slate-600">{r.comment}</p>}
-              {r.photoUrl && (
+              {!publicView && r.photoUrl && (
                 <a href={r.photoUrl} target="_blank" rel="noreferrer" className="mt-2 inline-block">
                   <img src={r.photoUrl} alt={`Photo shared by ${r.parentName}`} loading="lazy" className="h-20 w-20 rounded-lg object-cover" />
                 </a>
               )}
-              <button onClick={() => setReport(r)} disabled={reported.has(r.id)} className="mt-2 block min-h-10 text-xs font-semibold text-slate-500 underline disabled:opacity-60">{reported.has(r.id) ? 'Reported — track in My Complaints' : 'Report this review'}</button>
+              {!publicView && <button onClick={() => setReport(r)} disabled={reported.has(r.id)} className="mt-2 block min-h-10 text-xs font-semibold text-slate-500 underline disabled:opacity-60">{reported.has(r.id) ? 'Reported — track in My Complaints' : 'Report this review'}</button>}
             </div>
           </li>
         ))}
@@ -312,13 +337,14 @@ function ReportReview({ review, onClose, onDone }) {
 // Right-hand "Book a Lesson" panel. "Continue Booking" carries the choices to the full booking page.
 export function BookingPanel({ tutor, kids }) {
   const navigate = useNavigate()
+  const requestedMode = new URLSearchParams(useLocation().search).get('mode')
   const availableDays = useMemo(() => tutor.upcomingAvailability.filter((d) => d.slots.some((s) => s.status === 'available')), [tutor])
   const [date, setDate] = useState(availableDays[0]?.date || '')
   const slots = availableDays.find((d) => d.date === date)?.slots.filter((s) => s.status === 'available') || []
   const [time, setTime] = useState(slots[0]?.start || '')
   const [selectedSlots, setSelectedSlots] = useState([])
   const [childId, setChildId] = useState(recordRef(kids[0]) || '')
-  const [mode, setMode] = useState(tutor.offersPhysical ? 'PHYSICAL' : 'ONLINE')
+  const [mode, setMode] = useState(['ONLINE', 'PHYSICAL'].includes(requestedMode) ? requestedMode : tutor.offersPhysical ? 'PHYSICAL' : 'ONLINE')
   const [price, setPrice] = useState(String(tutor.hourlyRate))
   const [msg, setMsg] = useState('')
   const [error, setError] = useState('')

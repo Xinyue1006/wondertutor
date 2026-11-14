@@ -203,9 +203,9 @@ export function scoreTutor(tutor, c) {
 
   if (parts.location >= 0.55) {
     if (c.mode === 'ONLINE') add(parts.location * WEIGHTS.location, 'Offers online lessons')
-    else if (loc.km != null && tutor.offersPhysical)
+    else if (loc.km != null && loc.km <= 15 && tutor.offersPhysical)
       add(parts.location * WEIGHTS.location, `Teaches ${distanceBand(loc.km)} of your area`)
-    else if (tutor.offersOnline) add(parts.location * WEIGHTS.location, 'Offers online lessons')
+    else if (c.mode !== 'PHYSICAL' && tutor.offersOnline) add(parts.location * WEIGHTS.location, 'Offers online lessons')
   }
 
   if (chars.styleMatches.length) add(parts.characteristics * WEIGHTS.characteristics, 'Matches your preferred teaching style')
@@ -222,7 +222,7 @@ export function scoreTutor(tutor, c) {
     label: score >= 88 ? 'Highly suitable' : score >= 70 ? 'Good match' : 'Fair match',
     parts,
     reasons: reasons.map((r) => r.text),
-    distanceKm: loc.km == null ? null : Math.round(loc.km * 10) / 10,
+    distanceKm: c.mode === 'ONLINE' || loc.km == null ? null : Math.round(loc.km * 10) / 10,
   }
 }
 

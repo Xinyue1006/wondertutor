@@ -38,6 +38,7 @@ export default function Login({ admin = false }) {
   const { login, googleLogin, notice } = useAuth()
   const navigate = useNavigate()
   const { state } = useLocation()
+  const returnState = { from: state?.from, fromUserId: state?.fromUserId }
   const [form, setForm] = useState({ email: state?.email || '', password: '', remember: true })
   const [show, setShow] = useState(false)
   const [captcha, setCaptcha] = useState('')
@@ -76,7 +77,7 @@ export default function Login({ admin = false }) {
     setResendError('')
     try {
       await api.post('/auth/resend-otp', { email })
-      navigate('/signup', { state: { verifyEmail: email } })
+      navigate('/signup', { state: { ...returnState, verifyEmail: email } })
     } catch (err) {
       setResendError(errorMessage(err))
     } finally {
@@ -232,7 +233,7 @@ export default function Login({ admin = false }) {
             <GoogleButton onError={setError} onNeedsRole={(credential) => { setError(''); setNewGoogle(credential) }} />
           )}
           <p className="text-center text-sm text-slate-600">
-            New to WonderTutor? <Link to="/signup" className="inline-flex min-h-11 items-center font-semibold text-brand-600 hover:underline">Create an account</Link>
+            New to WonderTutor? <Link to="/signup" state={returnState} className="inline-flex min-h-11 items-center font-semibold text-brand-600 hover:underline">Create an account</Link>
           </p></>}
         </form>
       </div>
