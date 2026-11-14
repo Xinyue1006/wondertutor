@@ -77,3 +77,28 @@ test('a historical physical booking explains its missing exact venue without req
   expect(screen.queryByText(/ask the parent to confirm/)).not.toBeInTheDocument()
   expect(screen.queryByRole('link', { name: 'View lesson map' })).not.toBeInTheDocument()
 })
+
+test('list rows identify who must reply and keep payment deadlines visible during time changes', async () => {
+  const deadline = '2027-01-05T08:00:00Z'
+  const row = (id, status, reschedule) => ({ ...b, id, status, child: { ...b.child, name: 'Student ' + id }, payBy: deadline, reschedule })
+  const change = { status: 'PENDING', startAt: b.startAt, mine: false }
+  api.get.mockResolvedValue({ data: { bookings: [
+    row(1, 'PENDING'), row(2, 'COUNTER_OFFERED'), row(3, 'CONFIRMED', change),
+    row(4, 'CONFIRMED', { ...change, mine: true }), row(5, 'AWAITING_PAYMENT', { ...change, status: 'ESCALATED' }),
+    row(6, 'CONFIRMED', { ...change, status: 'APPROVED' }), row(7, 'COMPLETED', change),
+  ] } })
+  render(<MemoryRouter><BookingRequests /></MemoryRouter>)
+  const item = id => screen.getByRole('button', { name: new RegExp('Student ' + id) })
+  await screen.findByText('Your reply needed')
+  expect(item(1)).toHaveTextContent('Your reply needed')
+  expect(item(2)).toHaveTextContent('Waiting for parent to reply to your offer')
+  fireEvent.click(screen.getByRole('button', { name: 'Lessons (4)' }))
+  expect(item(3)).toHaveTextContent('Your reply needed on time change')
+  expect(item(4)).toHaveTextContent('Waiting for parent to reply to time change')
+  expect(item(5)).toHaveTextContent('Admin reviewing time change')
+  expect(item(5)).toHaveTextContent(/Payment due .*5 Jan 2027, 4:00 PM \(MYT\)/)
+  expect(item(6)).toHaveTextContent('Confirmed')
+  fireEvent.click(screen.getByRole('button', { name: 'History (1)' }))
+  expect(item(7)).toHaveTextContent('Completed')
+  expect(item(7)).not.toHaveTextContent(/reply|Payment due|time change/)
+})

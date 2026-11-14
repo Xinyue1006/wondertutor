@@ -13,6 +13,13 @@ const STATUS = {
 
 const KINDS = [['IDENTITY', 'Identity document (NRIC or passport)'], ['QUALIFICATION', 'Qualification']]
 
+function documentStatus(profile, kind) {
+  const docs = profile.documents.filter(d => d.kind === kind)
+  if (docs.some(d => d.status === 'APPROVED')) return 'Approved'
+  if (docs.some(d => d.status === 'PENDING')) return profile.submittedAt ? 'Awaiting admin review' : 'Uploaded · ready to submit'
+  return docs.length ? 'Replacement needed' : 'None uploaded'
+}
+
 const VerificationCard = forwardRef(function VerificationCard({ profile, onUpload }, ref) {
   const [badge, badgeCls, text] = STATUS[profile.status]
   const docs = profile.documents
@@ -33,6 +40,18 @@ const VerificationCard = forwardRef(function VerificationCard({ profile, onUploa
         </span>
         {profile.submittedAt && <span className="text-xs text-slate-600">Submitted {fmtDateLong(profile.submittedAt)}</span>}
       </div>
+      <dl className="mt-4 grid min-w-0 gap-3 sm:grid-cols-3">
+        {[
+          ['Email address', profile.isEmailVerified ? 'Verified' : 'Unverified'],
+          ['Qualification', documentStatus(profile, 'QUALIFICATION')],
+          ['Verified tutor badge', profile.isVerified ? 'Awarded' : 'Not awarded'],
+        ].map(([label, value]) => <div key={label} className="min-w-0 rounded-lg bg-brand-25 p-3">
+          <dt className="text-sm text-slate-600">{label}</dt>
+          <dd className="font-semibold text-navy">{value}</dd>
+        </div>)}
+      </dl>
+      <p className="mt-3 text-sm"><strong>Identity document:</strong> {documentStatus(profile, 'IDENTITY')}. The badge requires an approved identity document and at least one approved qualification.</p>
+      {!profile.isVerified && <p className="mt-2 font-semibold text-navy">You can accept booking requests before you earn the badge.</p>}
       <p className="mt-2 text-sm text-slate-600">{text}</p>
 
       {needsDocument && (
@@ -43,7 +62,8 @@ const VerificationCard = forwardRef(function VerificationCard({ profile, onUploa
       )}
 
       <div className="mt-3 flex flex-wrap gap-2">
-        {needsDocument && <button type="button" onClick={onUpload} className="btn-primary min-h-11 px-4">Upload a new document</button>}
+        {needsDocument && onUpload && <button type="button" onClick={onUpload} className="btn-primary min-h-11 px-4">Upload a new document</button>}
+        {!onUpload && <Link to="/tutor/setup" state={{ step: 'documents' }} className="btn-outline min-h-11 px-4">Manage verification documents</Link>}
         <Link to="/tutor/preview" className="btn-outline min-h-11 px-4">Preview my profile</Link>
       </div>
     </section>

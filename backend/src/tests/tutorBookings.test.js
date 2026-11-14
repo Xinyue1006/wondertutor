@@ -81,3 +81,14 @@ test('physical lessons reject links and elapsed payment holds expire before the 
   await expireStaleBookings(deadline)
   expect((await prisma.booking.findUnique({ where: { id: b.id } })).status).toBe('CANCELLED')
 })
+
+test('legacy unpaid rows use the lesson cutoff and newer rows show the earlier deadline', async () => {
+  const { b, actor } = await setup({ status: 'AWAITING_PAYMENT' })
+  const deadline = async () => Date.parse((await actor.get('/tutor/bookings')).bookings[0].payBy)
+  const cutoff = b.startAt.getTime() - 3600000
+  expect(await deadline()).toBe(cutoff)
+  for (const offset of [-3600000, 3600000]) {
+    await prisma.booking.update({ where: { id: b.id }, data: { payBy: new Date(cutoff + offset) } })
+    expect(await deadline()).toBe(Math.min(cutoff, cutoff + offset))
+  }
+})

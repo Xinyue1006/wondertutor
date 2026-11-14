@@ -1,6 +1,6 @@
 import { privateAsset, unsignedReference } from '../../services/privateMedia.js'
 import { z } from 'zod'
-import { prisma } from '../../config/prisma.js'
+import { teachingDay } from '../../services/tutorDashboard.service.js'
 import { AppError } from '../../utils/AppError.js'
 import { tutorHomeAreas } from '../../services/places.service.js'
 import { CHARACTERISTICS, LANGUAGES, MAX_GRADE, SUBJECTS, SUBJECT_LEVELS, isSubjectAtLevel } from '../../data/catalog.js'
@@ -113,12 +113,7 @@ export async function submitForVerification(req, res) {
   res.json(setup.toSetupDto(await setup.submitForVerification(req.tutor)))
 }
 
-// GET /tutor/dashboard: headline numbers for the tutor home page (verified tutors only)
+// GET /tutor/dashboard: the tutor's teaching day and booking actions.
 export async function dashboard(req, res) {
-  const now = new Date()
-  const [newRequests, upcoming] = await Promise.all([
-    prisma.booking.count({ where: { tutorId: req.tutor.id, status: 'PENDING' } }),
-    prisma.booking.count({ where: { tutorId: req.tutor.id, status: 'CONFIRMED', startAt: { gte: now } } }),
-  ])
-  res.json({ newRequests, upcomingSessions: upcoming, ratingAvg: req.tutor.ratingAvg, ratingCount: req.tutor.ratingCount })
+  res.json({ ...await teachingDay(req.tutor.id), ratingAvg: req.tutor.ratingAvg, ratingCount: req.tutor.ratingCount })
 }

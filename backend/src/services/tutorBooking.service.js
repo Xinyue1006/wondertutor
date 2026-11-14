@@ -2,7 +2,7 @@ import { prisma } from '../config/prisma.js'
 import { AppError } from '../utils/AppError.js'
 import { publicReference } from '../utils/publicIds.js'
 import { assertSlotBookable, assertChildFree } from './booking.service.js'
-import { newPayBy, assertCanAccept } from './paymentWindow.js'
+import { newPayBy, assertCanAccept, paymentDeadline } from './paymentWindow.js'
 import { notify, notifyWithEmail } from './notification.service.js'
 import { lessonLocationFields } from './lessonLocation.service.js'
 
@@ -24,18 +24,19 @@ export function tutorBooking(b) {
   const r = b.reschedules[0]
   return {
     id: b.id, publicId: b.publicId, subject: b.subject, parentName: b.parent.user.fullName, child: b.child,
+    report: b.status === 'COMPLETED' ? b.summary ?? null : null,
     parentSince: b.parent.user.createdAt, completedLessons: b.parent._count.bookings,
     startAt: b.startAt, endAt: b.endAt, status: b.status, teachingMode: b.teachingMode,
     proposedPrice: Number(b.proposedPrice), counterPrice: b.counterPrice, agreedPrice: b.agreedPrice,
     messageToTutor: b.messageToTutor, location: b.location, meetingLink: b.meetingLink,
     ...lessonLocationFields(b),
-    rejectionReason: b.rejectionReason, cancelReason: b.cancelReason, payBy: b.payBy, updatedAt: b.updatedAt,
+    rejectionReason: b.rejectionReason, cancelReason: b.cancelReason, payBy: b.status === 'AWAITING_PAYMENT' ? paymentDeadline(b) : b.payBy, updatedAt: b.updatedAt,
     reschedule: r && { id: r.id, status: r.status, startAt: r.newStartAt, reason: r.reason, mine: r.requestedById === b.tutor.userId },
   }
 }
 
 export async function listBookings(tutorId) {
-  const rows = await prisma.booking.findMany({ where: { tutorId }, include, orderBy: { startAt: 'asc' } })
+  const rows = await prisma.booking.findMany({ where: { tutorId }, include: { ...include, summary: { select: { progressNote: true, homework: true } } }, orderBy: [{ startAt: 'asc' }, { id: 'asc' }] })
   return rows.map(tutorBooking)
 }
 

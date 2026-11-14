@@ -42,3 +42,32 @@ test('extra date hours are bookable and malformed ranges fail',async()=>{
  expect(reply.status).toBe(409)
  expect(await prisma.booking.count({where:{childId:p.child.id}})).toBe(0)
 })
+
+test('the tutor preview matches the parent calendar for saved usual, week and date hours', async () => {
+  const t = await makeTutor(), p = await makeParent(), monday = nextDate(MONDAY), tuesday = addDays(monday, 1)
+  const tutor = api(t.token), parent = api(p.token)
+  async function compare(date, source, starts) {
+    const view = await tutor.get('/tutor/availability?week=' + monday)
+    const day = view.parentDays.find(d => d.date === date)
+    const calendar = await parent.get('/parent/tutors/' + t.tutor.id + '/slots?from=' + monday)
+    expect(day.source).toBe(source)
+    expect(day.slots).toEqual(calendar.days.find(d => d.date === date).slots.filter(s => s.status === 'available'))
+    expect(day.slots.map(s => s.start)).toEqual(starts)
+  }
+  await compare(monday, 'usual', ['16:00', '17:00', '18:00', '19:00'])
+  const exception = '/tutor/availability/exceptions'
+  await tutor.put(exception, { date: monday, ranges: [] })
+  await compare(monday, 'date', [])
+  await tutor.put('/tutor/availability/weeks/' + monday, { slots: [{ dayOfWeek: 2, startTime: '14:00', endTime: '16:00' }] })
+  await compare(tuesday, 'week', ['14:00', '15:00'])
+  await tutor.put(exception, { date: tuesday, ranges: [{ startTime: '09:00', endTime: '11:00' }] })
+  const body = { tutorId: t.tutor.id, childId: p.child.id, teachingMode: 'ONLINE', proposedPrice: 50, date: tuesday }
+  expect((await parent.post('/parent/bookings', { ...body, startTime: '14:00' })).status).toBe(400)
+  const created = await parent.post('/parent/bookings', { ...body, startTime: '09:00' })
+  expect(created.status).toBe(201)
+  await prisma.booking.update({ where: { id: created.booking.id }, data: { status: 'CONFIRMED' } })
+  await compare(tuesday, 'date', ['10:00'])
+  await prisma.booking.update({ where: { id: created.booking.id }, data: { status: 'CANCELLED' } })
+  await tutor.del(exception + '/' + tuesday)
+  await compare(tuesday, 'week', ['14:00', '15:00'])
+})

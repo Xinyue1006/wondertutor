@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import api, { errorMessage } from '../../api/client'
 import TutorPageHeader from '../../components/TutorPageHeader'
 import { ErrorBox, LoadError, SectionCard, Spinner } from '../../components/ui/Common'
@@ -20,6 +21,34 @@ function exportCsv(rows) {
   a.download = 'lesson-earnings.csv'
   a.click()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+function LessonAmounts({ row }) {
+  const amounts = [
+    ['Lesson fee', row.fee],
+    [`Saved commission (${Number(row.rate)}%)`, row.originalCommission],
+  ]
+  if (Number(row.refunded) > 0) {
+    amounts.push(
+      ['Your share before refund', row.originalShare],
+      ['Refund to parent', row.refunded],
+      ['Taken from your share', row.tutorRefundShare],
+      ['Taken from commission', row.platformRefundShare],
+      ['Commission after refund', row.commission],
+    )
+  }
+  amounts.push(['Tutor share', row.net])
+  return <dl className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">{amounts.map(([label, amount]) =>
+    <div key={label}><dt>{label}</dt><dd className="font-semibold">{money(amount)}</dd></div>
+  )}</dl>
+}
+
+function WithdrawalList({ rows }) {
+  return <ul className="divide-y divide-brand-100">{rows.map(w =>
+    <li key={w.id} className="break-words py-3"><strong>{money(w.amount)} · {statusLabel[w.status]}</strong>
+      <p className="text-sm">{fmtDate(w.date)} · {accountLabel(w.bank)}</p>{w.reason && <p>Reason: {w.reason}</p>}
+    </li>
+  )}</ul>
 }
 
 function BankCard({ data, refresh }) {
@@ -89,6 +118,10 @@ export default function Earnings() {
   if (!data) return <Spinner />
   const rows = data.transactions.filter(r => period === 'all' || monthKey(r.date) === data.month)
 
+  const isPending = w => w.status === 'PENDING' || w.status === 'ESCALATED'
+  const pendingWithdrawals = data.withdrawals.filter(isPending)
+  const closedWithdrawals = data.withdrawals.filter(w => !isPending(w))
+
   async function withdraw(e) {
     e.preventDefault()
     setBusy(true)
@@ -120,6 +153,10 @@ export default function Earnings() {
           <button className="btn-primary min-h-11 w-full" disabled={busy || !data.bank || Number(data.available) <= 0 || !amount}>{busy ? 'Submitting…' : 'Request withdrawal'}</button>
           {notice && <p role="status" className="text-sm">{notice}</p>}
         </form></SectionCard>
+        <SectionCard title="Pending withdrawals" icon="clock">
+          {pendingWithdrawals.length ? <><p className="text-sm">{money(data.held)} is already set aside from your available balance.</p>
+            <WithdrawalList rows={pendingWithdrawals} /></> : <p>No withdrawals awaiting review.</p>}
+        </SectionCard>
         <BankCard data={data} refresh={load} />
       </div>
       <div className="min-w-0 space-y-4 lg:col-start-1 lg:row-start-1">
@@ -130,14 +167,15 @@ export default function Earnings() {
           <ul className="divide-y divide-brand-100">{rows.map(r => <li key={r.id} className="space-y-2 break-words py-3">
             <div className="flex flex-wrap items-baseline justify-between gap-x-3"><strong>{r.subject} · {r.student}</strong><span>{r.state}</span></div>
             <p className="text-sm">{fmtDate(r.date)} · Booking #{r.bookingId}</p>
-            <dl className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">{[['Lesson fee', money(r.fee)], ['Commission (' + Number(r.rate) + '%)', money(r.commission)], ['Tutor share', money(r.net)], ...(Number(r.refunded) ? [['Refund', money(r.refunded)], ['Original commission', money(r.originalCommission)]] : [])].map(([k,v]) => <div key={k}><dt>{k}</dt><dd className="font-semibold">{v}</dd></div>)}</dl>
+            {r.bookingStatus && <p className="text-sm">Lesson · {r.bookingStatus[0] + r.bookingStatus.slice(1).toLowerCase().replaceAll('_', ' ')}</p>}
+            {r.bookingStatus === 'COMPLETED' && <Link className="inline-flex min-h-11 items-center underline" to={'/tutor/bookings/' + (r.bookingRef || r.bookingId) + '/session'}>View lesson report</Link>}
+            <LessonAmounts row={r} />
           </li>)}</ul>
         </SectionCard>
         <SectionCard title="Withdrawal history" icon="clock">
           <p className="text-sm">Total approved: {money(data.withdrawn)}</p>
-          {!data.withdrawals.length && <p className="mt-2">No withdrawals yet.</p>}
-          <ul className="divide-y divide-brand-100">{data.withdrawals.map(w => <li key={w.id} className="break-words py-3"><strong>{money(w.amount)} · {statusLabel[w.status]}</strong>
-            <p className="text-sm">{fmtDate(w.date)} · {accountLabel(w.bank)}</p>{w.reason && <p>Reason: {w.reason}</p>}</li>)}</ul>
+          {!closedWithdrawals.length && <p className="mt-2">{data.withdrawals.length ? 'No withdrawal decisions yet.' : 'No withdrawals yet.'}</p>}
+          <WithdrawalList rows={closedWithdrawals} />
         </SectionCard>
       </div>
     </div>
