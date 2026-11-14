@@ -1,0 +1,530 @@
+﻿ID,Feature,Layer,Group,Scenario and expected result,Test file,Result
+TC-001,"Sign-up, profile and verification",Server,access without verification,a tutor who just signed up can use the tutor features before Admin verifies them,backend/src/tests/tutorSetup.test.js,Pass
+TC-002,"Sign-up, profile and verification",Server,access without verification,parents and admins cannot use the tutor API,backend/src/tests/tutorSetup.test.js,Pass
+TC-003,"Sign-up, profile and verification",Server,login reCAPTCHA,"is required when the secret is set, and a token Google rejects is refused",backend/src/tests/tutorSetup.test.js,Pass
+TC-004,"Sign-up, profile and verification",Server,login reCAPTCHA,is skipped when no secret is configured (development and tests),backend/src/tests/tutorSetup.test.js,Pass
+TC-005,"Sign-up, profile and verification",Server,profile setup,saves each step as a partial draft and lists what is still missing,backend/src/tests/tutorSetup.test.js,Pass
+TC-006,"Sign-up, profile and verification",Server,profile setup,"rejects bad input: unknown area, own number as emergency contact, impossible grade, outside file links",backend/src/tests/tutorSetup.test.js,Pass
+TC-007,"Sign-up, profile and verification",Server,profile setup,"submit is refused while anything required is missing, then accepted once complete, and only once",backend/src/tests/tutorSetup.test.js,Pass
+TC-008,"Sign-up, profile and verification",Server,tutor sign-up,needs no gender or emergency contact; the new tutor starts as not submitted,backend/src/tests/tutorSetup.test.js,Pass
+TC-009,"Sign-up, profile and verification",Server,tutor sign-up,parents get no tutor status,backend/src/tests/tutorSetup.test.js,Pass
+TC-010,"Sign-up, profile and verification",Server,verification,a tutor is verified only after Admin approves an identity document and a qualification,backend/src/tests/tutorSetup.test.js,Pass
+TC-011,"Sign-up, profile and verification",Server,verification,"a rejected document asks for changes, and uploading a new one puts the profile back under review",backend/src/tests/tutorSetup.test.js,Pass
+TC-012,"Sign-up, profile and verification",Server,verification,a tutor cannot read or delete another tutor's document,backend/src/tests/tutorSetup.test.js,Pass
+TC-013,"Sign-up, profile and verification",Server,verification,removing an approved document takes the badge away; removing a pending one changes nothing,backend/src/tests/tutorSetup.test.js,Pass
+TC-014,"Sign-up, profile and verification",Server,verification,the default name avatar can be submitted without a profile photo; verification documents remain required,backend/src/tests/tutorSetup.test.js,Pass
+TC-015,"Sign-up, profile and verification",Server,verification,the tutor is told about a review on the verification status page,backend/src/tests/tutorSetup.test.js,Pass
+TC-016,"Sign-up, profile and verification",Page,profile responses belong to the signed-in tutor,a late profile read cannot change the next session: null,frontend/src/tests/ProfileSetup.test.jsx,Pass
+TC-017,"Sign-up, profile and verification",Page,profile responses belong to the signed-in tutor,"a late profile read cannot change the next session: { id: 99, role: 'TUTOR', …(2) }",frontend/src/tests/ProfileSetup.test.jsx,Pass
+TC-018,"Sign-up, profile and verification",Page,profile responses belong to the signed-in tutor,a late save cannot restore the old tutor after logout,frontend/src/tests/ProfileSetup.test.jsx,Pass
+TC-019,"Sign-up, profile and verification",Page,setup step checks (mirror the server),a profile photo is optional: null,frontend/src/tests/ProfileSetup.test.jsx,Pass
+TC-020,"Sign-up, profile and verification",Page,setup step checks (mirror the server),a profile photo is optional: https://lh3.googleusercontent.com/a/photo,frontend/src/tests/ProfileSetup.test.jsx,Pass
+TC-021,"Sign-up, profile and verification",Page,setup step checks (mirror the server),a profile photo is optional: https://res.cloudinary.com/x/me.jpg,frontend/src/tests/ProfileSetup.test.jsx,Pass
+TC-022,"Sign-up, profile and verification",Page,setup step checks (mirror the server),the emergency contact must be someone else,frontend/src/tests/ProfileSetup.test.jsx,Pass
+TC-023,"Sign-up, profile and verification",Page,setup step checks (mirror the server),documents need an identity document and a qualification that are not rejected,frontend/src/tests/ProfileSetup.test.jsx,Pass
+TC-024,"Sign-up, profile and verification",Page,setup step checks (mirror the server),the hourly rate follows the same RM rule as the server,frontend/src/tests/ProfileSetup.test.jsx,Pass
+TC-025,"Sign-up, profile and verification",Page,tutor profile setup,"Save and continue is blocked while a required field is missing, and nothing is saved",frontend/src/tests/ProfileSetup.test.jsx,Pass
+TC-026,"Sign-up, profile and verification",Page,tutor profile setup,a complete basic step is saved on its own and the wizard moves on,frontend/src/tests/ProfileSetup.test.jsx,Pass
+TC-027,"Sign-up, profile and verification",Page,tutor profile setup,submit stays disabled until the confirmation box is ticked,frontend/src/tests/ProfileSetup.test.jsx,Pass
+TC-028,"Sign-up, profile and verification",Page,tutor profile setup,"a tutor can keep default initials, finish the photo step and submit for verification",frontend/src/tests/ProfileSetup.test.jsx,Pass
+TC-029,"Sign-up, profile and verification",Page,tutor profile setup: editing and documents,Back keeps what was typed in the step,frontend/src/tests/ProfileSetup.test.jsx,Pass
+TC-030,"Sign-up, profile and verification",Page,tutor profile setup: editing and documents,a double click on submit sends one request,frontend/src/tests/ProfileSetup.test.jsx,Pass
+TC-031,"Sign-up, profile and verification",Page,tutor profile setup: editing and documents,removing an approved document asks first and does nothing when cancelled,frontend/src/tests/ProfileSetup.test.jsx,Pass
+TC-032,"Sign-up, profile and verification",Page,verification on My Profile,a tutor can skip qualifications and finish without submitting for verification,frontend/src/tests/ProfileSetup.test.jsx,Pass
+TC-033,"Sign-up, profile and verification",Page,verification on My Profile,a new tutor sees that nothing has been submitted,frontend/src/tests/ProfileSetup.test.jsx,Pass
+TC-034,"Sign-up, profile and verification",Page,verification on My Profile,a verified tutor sees the verified state,frontend/src/tests/ProfileSetup.test.jsx,Pass
+TC-035,"Sign-up, profile and verification",Page,verification on My Profile,a rejected document shows Admin's reason and the button opens the Qualifications step,frontend/src/tests/ProfileSetup.test.jsx,Pass
+TC-036,"Sign-up, profile and verification",Page,verification on My Profile,a removed document is listed as missing,frontend/src/tests/ProfileSetup.test.jsx,Pass
+TC-037,"Sign-up, profile and verification",Page,tutor status banner,a tutor who has not submitted is asked to complete the profile,frontend/src/tests/TutorStatusBanner.test.jsx,Pass
+TC-038,"Sign-up, profile and verification",Page,tutor status banner,a tutor under review is told what verification will give them,frontend/src/tests/TutorStatusBanner.test.jsx,Pass
+TC-039,"Sign-up, profile and verification",Page,tutor status banner,"nothing is shown to a verified tutor, or on the setup and status pages",frontend/src/tests/TutorStatusBanner.test.jsx,Pass
+TC-040,Dashboard,Server,dashboard,"a new tutor sees zero requests, zero lessons and no rating",backend/src/tests/tutorDashboard.test.js,Pass
+TC-041,Dashboard,Server,dashboard,counts only pending requests as new requests,backend/src/tests/tutorDashboard.test.js,Pass
+TC-042,Dashboard,Server,dashboard,"counts confirmed future lessons only, not past, completed or cancelled ones",backend/src/tests/tutorDashboard.test.js,Pass
+TC-043,Dashboard,Server,dashboard,never counts another tutor's bookings,backend/src/tests/tutorDashboard.test.js,Pass
+TC-044,Dashboard,Server,dashboard,shows the saved parent rating,backend/src/tests/tutorDashboard.test.js,Pass
+TC-045,Dashboard,Server,dashboard,only a logged-in tutor can open the dashboard,backend/src/tests/tutorDashboard.test.js,Pass
+TC-046,Dashboard,Page,,shows the tutor overview and links to teaching tools,frontend/src/tests/TutorDashboard.test.jsx,Pass
+TC-047,Dashboard,Page,,shows an honest empty rating before the first review,frontend/src/tests/TutorDashboard.test.jsx,Pass
+TC-048,Dashboard,Page,,lets the tutor retry a failed dashboard request,frontend/src/tests/TutorDashboard.test.jsx,Pass
+TC-049,Students,Server,students list,"returns each lesson with the child's id, name, grade and level and no private details",backend/src/tests/tutorDashboard.test.js,Pass
+TC-050,Students,Server,students list,keeps two children of the same parent apart,backend/src/tests/tutorDashboard.test.js,Pass
+TC-051,Students,Server,students list,lists lessons from the earliest to the latest,backend/src/tests/tutorDashboard.test.js,Pass
+TC-052,Students,Server,students list,never shows another tutor's students,backend/src/tests/tutorDashboard.test.js,Pass
+TC-053,Students,Page,,loads the tutor lesson list,frontend/src/tests/Students.test.jsx,Pass
+TC-054,Students,Page,,groups lessons by student and shows the grade and lesson count,frontend/src/tests/Students.test.jsx,Pass
+TC-055,Students,Page,,"lists confirmed, completed and disputed lessons only",frontend/src/tests/Students.test.jsx,Pass
+TC-056,Students,Page,,a child with only requests or cancelled lessons is not listed,frontend/src/tests/Students.test.jsx,Pass
+TC-057,Students,Page,,"each lesson links to its session page with date, subject and status",frontend/src/tests/Students.test.jsx,Pass
+TC-058,Students,Page,,"search finds a student by part of the name, ignoring case",frontend/src/tests/Students.test.jsx,Pass
+TC-059,Students,Page,,search with no match says so and clearing it shows everyone again,frontend/src/tests/Students.test.jsx,Pass
+TC-060,Students,Page,,two children with the same name stay separate,frontend/src/tests/Students.test.jsx,Pass
+TC-061,Students,Page,,a student's lessons stay in the order the server sent them,frontend/src/tests/Students.test.jsx,Pass
+TC-062,Students,Page,,a failed load can be retried,frontend/src/tests/Students.test.jsx,Pass
+TC-063,Availability,Server,PUT /tutor/availability validation,rejects minutes other than 00 with a readable message,backend/src/tests/availability.test.js,Pass
+TC-064,Availability,Server,PUT /tutor/availability validation,rejects start after end with a readable message,backend/src/tests/availability.test.js,Pass
+TC-065,Availability,Server,PUT /tutor/availability validation,rejects start equal to end with a readable message,backend/src/tests/availability.test.js,Pass
+TC-066,Availability,Server,PUT /tutor/availability validation,rejects before the first hour with a readable message,backend/src/tests/availability.test.js,Pass
+TC-067,Availability,Server,PUT /tutor/availability validation,rejects after the last hour with a readable message,backend/src/tests/availability.test.js,Pass
+TC-068,Availability,Server,PUT /tutor/availability validation,rejects not a time with a readable message,backend/src/tests/availability.test.js,Pass
+TC-069,Availability,Server,PUT /tutor/availability validation,rejects day 7 with a readable message,backend/src/tests/availability.test.js,Pass
+TC-070,Availability,Server,PUT /tutor/availability validation,rejects a fractional day with a readable message,backend/src/tests/availability.test.js,Pass
+TC-071,Availability,Server,PUT /tutor/availability validation,rejects extra fields on a row with a readable message,backend/src/tests/availability.test.js,Pass
+TC-072,Availability,Server,PUT /tutor/availability validation,rejects more rows than the limit with a readable message,backend/src/tests/availability.test.js,Pass
+TC-073,Availability,Server,PUT /tutor/availability validation,"rejects extra fields next to slots, and a missing list",backend/src/tests/availability.test.js,Pass
+TC-074,Availability,Server,access,each tutor only reads and changes their own schedule,backend/src/tests/availability.test.js,Pass
+TC-075,Availability,Server,access,one tutor's week changes never reach another tutor,backend/src/tests/availability.test.js,Pass
+TC-076,Availability,Server,access,PUT a week needs a tutor: a visitor gets 401 and a parent 403,backend/src/tests/availability.test.js,Pass
+TC-077,Availability,Server,access,DELETE a week needs a tutor: a visitor gets 401 and a parent 403,backend/src/tests/availability.test.js,Pass
+TC-078,Availability,Server,access,copy a week needs a tutor: a visitor gets 401 and a parent 403,backend/src/tests/availability.test.js,Pass
+TC-079,Availability,Server,access,"an unverified tutor can use it, a visitor gets 401 and a parent 403",backend/src/tests/availability.test.js,Pass
+TC-080,Availability,Server,booked hours,a CONFIRMED booking is listed for its week as BOOKED,backend/src/tests/availability.test.js,Pass
+TC-081,Availability,Server,booked hours,a booking is listed only for its own week,backend/src/tests/availability.test.js,Pass
+TC-082,Availability,Server,booked hours,"dropping a booked hour from the usual hours returns 409, names the date, and changes nothing",backend/src/tests/availability.test.js,Pass
+TC-083,Availability,Server,booked hours,a schedule that keeps the booked hour is accepted,backend/src/tests/availability.test.js,Pass
+TC-084,Availability,Server,booked hours,a PENDING booking does not lock the hour,backend/src/tests/availability.test.js,Pass
+TC-085,Availability,Server,booked hours,a past booking does not lock the hour,backend/src/tests/availability.test.js,Pass
+TC-086,Availability,Server,booked-hour lock per scope,"a booking blocks removing its hour in its own week, and the message has the date",backend/src/tests/availability.test.js,Pass
+TC-087,Availability,Server,booked-hour lock per scope,a booking in another week does not block the change,backend/src/tests/availability.test.js,Pass
+TC-088,Availability,Server,booked-hour lock per scope,saving the usual hours is blocked by a booking in a week without an override,backend/src/tests/availability.test.js,Pass
+TC-089,Availability,Server,booked-hour lock per scope,saving the usual hours is not blocked by a booking in a week with an override,backend/src/tests/availability.test.js,Pass
+TC-090,Availability,Server,booked-hour lock per scope,reset is blocked when the booking is outside the usual hours,backend/src/tests/availability.test.js,Pass
+TC-091,Availability,Server,booked-hour lock per scope,a Sunday 22:00 Malaysia-time booking counts in the week that ends on that Sunday,backend/src/tests/availability.test.js,Pass
+TC-092,Availability,Server,copying a week,copies an override to several weeks and leaves the source alone,backend/src/tests/availability.test.js,Pass
+TC-093,Availability,Server,copying a week,copying a week on the usual hours creates no override rows,backend/src/tests/availability.test.js,Pass
+TC-094,Availability,Server,copying a week,a target that had its own hours is replaced,backend/src/tests/availability.test.js,Pass
+TC-095,Availability,Server,copying a week,"the source, a past week, a week beyond the horizon and a duplicate are skipped with a reason",backend/src/tests/availability.test.js,Pass
+TC-096,Availability,Server,copying a week,a target whose booked hour would be lost is skipped while the others are saved,backend/src/tests/availability.test.js,Pass
+TC-097,Availability,Server,copying a week,"more than 8 targets, or none, is refused",backend/src/tests/availability.test.js,Pass
+TC-098,Availability,Server,copying a week,the source must be an allowed week,backend/src/tests/availability.test.js,Pass
+TC-099,Availability,Server,effectiveSlotsForDate,uses the usual hours when the week has no override,backend/src/tests/availability.test.js,Pass
+TC-100,Availability,Server,effectiveSlotsForDate,the override wins for its own week and not for the next,backend/src/tests/availability.test.js,Pass
+TC-101,Availability,Server,effectiveSlotsForDate,only the slots of that weekday are returned,backend/src/tests/availability.test.js,Pass
+TC-102,Availability,Server,effectiveSlotsForDate,an override with no hours means nothing that week,backend/src/tests/availability.test.js,Pass
+TC-103,Availability,Server,effectiveSlotsForDate,Sunday belongs to the week that ends on it,backend/src/tests/availability.test.js,Pass
+TC-104,Availability,Server,held and booked hours,an AWAITING_PAYMENT booking is PENDING_PAYMENT and held until its deadline,backend/src/tests/availability.test.js,Pass
+TC-105,Availability,Server,held and booked hours,with no payBy the hold ends before the lesson by the old rule,backend/src/tests/availability.test.js,Pass
+TC-106,Availability,Server,held and booked hours,a paid lesson wins when two bookings share an hour,backend/src/tests/availability.test.js,Pass
+TC-107,Availability,Server,held and booked hours,a PENDING booking does not hold the hour,backend/src/tests/availability.test.js,Pass
+TC-108,Availability,Server,held and booked hours,a COUNTER_OFFERED booking does not hold the hour,backend/src/tests/availability.test.js,Pass
+TC-109,Availability,Server,held and booked hours,a past held booking does not appear,backend/src/tests/availability.test.js,Pass
+TC-110,Availability,Server,held and booked hours,"a held hour blocks saving a week, with the pay-by time",backend/src/tests/availability.test.js,Pass
+TC-111,Availability,Server,held and booked hours,a held hour blocks saving the usual hours,backend/src/tests/availability.test.js,Pass
+TC-112,Availability,Server,held and booked hours,"copying skips a week whose held hour would be lost, with the reason",backend/src/tests/availability.test.js,Pass
+TC-113,Availability,Server,held and booked hours,"a booked hour keeps its own wording, and a mix lists both",backend/src/tests/availability.test.js,Pass
+TC-114,Availability,Server,held and booked hours,once the booking is cancelled the hour is free and the same save succeeds,backend/src/tests/availability.test.js,Pass
+TC-115,Availability,Server,normaliseSlots,joins overlapping and touching ranges on the same day,backend/src/tests/availability.test.js,Pass
+TC-116,Availability,Server,normaliseSlots,sorts unsorted input and keeps gaps and different days apart,backend/src/tests/availability.test.js,Pass
+TC-117,Availability,Server,"one availability rule for parents: date change, then week, then usual hours","the parent calendar follows the order, with each hour's mode",backend/src/tests/availability.test.js,Pass
+TC-118,Availability,Server,"one availability rule for parents: date change, then week, then usual hours",a closed date and a closed week stay closed,backend/src/tests/availability.test.js,Pass
+TC-119,Availability,Server,"one availability rule for parents: date change, then week, then usual hours",booking follows the order and the hour's mode,backend/src/tests/availability.test.js,Pass
+TC-120,Availability,Server,"one availability rule for parents: date change, then week, then usual hours","accepting a counter-offer checks the hour again, including its mode",backend/src/tests/availability.test.js,Pass
+TC-121,Availability,Server,"one availability rule for parents: date change, then week, then usual hours",a lesson can only be moved to an hour that allows its mode,backend/src/tests/availability.test.js,Pass
+TC-122,Availability,Server,"one availability rule for parents: date change, then week, then usual hours",search by date and time follows the order and the mode,backend/src/tests/availability.test.js,Pass
+TC-123,Availability,Server,"one availability rule for parents: date change, then week, then usual hours",the day filter counts the next weeks under the same rule and mode,backend/src/tests/availability.test.js,Pass
+TC-124,Availability,Server,"one availability rule for parents: date change, then week, then usual hours",a lesson on a date with its own change does not lock the week or usual hours,backend/src/tests/availability.test.js,Pass
+TC-125,Availability,Server,"one availability rule for parents: date change, then week, then usual hours","removing a date change falls back to that week's hours, then the usual hours",backend/src/tests/availability.test.js,Pass
+TC-126,Availability,Server,parent booking calendar,offers exactly the hours the tutor saved,backend/src/tests/availability.test.js,Pass
+TC-127,Availability,Server,quick adds,a tutor starts with none of their own,backend/src/tests/availability.test.js,Pass
+TC-128,Availability,Server,quick adds,saved quick adds come back with the week and belong to that tutor,backend/src/tests/availability.test.js,Pass
+TC-129,Availability,Server,quick adds,saving an empty list keeps it empty rather than going back to the built-in ones,backend/src/tests/availability.test.js,Pass
+TC-130,Availability,Server,quick adds,the name is trimmed,backend/src/tests/availability.test.js,Pass
+TC-131,Availability,Server,quick adds,a blank name is refused,backend/src/tests/availability.test.js,Pass
+TC-132,Availability,Server,quick adds,a long name is refused,backend/src/tests/availability.test.js,Pass
+TC-133,Availability,Server,quick adds,no days is refused,backend/src/tests/availability.test.js,Pass
+TC-134,Availability,Server,quick adds,a repeated day is refused,backend/src/tests/availability.test.js,Pass
+TC-135,Availability,Server,quick adds,a day out of range is refused,backend/src/tests/availability.test.js,Pass
+TC-136,Availability,Server,quick adds,a backwards time is refused,backend/src/tests/availability.test.js,Pass
+TC-137,Availability,Server,quick adds,a part hour is refused,backend/src/tests/availability.test.js,Pass
+TC-138,Availability,Server,quick adds,an unknown mode is refused,backend/src/tests/availability.test.js,Pass
+TC-139,Availability,Server,quick adds,at most 8 can be kept,backend/src/tests/availability.test.js,Pass
+TC-140,Availability,Server,quick adds,saving quick adds does not change the hours,backend/src/tests/availability.test.js,Pass
+TC-141,Availability,Server,quick adds,a parent cannot save quick adds,backend/src/tests/availability.test.js,Pass
+TC-142,Availability,Server,saving one week,a week that differs from the usual hours is stored and reported as changed,backend/src/tests/availability.test.js,Pass
+TC-143,Availability,Server,saving one week,hours equal to the usual ones remove the override,backend/src/tests/availability.test.js,Pass
+TC-144,Availability,Server,saving one week,a second save replaces the first,backend/src/tests/availability.test.js,Pass
+TC-145,Availability,Server,saving one week,reset goes back to the usual hours,backend/src/tests/availability.test.js,Pass
+TC-146,Availability,Server,saving one week,reset does not fail when the week has no override,backend/src/tests/availability.test.js,Pass
+TC-147,Availability,Server,saving the schedule,stores merged ranges and answers in the same shape as GET,backend/src/tests/availability.test.js,Pass
+TC-148,Availability,Server,saving the schedule,replaces the previous schedule completely,backend/src/tests/availability.test.js,Pass
+TC-149,Availability,Server,saving the schedule,an empty schedule is allowed,backend/src/tests/availability.test.js,Pass
+TC-150,Availability,Server,teaching mode checks,"an online-only tutor cannot save a physical hour for a week, and nothing is saved",backend/src/tests/availability.test.js,Pass
+TC-151,Availability,Server,teaching mode checks,an online-only tutor can save a ONLINE hour for a week,backend/src/tests/availability.test.js,Pass
+TC-152,Availability,Server,teaching mode checks,an online-only tutor can save a BOTH hour for a week,backend/src/tests/availability.test.js,Pass
+TC-153,Availability,Server,teaching mode checks,a physical-only tutor cannot save an online usual hour,backend/src/tests/availability.test.js,Pass
+TC-154,Availability,Server,teaching mode checks,a tutor offering both can save a PHYSICAL hour,backend/src/tests/availability.test.js,Pass
+TC-155,Availability,Server,teaching mode checks,a tutor offering both can save a ONLINE hour,backend/src/tests/availability.test.js,Pass
+TC-156,Availability,Server,teaching mode checks,a tutor offering both can save a BOTH hour,backend/src/tests/availability.test.js,Pass
+TC-157,Availability,Server,teaching mode checks,a tutor with neither switched on can save a PHYSICAL hour,backend/src/tests/availability.test.js,Pass
+TC-158,Availability,Server,teaching mode checks,a tutor with neither switched on can save a ONLINE hour,backend/src/tests/availability.test.js,Pass
+TC-159,Availability,Server,teaching mode checks,a tutor with neither switched on can save a BOTH hour,backend/src/tests/availability.test.js,Pass
+TC-160,Availability,Server,teaching mode checks,"a quick add must be a mode the profile offers, and one with no mode is fine",backend/src/tests/availability.test.js,Pass
+TC-161,Availability,Server,teaching mode checks,a paid physical lesson stops its hour becoming online only,backend/src/tests/availability.test.js,Pass
+TC-162,Availability,Server,teaching mode checks,a held online lesson can have its hour opened to both but not made physical only,backend/src/tests/availability.test.js,Pass
+TC-163,Availability,Server,teaching mode checks,the usual hours cannot strand a lesson either,backend/src/tests/availability.test.js,Pass
+TC-164,Availability,Server,teaching mode checks,"copying skips a week whose lesson the source mode would strand, with the reason",backend/src/tests/availability.test.js,Pass
+TC-165,Availability,Server,teaching mode checks,the week view gives each hour its lesson mode,backend/src/tests/availability.test.js,Pass
+TC-166,Availability,Server,teaching mode of a slot,hours sent without a mode are BOTH,backend/src/tests/availability.test.js,Pass
+TC-167,Availability,Server,teaching mode of a slot,touching hours stay apart when the mode differs and join when it is the same,backend/src/tests/availability.test.js,Pass
+TC-168,Availability,Server,teaching mode of a slot,one hour cannot have two modes,backend/src/tests/availability.test.js,Pass
+TC-169,Availability,Server,teaching mode of a slot,an unknown mode is refused,backend/src/tests/availability.test.js,Pass
+TC-170,Availability,Server,teaching mode of a slot,the usual hours keep their modes and the view says what the profile offers,backend/src/tests/availability.test.js,Pass
+TC-171,Availability,Server,teaching mode of a slot,a week with the same hours but another mode counts as changed,backend/src/tests/availability.test.js,Pass
+TC-172,Availability,Server,teaching mode of a slot,copying a week carries the modes,backend/src/tests/availability.test.js,Pass
+TC-173,Availability,Server,teaching mode of a slot,effectiveSlotsForDate returns the mode,backend/src/tests/availability.test.js,Pass
+TC-174,Availability,Server,week validation,not a Monday is refused,backend/src/tests/availability.test.js,Pass
+TC-175,Availability,Server,week validation,a malformed date is refused,backend/src/tests/availability.test.js,Pass
+TC-176,Availability,Server,week validation,an impossible date is refused,backend/src/tests/availability.test.js,Pass
+TC-177,Availability,Server,week validation,a past week is refused,backend/src/tests/availability.test.js,Pass
+TC-178,Availability,Server,week validation,beyond the horizon is refused,backend/src/tests/availability.test.js,Pass
+TC-179,Availability,Server,week validation,the current week and the last allowed week are accepted,backend/src/tests/availability.test.js,Pass
+TC-180,Availability,Server,week validation,slots follow the same rules as the usual hours,backend/src/tests/availability.test.js,Pass
+TC-181,Availability,Server,week validation,the week view snaps any date to its Monday and defaults to the current week,backend/src/tests/availability.test.js,Pass
+TC-182,Availability,Server,week validation,the view reports the weeks that can be opened,backend/src/tests/availability.test.js,Pass
+TC-183,Availability,Server,,a half-hour lesson locks every grid hour it touches and cannot be truncated,backend/src/tests/availabilityIntegration.test.js,Pass
+TC-184,Availability,Server,,the final half-hour of a CONFIRMED lesson keeps its teaching mode,backend/src/tests/availabilityIntegration.test.js,Pass
+TC-185,Availability,Server,,the final half-hour of a AWAITING_PAYMENT lesson keeps its teaching mode,backend/src/tests/availabilityIntegration.test.js,Pass
+TC-186,Availability,Server,,reset and copy cannot strand the final half-hour of a lesson,backend/src/tests/availabilityIntegration.test.js,Pass
+TC-187,Availability,Server,,adjoining online and physical lessons require BOTH in their shared grid hour,backend/src/tests/availabilityIntegration.test.js,Pass
+TC-188,Availability,Server,,week and date scopes tell the editor which booked hours protect its current scope,backend/src/tests/availabilityIntegration.test.js,Pass
+TC-189,Availability,Server,,a half-hour reschedule may cross touching compatible modes but cannot cross a mode restriction,backend/src/tests/availabilityIntegration.test.js,Pass
+TC-190,Availability,Server,,restoring weekly hours checks the complete lesson across compatible mode ranges,backend/src/tests/availabilityIntegration.test.js,Pass
+TC-191,Availability,Server,,parent cancellation closes the pending time proposal in both portals,backend/src/tests/availabilityIntegration.test.js,Pass
+TC-192,Availability,Server,,tutor public booking links retain ownership and parent counter-offer notifications use public references,backend/src/tests/availabilityIntegration.test.js,Pass
+TC-193,Availability,Server,,"the whole lesson must be covered, including its final half hour",backend/src/tests/availabilityIntervals.test.js,Pass
+TC-194,Availability,Server,,touching compatible ranges cover a rescheduled lesson even when their modes differ,backend/src/tests/availabilityIntervals.test.js,Pass
+TC-195,Availability,Server,,a gap or an incompatible segment cannot be hidden by a compatible first range,backend/src/tests/availabilityIntervals.test.js,Pass
+TC-196,Availability,Server,,endpoints are exclusive and unrelated later ranges cannot invalidate coverage,backend/src/tests/availabilityIntervals.test.js,Pass
+TC-197,Availability,Server,,"empty, reversed and overnight intervals are rejected",backend/src/tests/availabilityIntervals.test.js,Pass
+TC-198,Availability,Page,availability integration safeguards,a lesson controlled by a date exception never adds hours to the usual pattern,frontend/src/tests/Availability.test.jsx,Pass
+TC-199,Availability,Page,availability integration safeguards,a lesson controlled by a date exception never adds hours to the week pattern,frontend/src/tests/Availability.test.jsx,Pass
+TC-200,Availability,Page,availability integration safeguards,"editing and navigation are frozen while saving, so the response cannot discard later edits",frontend/src/tests/Availability.test.jsx,Pass
+TC-201,Availability,Page,copying this week,the button is only there when editing this week,frontend/src/tests/Availability.test.jsx,Pass
+TC-202,Availability,Page,copying this week,the button is disabled with unsaved changes,frontend/src/tests/Availability.test.jsx,Pass
+TC-203,Availability,Page,copying this week,the dialog lists the next 8 weeks and marks the ones that will be replaced,frontend/src/tests/Availability.test.jsx,Pass
+TC-204,Availability,Page,copying this week,the list stops at the last week that can be edited,frontend/src/tests/Availability.test.jsx,Pass
+TC-205,Availability,Page,copying this week,the quick choices tick 4 or 8 weeks,frontend/src/tests/Availability.test.jsx,Pass
+TC-206,Availability,Page,copying this week,Copy needs at least one week,frontend/src/tests/Availability.test.jsx,Pass
+TC-207,Availability,Page,copying this week,Escape closes the dialog,frontend/src/tests/Availability.test.jsx,Pass
+TC-208,Availability,Page,copying this week,confirming sends the copy and shows the copied and skipped weeks with reasons,frontend/src/tests/Availability.test.jsx,Pass
+TC-209,Availability,Page,editing the hours,"draws the blocks, the booked hour and the week summary",frontend/src/tests/Availability.test.jsx,Pass
+TC-210,Availability,Page,editing the hours,events sit on the real dates of the week,frontend/src/tests/Availability.test.jsx,Pass
+TC-211,Availability,Page,editing the hours,a selection must stay inside one day,frontend/src/tests/Availability.test.jsx,Pass
+TC-212,Availability,Page,editing the hours,in Add mode a selection switches those hours on,frontend/src/tests/Availability.test.jsx,Pass
+TC-213,Availability,Page,editing the hours,in Remove mode a selection switches hours off and can split a block,frontend/src/tests/Availability.test.jsx,Pass
+TC-214,Availability,Page,editing the hours,Remove mode never removes a booked hour,frontend/src/tests/Availability.test.jsx,Pass
+TC-215,Availability,Page,editing the hours,blocks can only be moved in Add mode,frontend/src/tests/Availability.test.jsx,Pass
+TC-216,Availability,Page,editing the hours,moving a block takes the old hours off and puts the new ones on,frontend/src/tests/Availability.test.jsx,Pass
+TC-217,Availability,Page,editing the hours,resizing a block changes its length,frontend/src/tests/Availability.test.jsx,Pass
+TC-218,Availability,Page,editing the hours,a move that drops a booked hour is reverted and explained,frontend/src/tests/Availability.test.jsx,Pass
+TC-219,Availability,Page,editing the hours,the booked hours of a week with an override do not lock the usual hours,frontend/src/tests/Availability.test.jsx,Pass
+TC-220,Availability,Page,editing the hours,the booked hours are locked while editing that week,frontend/src/tests/Availability.test.jsx,Pass
+TC-221,Availability,Page,editing the hours,the × button removes a block,frontend/src/tests/Availability.test.jsx,Pass
+TC-222,Availability,Page,editing the hours,the × button on a block with a booked hour keeps that hour,frontend/src/tests/Availability.test.jsx,Pass
+TC-223,Availability,Page,editing the hours,Add many hours at once switches on the chosen hours and leaves the others,frontend/src/tests/Availability.test.jsx,Pass
+TC-224,Availability,Page,editing the hours,Add explains a missing day and a backwards time range,frontend/src/tests/Availability.test.jsx,Pass
+TC-225,Availability,Page,editing the hours,a preset adds its hours,frontend/src/tests/Availability.test.jsx,Pass
+TC-226,Availability,Page,editing the hours,Clear this day and Clear all leave the booked hour on,frontend/src/tests/Availability.test.jsx,Pass
+TC-227,Availability,Page,editing the hours,a 409 is shown on the page and the changes are kept,frontend/src/tests/Availability.test.jsx,Pass
+TC-228,Availability,Page,hours that have already passed,in This week only they cannot be selected or moved,frontend/src/tests/Availability.test.jsx,Pass
+TC-229,Availability,Page,hours that have already passed,in This week only they are drawn as passed and have no × button,frontend/src/tests/Availability.test.jsx,Pass
+TC-230,Availability,Page,hours that have already passed,the passed hours follow the clock while the page stays open,frontend/src/tests/Availability.test.jsx,Pass
+TC-231,Availability,Page,hours that have already passed,"in This week only, clearing leaves them as they were",frontend/src/tests/Availability.test.jsx,Pass
+TC-232,Availability,Page,hours that have already passed,"in This week only, adding does not switch them on",frontend/src/tests/Availability.test.jsx,Pass
+TC-233,Availability,Page,hours that have already passed,in My usual hours every hour can still be changed,frontend/src/tests/Availability.test.jsx,Pass
+TC-234,Availability,Page,quick adds,a tutor with none saved sees the built-in ones,frontend/src/tests/Availability.test.jsx,Pass
+TC-235,Availability,Page,quick adds,saved ones replace the built-in ones and show their details,frontend/src/tests/Availability.test.jsx,Pass
+TC-236,Availability,Page,quick adds,an empty list says so,frontend/src/tests/Availability.test.jsx,Pass
+TC-237,Availability,Page,quick adds,"using one adds its hours with its own mode, whatever mode is chosen above",frontend/src/tests/Availability.test.jsx,Pass
+TC-238,Availability,Page,quick adds,a built-in one uses the mode chosen above,frontend/src/tests/Availability.test.jsx,Pass
+TC-239,Availability,Page,quick adds,a saved mode the profile no longer offers falls back to the chosen one,frontend/src/tests/Availability.test.jsx,Pass
+TC-240,Availability,Page,quick adds,"saving a new one sends the chosen days, times and mode and shows it",frontend/src/tests/Availability.test.jsx,Pass
+TC-241,Availability,Page,quick adds,"a name, a day and a valid time are needed",frontend/src/tests/Availability.test.jsx,Pass
+TC-242,Availability,Page,quick adds,editing loads it into the fields and replaces it,frontend/src/tests/Availability.test.jsx,Pass
+TC-243,Availability,Page,quick adds,"a built-in one can be edited, which keeps the other one",frontend/src/tests/Availability.test.jsx,Pass
+TC-244,Availability,Page,quick adds,deleting asks first,frontend/src/tests/Availability.test.jsx,Pass
+TC-245,Availability,Page,quick adds,saving one leaves unsaved hours on the calendar,frontend/src/tests/Availability.test.jsx,Pass
+TC-246,Availability,Page,quick adds,a server error is shown and the form stays open,frontend/src/tests/Availability.test.jsx,Pass
+TC-247,Availability,Page,quick adds,at the limit no new one can be saved,frontend/src/tests/Availability.test.jsx,Pass
+TC-248,Availability,Page,slot states,"booked and held hours have their own classes, icons, tooltips and names",frontend/src/tests/Availability.test.jsx,Pass
+TC-249,Availability,Page,slot states,the legend has the five states,frontend/src/tests/Availability.test.jsx,Pass
+TC-250,Availability,Page,slot states,Clear all keeps both kinds,frontend/src/tests/Availability.test.jsx,Pass
+TC-251,Availability,Page,slot states,a 409 about a held hour is shown as it is,frontend/src/tests/Availability.test.jsx,Pass
+TC-252,Availability,Page,slot states > re-reading the week,after 60 seconds a held hour turns free without touching unsaved hours,frontend/src/tests/Availability.test.jsx,Pass
+TC-253,Availability,Page,slot states > re-reading the week,a held hour that is paid turns booked,frontend/src/tests/Availability.test.jsx,Pass
+TC-254,Availability,Page,slot states > re-reading the week,a newly held hour becomes locked and adds nothing to the unsaved changes,frontend/src/tests/Availability.test.jsx,Pass
+TC-255,Availability,Page,slot states > re-reading the week,the page also re-reads when the window regains focus,frontend/src/tests/Availability.test.jsx,Pass
+TC-256,Availability,Page,slot states > re-reading the week,nothing is re-read while a save is running,frontend/src/tests/Availability.test.jsx,Pass
+TC-257,Availability,Page,slot states > re-reading the week,the timer stops when the page closes,frontend/src/tests/Availability.test.jsx,Pass
+TC-258,Availability,Page,teaching mode of a slot,new hours take the chosen mode and are saved with it,frontend/src/tests/Availability.test.jsx,Pass
+TC-259,Availability,Page,teaching mode of a slot,the mode is written on the block,frontend/src/tests/Availability.test.jsx,Pass
+TC-260,Availability,Page,teaching mode of a slot,hours of different modes are separate blocks,frontend/src/tests/Availability.test.jsx,Pass
+TC-261,Availability,Page,teaching mode of a slot,there is no Change mode option,frontend/src/tests/Availability.test.jsx,Pass
+TC-262,Availability,Page,teaching mode of a slot,adding existing hours again changes their mode and counts as unsaved,frontend/src/tests/Availability.test.jsx,Pass
+TC-263,Availability,Page,teaching mode of a slot,adding over a booked hour leaves its mode alone,frontend/src/tests/Availability.test.jsx,Pass
+TC-264,Availability,Page,teaching mode of a slot,Add many hours at once uses the chosen mode,frontend/src/tests/Availability.test.jsx,Pass
+TC-265,Availability,Page,teaching mode of a slot,a moved block keeps its mode,frontend/src/tests/Availability.test.jsx,Pass
+TC-266,Availability,Page,teaching mode of a slot,a tutor who offers one mode has no choice to make,frontend/src/tests/Availability.test.jsx,Pass
+TC-267,Availability,Page,the week on screen,the week loads and the title shows its dates,frontend/src/tests/Availability.test.jsx,Pass
+TC-268,Availability,Page,the week on screen,each row shows its time as a range,frontend/src/tests/Availability.test.jsx,Pass
+TC-269,Availability,Page,the week on screen,Next requests the following Monday and Previous goes back,frontend/src/tests/Availability.test.jsx,Pass
+TC-270,Availability,Page,the week on screen,Today goes to the current week,frontend/src/tests/Availability.test.jsx,Pass
+TC-271,Availability,Page,the week on screen,Previous and Today are disabled on the first week,frontend/src/tests/Availability.test.jsx,Pass
+TC-272,Availability,Page,the week on screen,Next is disabled on the last week,frontend/src/tests/Availability.test.jsx,Pass
+TC-273,Availability,Page,the week on screen,a load failure offers Try again,frontend/src/tests/Availability.test.jsx,Pass
+TC-274,Availability,Page,the week on screen,the changed-week chips jump to that week,frontend/src/tests/Availability.test.jsx,Pass
+TC-275,Availability,Page,unsaved changes,changing week asks first and Cancel keeps the edits,frontend/src/tests/Availability.test.jsx,Pass
+TC-276,Availability,Page,unsaved changes,changing week after agreeing to discard loads the new week,frontend/src/tests/Availability.test.jsx,Pass
+TC-277,Availability,Page,unsaved changes,changing scope asks first and Cancel keeps the edits,frontend/src/tests/Availability.test.jsx,Pass
+TC-278,Availability,Page,unsaved changes,nothing asks when there are no changes,frontend/src/tests/Availability.test.jsx,Pass
+TC-279,Availability,Page,unsaved changes,"Save is disabled until something changes, and again if the change is undone",frontend/src/tests/Availability.test.jsx,Pass
+TC-280,Availability,Page,unsaved changes,leaving through a link with unsaved changes asks first,frontend/src/tests/Availability.test.jsx,Pass
+TC-281,Availability,Page,what is being edited,a week with no override opens on the usual hours,frontend/src/tests/Availability.test.jsx,Pass
+TC-282,Availability,Page,what is being edited,a week with an override opens on that week,frontend/src/tests/Availability.test.jsx,Pass
+TC-283,Availability,Page,what is being edited,the scope label names the week,frontend/src/tests/Availability.test.jsx,Pass
+TC-284,Availability,Page,what is being edited,switching scope shows the other set of hours,frontend/src/tests/Availability.test.jsx,Pass
+TC-285,Availability,Page,what is being edited,Save usual hours sends the usual hours,frontend/src/tests/Availability.test.jsx,Pass
+TC-286,Availability,Page,what is being edited,"after saving the usual hours, the weeks that kept their own hours are named",frontend/src/tests/Availability.test.jsx,Pass
+TC-287,Availability,Page,what is being edited,Save this week sends that week,frontend/src/tests/Availability.test.jsx,Pass
+TC-288,Availability,Page,what is being edited,Reset is offered only when the week has an override,frontend/src/tests/Availability.test.jsx,Pass
+TC-289,Availability,Page,what is being edited,"Reset asks first, then goes back to the usual hours",frontend/src/tests/Availability.test.jsx,Pass
+TC-290,Availability,Page,what is being edited,the empty note depends on what is being edited,frontend/src/tests/Availability.test.jsx,Pass
+TC-291,Availability,Logic,Malaysia time and past hours,nowInMalaysia reads Malaysia time whatever the computer uses,frontend/src/tests/availability.test.js,Pass
+TC-292,Availability,Logic,Malaysia time and past hours,an hour is over once it has started,frontend/src/tests/availability.test.js,Pass
+TC-293,Availability,Logic,Malaysia time and past hours,momentIsPast reads the floating calendar time,frontend/src/tests/availability.test.js,Pass
+TC-294,Availability,Logic,Malaysia time and past hours,pastCells covers earlier days and the hours already started today,frontend/src/tests/availability.test.js,Pass
+TC-295,Availability,Logic,Malaysia time and past hours,"a cell counts as passed once its hour has started, and not before",frontend/src/tests/availability.test.js,Pass
+TC-296,Availability,Logic,Malaysia time and past hours,a later week has no past hours,frontend/src/tests/availability.test.js,Pass
+TC-297,Availability,Logic,Malaysia time and past hours,keepPast undoes any change to a past hour and keeps the rest,frontend/src/tests/availability.test.js,Pass
+TC-298,Availability,Logic,a real week on the calendar,day 0 survives the trip to the calendar and back,frontend/src/tests/availability.test.js,Pass
+TC-299,Availability,Logic,a real week on the calendar,day 1 survives the trip to the calendar and back,frontend/src/tests/availability.test.js,Pass
+TC-300,Availability,Logic,a real week on the calendar,day 2 survives the trip to the calendar and back,frontend/src/tests/availability.test.js,Pass
+TC-301,Availability,Logic,a real week on the calendar,day 3 survives the trip to the calendar and back,frontend/src/tests/availability.test.js,Pass
+TC-302,Availability,Logic,a real week on the calendar,day 4 survives the trip to the calendar and back,frontend/src/tests/availability.test.js,Pass
+TC-303,Availability,Logic,a real week on the calendar,day 5 survives the trip to the calendar and back,frontend/src/tests/availability.test.js,Pass
+TC-304,Availability,Logic,a real week on the calendar,day 6 survives the trip to the calendar and back,frontend/src/tests/availability.test.js,Pass
+TC-305,Availability,Logic,a real week on the calendar,"each day lands on its own date, with Sunday last",frontend/src/tests/availability.test.js,Pass
+TC-306,Availability,Logic,a real week on the calendar,a block ending at 22:00 keeps its end,frontend/src/tests/availability.test.js,Pass
+TC-307,Availability,Logic,a real week on the calendar,dates cross months and years,frontend/src/tests/availability.test.js,Pass
+TC-308,Availability,Logic,a real week on the calendar,"weekStartOf finds the Monday, and a Sunday belongs to the week before it",frontend/src/tests/availability.test.js,Pass
+TC-309,Availability,Logic,a real week on the calendar,week labels,frontend/src/tests/availability.test.js,Pass
+TC-310,Availability,Logic,availability helpers,"the grid runs 07:00 to 22:00, Monday first",frontend/src/tests/availability.test.js,Pass
+TC-311,Availability,Logic,availability helpers,ranges become one key per hour,frontend/src/tests/availability.test.js,Pass
+TC-312,Availability,Logic,availability helpers,cells and ranges convert both ways without change,frontend/src/tests/availability.test.js,Pass
+TC-313,Availability,Logic,availability helpers,consecutive hours merge into one range; a gap splits them,frontend/src/tests/availability.test.js,Pass
+TC-314,Availability,Logic,availability helpers,the last hour of the day closes at 22:00,frontend/src/tests/availability.test.js,Pass
+TC-315,Availability,Logic,availability helpers,an empty set gives no ranges,frontend/src/tests/availability.test.js,Pass
+TC-316,Availability,Logic,availability helpers,"addHours switches on the hours between, on every chosen day",frontend/src/tests/availability.test.js,Pass
+TC-317,Availability,Logic,availability helpers,addHours keeps what was already on and does not change its input,frontend/src/tests/availability.test.js,Pass
+TC-318,Availability,Logic,availability helpers,addHours leaves a locked hour on,frontend/src/tests/availability.test.js,Pass
+TC-319,Availability,Logic,availability helpers,clearing one day keeps other days and locked hours,frontend/src/tests/availability.test.js,Pass
+TC-320,Availability,Logic,availability helpers,clearing everything keeps only locked hours,frontend/src/tests/availability.test.js,Pass
+TC-321,Availability,Logic,availability helpers,clearing Sunday (day 0) is not treated as clearing everything,frontend/src/tests/availability.test.js,Pass
+TC-322,Availability,Logic,availability helpers,sameCells ignores order,frontend/src/tests/availability.test.js,Pass
+TC-323,Availability,Logic,held hours,"malaysiaLabel reads an instant in Malaysia time, across a midnight and a month",frontend/src/tests/availability.test.js,Pass
+TC-324,Availability,Logic,held hours,applyLockChanges switches a new hold on and leaves a released hour that the tutor opened,frontend/src/tests/availability.test.js,Pass
+TC-325,Availability,Logic,held hours,applyLockChanges drops a released hour that was on only because of the hold,frontend/src/tests/availability.test.js,Pass
+TC-326,Availability,Logic,"moving, removing and the lock check",moveRange takes the old hours off and puts the new ones on,frontend/src/tests/availability.test.js,Pass
+TC-327,Availability,Logic,"moving, removing and the lock check",moveRange leaves other blocks alone,frontend/src/tests/availability.test.js,Pass
+TC-328,Availability,Logic,"moving, removing and the lock check",a move that keeps the booked hour is accepted,frontend/src/tests/availability.test.js,Pass
+TC-329,Availability,Logic,"moving, removing and the lock check",a move to another day drops the booked hour and is refused,frontend/src/tests/availability.test.js,Pass
+TC-330,Availability,Logic,"moving, removing and the lock check",a resize that shrinks past the booked hour is refused,frontend/src/tests/availability.test.js,Pass
+TC-331,Availability,Logic,"moving, removing and the lock check",taking the hours off without the lock would be refused,frontend/src/tests/availability.test.js,Pass
+TC-332,Availability,Logic,"moving, removing and the lock check",removeRange takes the free hours off and leaves the booked one on,frontend/src/tests/availability.test.js,Pass
+TC-333,Availability,Logic,"moving, removing and the lock check",removeRange can split a block,frontend/src/tests/availability.test.js,Pass
+TC-334,Availability,Logic,"moving, removing and the lock check",removeRange does not change its input,frontend/src/tests/availability.test.js,Pass
+TC-335,Availability,Logic,quick add details,"Monday comes first and Sunday last, whatever order they were ticked in",frontend/src/tests/availability.test.js,Pass
+TC-336,Availability,Logic,teaching mode per hour,hours with different modes stay as separate ranges,frontend/src/tests/availability.test.js,Pass
+TC-337,Availability,Logic,teaching mode per hour,hours with the same mode join into one range,frontend/src/tests/availability.test.js,Pass
+TC-338,Availability,Logic,teaching mode per hour,an hour with no entry is BOTH,frontend/src/tests/availability.test.js,Pass
+TC-339,Availability,Logic,teaching mode per hour,setCellModes leaves the skipped hours alone,frontend/src/tests/availability.test.js,Pass
+TC-340,Availability,Logic,teaching mode per hour,sameModes only looks at hours that are on,frontend/src/tests/availability.test.js,Pass
+TC-341,Availability,Logic,teaching mode per hour,the profile limits the choices,frontend/src/tests/availability.test.js,Pass
+TC-342,Availability,Logic,teaching mode per hour,BOTH shows as the one mode a tutor offers,frontend/src/tests/availability.test.js,Pass
+TC-343,Availability,Logic,the mode of a booking,"an hour set to one mode decides it, BOTH hours leave the choice to the parent",frontend/src/tests/availability.test.js,Pass
+TC-344,Availability,Logic,the mode of a booking,online-only and physical-only hours cannot go in one request,frontend/src/tests/availability.test.js,Pass
+TC-345,Availability,Logic,useUnsavedWarning,a clean page adds nothing to the history,frontend/src/tests/useUnsavedWarning.test.jsx,Pass
+TC-346,Availability,Logic,useUnsavedWarning,a dirty page pushes one guard entry and keeps the state already there,frontend/src/tests/useUnsavedWarning.test.jsx,Pass
+TC-347,Availability,Logic,useUnsavedWarning,StrictMode still pushes only one guard entry and does not remove it,frontend/src/tests/useUnsavedWarning.test.jsx,Pass
+TC-348,Availability,Logic,useUnsavedWarning,Back then Stay pushes the guard again and does not leave,frontend/src/tests/useUnsavedWarning.test.jsx,Pass
+TC-349,Availability,Logic,useUnsavedWarning,the next Back after Stay asks again,frontend/src/tests/useUnsavedWarning.test.jsx,Pass
+TC-350,Availability,Logic,useUnsavedWarning,Back then Leave goes back once more and does not ask a second time,frontend/src/tests/useUnsavedWarning.test.jsx,Pass
+TC-351,Availability,Logic,useUnsavedWarning,saving removes the guard entry without asking,frontend/src/tests/useUnsavedWarning.test.jsx,Pass
+TC-352,Availability,Logic,useUnsavedWarning,"after saving, Back no longer asks",frontend/src/tests/useUnsavedWarning.test.jsx,Pass
+TC-353,Availability,Logic,useUnsavedWarning,leaving through a confirmed link does not go back,frontend/src/tests/useUnsavedWarning.test.jsx,Pass
+TC-354,Availability,Logic,useUnsavedWarning,closing the tab still asks,frontend/src/tests/useUnsavedWarning.test.jsx,Pass
+TC-355,Availability,Logic,useUnsavedWarning,closing the tab does not ask on a clean page,frontend/src/tests/useUnsavedWarning.test.jsx,Pass
+TC-356,Date-specific hours,Server,,"date override replaces weekly hours, restores them, and is tutor-owned",backend/src/tests/availabilityExceptions.test.js,Pass
+TC-357,Date-specific hours,Server,,multi-date request is atomic and exceptions cannot invalidate existing requests,backend/src/tests/availabilityExceptions.test.js,Pass
+TC-358,Date-specific hours,Server,,extra date hours are bookable and malformed ranges fail,backend/src/tests/availabilityExceptions.test.js,Pass
+TC-359,Date-specific hours,Server,booked lessons,new hours that still cover a confirmed lesson can be saved,backend/src/tests/dateHours.test.js,Pass
+TC-360,Date-specific hours,Server,booked lessons,new hours that leave out a confirmed lesson are refused and nothing is saved,backend/src/tests/dateHours.test.js,Pass
+TC-361,Date-specific hours,Server,booked lessons,a cancelled lesson does not block a change,backend/src/tests/dateHours.test.js,Pass
+TC-362,Date-specific hours,Server,booked lessons,restoring weekly hours is refused when a lesson booked on the extra hours would fall outside them,backend/src/tests/dateHours.test.js,Pass
+TC-363,Date-specific hours,Server,booked lessons,restoring weekly hours works when the lesson is inside the usual hours,backend/src/tests/dateHours.test.js,Pass
+TC-364,Date-specific hours,Server,input checks,refuses a date in the past,backend/src/tests/dateHours.test.js,Pass
+TC-365,Date-specific hours,Server,input checks,accepts today,backend/src/tests/dateHours.test.js,Pass
+TC-366,Date-specific hours,Server,input checks,refuses a badly written date,backend/src/tests/dateHours.test.js,Pass
+TC-367,Date-specific hours,Server,input checks,refuses overlapping ranges,backend/src/tests/dateHours.test.js,Pass
+TC-368,Date-specific hours,Server,input checks,accepts ranges that touch end to start,backend/src/tests/dateHours.test.js,Pass
+TC-369,Date-specific hours,Server,input checks,refuses half-hour starts and ends,backend/src/tests/dateHours.test.js,Pass
+TC-370,Date-specific hours,Server,input checks,refuses a range whose end equals its start,backend/src/tests/dateHours.test.js,Pass
+TC-371,Date-specific hours,Server,input checks,refuses more than 24 ranges,backend/src/tests/dateHours.test.js,Pass
+TC-372,Date-specific hours,Server,input checks,refuses a missing ranges list,backend/src/tests/dateHours.test.js,Pass
+TC-373,Date-specific hours,Server,input checks,refuses a badly written date when restoring,backend/src/tests/dateHours.test.js,Pass
+TC-374,Date-specific hours,Server,saving and listing,saving the same date again replaces its hours instead of adding a second row,backend/src/tests/dateHours.test.js,Pass
+TC-375,Date-specific hours,Server,saving and listing,lists saved dates from the earliest to the latest,backend/src/tests/dateHours.test.js,Pass
+TC-376,Date-specific hours,Server,saving and listing,hours on a day with no usual hours become bookable that date only,backend/src/tests/dateHours.test.js,Pass
+TC-377,Date-specific hours,Server,saving and listing,narrower hours replace the usual hours for that date,backend/src/tests/dateHours.test.js,Pass
+TC-378,Date-specific hours,Server,saving and listing,restoring one tutor's date does not touch another tutor's saved date,backend/src/tests/dateHours.test.js,Pass
+TC-379,Date-specific hours,Server,saving and listing,only tutors can read or change date-specific hours,backend/src/tests/dateHours.test.js,Pass
+TC-380,Date-specific hours,Page,,"starts on today, cannot pick a past date, and links back to the weekly page",frontend/src/tests/DateAvailability.test.jsx,Pass
+TC-381,Date-specific hours,Page,,lists saved dates with their hours or as unavailable all day,frontend/src/tests/DateAvailability.test.jsx,Pass
+TC-382,Date-specific hours,Page,,choosing a saved date loads its hours into the form,frontend/src/tests/DateAvailability.test.jsx,Pass
+TC-383,Date-specific hours,Page,,typing a date that has saved hours loads them too,frontend/src/tests/DateAvailability.test.jsx,Pass
+TC-384,Date-specific hours,Page,,Add hours adds a 09:00 to 10:00 row that can be edited and removed,frontend/src/tests/DateAvailability.test.jsx,Pass
+TC-385,Date-specific hours,Page,,Add hours stops at 24 rows,frontend/src/tests/DateAvailability.test.jsx,Pass
+TC-386,Date-specific hours,Page,,"saving sends the date and edited hours, then reloads the saved list",frontend/src/tests/DateAvailability.test.jsx,Pass
+TC-387,Date-specific hours,Page,,saving with no hours marks the whole date unavailable,frontend/src/tests/DateAvailability.test.jsx,Pass
+TC-388,Date-specific hours,Page,,Restore weekly hours is off until the chosen date has saved hours,frontend/src/tests/DateAvailability.test.jsx,Pass
+TC-389,Date-specific hours,Page,,"restoring deletes the saved date, clears the form and reloads the list",frontend/src/tests/DateAvailability.test.jsx,Pass
+TC-390,Date-specific hours,Page,,a refused save shows the server message and keeps the typed hours,frontend/src/tests/DateAvailability.test.jsx,Pass
+TC-391,Date-specific hours,Page,,a refused restore shows the server message and keeps the saved date,frontend/src/tests/DateAvailability.test.jsx,Pass
+TC-392,Date-specific hours,Page,,the buttons are locked while a save is running,frontend/src/tests/DateAvailability.test.jsx,Pass
+TC-393,Date-specific hours,Page,,a failed first load shows the error,frontend/src/tests/DateAvailability.test.jsx,Pass
+TC-394,Booking requests,Server,,"parent and tutor negotiate, accept and share the online link after payment",backend/src/tests/tutorBookings.test.js,Pass
+TC-395,Booking requests,Server,,"scopes actions to the owner, validates reasons and honours removed availability",backend/src/tests/tutorBookings.test.js,Pass
+TC-396,Booking requests,Server,,a tutor can request a new time and send an unresolved parent time change to admin,backend/src/tests/tutorBookings.test.js,Pass
+TC-397,Booking requests,Server,,a fee dispute is visible in the admin complaints queue only once,backend/src/tests/tutorBookings.test.js,Pass
+TC-398,Booking requests,Server,,physical lessons reject links and elapsed payment holds expire before the lesson cutoff,backend/src/tests/tutorBookings.test.js,Pass
+TC-399,Booking requests,Page,,tutor opens a linked lesson and saves its classroom URL,frontend/src/tests/BookingRequests.test.jsx,Pass
+TC-400,Booking requests,Page,,parent sees the payment deadline on an accepted booking,frontend/src/tests/BookingRequests.test.jsx,Pass
+TC-401,Booking requests,Page,,tutor notification and action use the booking public ID when provided,frontend/src/tests/BookingRequests.test.jsx,Pass
+TC-402,Booking requests,Page,,a changed booking can be refreshed before another response is submitted,frontend/src/tests/BookingRequests.test.jsx,Pass
+TC-403,Booking requests,Page,,the tutor opens a confirmed session using its public booking ID,frontend/src/tests/BookingRequests.test.jsx,Pass
+TC-404,Booking requests,Page,,a historical physical booking explains its missing exact venue without requesting an impossible confirmation,frontend/src/tests/BookingRequests.test.jsx,Pass
+TC-405,Payment window,Server,assertCanAccept,passes for a lesson days away,backend/src/tests/paymentWindow.test.js,Pass
+TC-406,Payment window,Server,assertCanAccept,refuses a lesson inside the cutoff,backend/src/tests/paymentWindow.test.js,Pass
+TC-407,Payment window,Server,assertCanAccept,refuses a lesson exactly at the cutoff,backend/src/tests/paymentWindow.test.js,Pass
+TC-408,Payment window,Server,newPayBy,a lesson days away gets the whole window,backend/src/tests/paymentWindow.test.js,Pass
+TC-409,Payment window,Server,newPayBy,a lesson sooner than the window is capped before the lesson,backend/src/tests/paymentWindow.test.js,Pass
+TC-410,Payment window,Server,newPayBy,a lesson inside the cutoff gives a time that is not after now,backend/src/tests/paymentWindow.test.js,Pass
+TC-411,Payment window,Server,paymentDeadline,a booking with no payBy follows the cutoff,backend/src/tests/paymentWindow.test.js,Pass
+TC-412,Payment window,Server,paymentDeadline,a payBy later than the cutoff is capped by it,backend/src/tests/paymentWindow.test.js,Pass
+TC-413,Payment window,Server,paymentDeadline,an earlier payBy wins,backend/src/tests/paymentWindow.test.js,Pass
+TC-414,Rescheduling,Server,parent asks to reschedule,an unanswered request cannot move a lesson after it has started,backend/src/tests/reschedule.test.js,Pass
+TC-415,Rescheduling,Server,parent asks to reschedule,two lessons cannot be rescheduled into the same tutor slot concurrently,backend/src/tests/reschedule.test.js,Pass
+TC-416,Rescheduling,Server,parent asks to reschedule,simultaneous requests create only one pending reschedule,backend/src/tests/reschedule.test.js,Pass
+TC-417,Rescheduling,Server,parent asks to reschedule,PARENT cannot replace a time change while administrator review is pending,backend/src/tests/reschedule.test.js,Pass
+TC-418,Rescheduling,Server,parent asks to reschedule,TUTOR cannot replace a time change while administrator review is pending,backend/src/tests/reschedule.test.js,Pass
+TC-419,Rescheduling,Server,parent asks to reschedule,a stale acceptance cannot move a booking cancelled after it was loaded,backend/src/tests/reschedule.test.js,Pass
+TC-420,Rescheduling,Server,parent asks to reschedule,asking creates a pending request and tells the tutor,backend/src/tests/reschedule.test.js,Pass
+TC-421,Rescheduling,Server,parent asks to reschedule,"only one open request at a time, and the parent cannot approve their own request",backend/src/tests/reschedule.test.js,Pass
+TC-422,Rescheduling,Server,parent asks to reschedule,"when the tutor agrees, the lesson moves to the new time and the parent is told",backend/src/tests/reschedule.test.js,Pass
+TC-423,Rescheduling,Server,parent asks to reschedule,a lesson can be moved into a time that overlaps its own old time,backend/src/tests/reschedule.test.js,Pass
+TC-424,Rescheduling,Server,parent asks to reschedule,the new time must be inside the tutor availability and free,backend/src/tests/reschedule.test.js,Pass
+TC-425,Rescheduling,Server,parent asks to reschedule,the parent can withdraw their own request,backend/src/tests/reschedule.test.js,Pass
+TC-426,Rescheduling,Server,parent asks to reschedule,requests that are not yet agreed (PENDING) cannot be rescheduled; cancel and rebook instead,backend/src/tests/reschedule.test.js,Pass
+TC-427,Rescheduling,Server,tutor asks to reschedule,the parent declining escalates to Admin and the lesson keeps its time,backend/src/tests/reschedule.test.js,Pass
+TC-428,Rescheduling,Server,tutor asks to reschedule,another parent cannot touch the booking,backend/src/tests/reschedule.test.js,Pass
+TC-429,Lesson sessions,Server,,physical requests require an explicit address and confirmed pin; matching area never supplies it,backend/src/tests/lessonLocation.test.js,Pass
+TC-430,Lesson sessions,Server,,"malformed or unconfirmed lesson location is rejected without creating rows: {""address"": ""   area   "", ""confirmed"": true, ""latitude"": 3.10001, ""longitude"": 101.68001}",backend/src/tests/lessonLocation.test.js,Pass
+TC-431,Lesson sessions,Server,,"malformed or unconfirmed lesson location is rejected without creating rows: {""address"": ""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"", ""confirmed"": true, ""latitude"": 3.10001, ""longitude"": 101.68001}",backend/src/tests/lessonLocation.test.js,Pass
+TC-432,Lesson sessions,Server,,"malformed or unconfirmed lesson location is rejected without creating rows: {""address"": ""  12 Jalan Test, Taman Desa, Kuala Lumpur  "", ""confirmed"": true, ""latitude"": 91, ""longitude"": 101.68001}",backend/src/tests/lessonLocation.test.js,Pass
+TC-433,Lesson sessions,Server,,"malformed or unconfirmed lesson location is rejected without creating rows: {""address"": ""  12 Jalan Test, Taman Desa, Kuala Lumpur  "", ""confirmed"": true, ""latitude"": 3.10001, ""longitude"": -181}",backend/src/tests/lessonLocation.test.js,Pass
+TC-434,Lesson sessions,Server,,"malformed or unconfirmed lesson location is rejected without creating rows: {""address"": ""  12 Jalan Test, Taman Desa, Kuala Lumpur  "", ""confirmed"": true, ""latitude"": ""3.1"", ""longitude"": 101.68001}",backend/src/tests/lessonLocation.test.js,Pass
+TC-435,Lesson sessions,Server,,"malformed or unconfirmed lesson location is rejected without creating rows: {""address"": ""  12 Jalan Test, Taman Desa, Kuala Lumpur  "", ""confirmed"": true, ""latitude"": 3.10001, ""longitude"": null}",backend/src/tests/lessonLocation.test.js,Pass
+TC-436,Lesson sessions,Server,,"malformed or unconfirmed lesson location is rejected without creating rows: {""address"": ""  12 Jalan Test, Taman Desa, Kuala Lumpur  "", ""confirmed"": false, ""latitude"": 3.10001, ""longitude"": 101.68001}",backend/src/tests/lessonLocation.test.js,Pass
+TC-437,Lesson sessions,Server,,"malformed or unconfirmed lesson location is rejected without creating rows: {""address"": ""  12 Jalan Test, Taman Desa, Kuala Lumpur  "", ""confirmed"": true, ""injected"": true, ""latitude"": 3.10001, ""longitude"": 101.68001}",backend/src/tests/lessonLocation.test.js,Pass
+TC-438,Lesson sessions,Server,,"all selected physical lessons snapshot the explicit point, with no change to matching area",backend/src/tests/lessonLocation.test.js,Pass
+TC-439,Lesson sessions,Server,,online requests reject a physical address and never copy profile coordinates,backend/src/tests/lessonLocation.test.js,Pass
+TC-440,Lesson sessions,Server,,"legacy coordinates stay unconfirmed and are hidden from parent, tutor list and session",backend/src/tests/lessonLocation.test.js,Pass
+TC-441,Lesson sessions,Server,,a legacy CONFIRMED lesson can be confirmed once without changing its payment/status,backend/src/tests/lessonLocation.test.js,Pass
+TC-442,Lesson sessions,Server,,a legacy AWAITING_PAYMENT lesson can be confirmed once without changing its payment/status,backend/src/tests/lessonLocation.test.js,Pass
+TC-443,Lesson sessions,Server,,only the owning parent can confirm with a current version and a strict valid body,backend/src/tests/lessonLocation.test.js,Pass
+TC-444,Lesson sessions,Server,,confirming a PENDING venue lets the tutor review it before accepting,backend/src/tests/lessonLocation.test.js,Pass
+TC-445,Lesson sessions,Server,,confirming a COUNTER_OFFERED venue lets the tutor review it before accepting,backend/src/tests/lessonLocation.test.js,Pass
+TC-446,Lesson sessions,Server,,"inactive, historical and online records cannot acquire a physical venue: {""status"": ""CANCELLED""}",backend/src/tests/lessonLocation.test.js,Pass
+TC-447,Lesson sessions,Server,,"inactive, historical and online records cannot acquire a physical venue: {""status"": ""COMPLETED""}",backend/src/tests/lessonLocation.test.js,Pass
+TC-448,Lesson sessions,Server,,"inactive, historical and online records cannot acquire a physical venue: {""status"": ""DISPUTED""}",backend/src/tests/lessonLocation.test.js,Pass
+TC-449,Lesson sessions,Server,,"inactive, historical and online records cannot acquire a physical venue: {""status"": ""REJECTED""}",backend/src/tests/lessonLocation.test.js,Pass
+TC-450,Lesson sessions,Server,,"inactive, historical and online records cannot acquire a physical venue: {""teachingMode"": ""ONLINE""}",backend/src/tests/lessonLocation.test.js,Pass
+TC-451,Lesson sessions,Server,,"inactive, historical and online records cannot acquire a physical venue: {""endAt"": 2026-11-14T13:53:39.417Z}",backend/src/tests/lessonLocation.test.js,Pass
+TC-452,Lesson sessions,Server,,simultaneous location corrections use one version exactly once,backend/src/tests/lessonLocation.test.js,Pass
+TC-453,Lesson sessions,Server,,"GPS rejects a legacy area centre before requiring a photo, then checks the exact confirmed point",backend/src/tests/lessonLocation.test.js,Pass
+TC-454,Lesson sessions,Server,,a legacy booking with an existing check-in cannot be relocated or retroactively confirmed,backend/src/tests/lessonLocation.test.js,Pass
+TC-455,Lesson sessions,Server,,editing the matching area and mutually rescheduling preserve the confirmed venue snapshot,backend/src/tests/lessonLocation.test.js,Pass
+TC-456,Lesson sessions,Server,,a check-in racing legacy venue confirmation uses only the committed explicit point,backend/src/tests/lessonLocation.test.js,Pass
+TC-457,Lesson sessions,Server,,"physical check-in rechecks the saved radius, photo receipt, and lesson ownership",backend/src/tests/lessonSession.test.js,Pass
+TC-458,Lesson sessions,Server,,online attendance needs no location and completing the report publishes it to the parent once,backend/src/tests/lessonSession.test.js,Pass
+TC-459,Lesson sessions,Server,,"missing coordinates, unconfirmed bookings and future lessons cannot check in",backend/src/tests/lessonSession.test.js,Pass
+TC-460,Lesson sessions,Server,,an owned UUID lesson can be completed online and its real attendance/homework reaches the parent,backend/src/tests/sessionIntegrationParity.test.js,Pass
+TC-461,Lesson sessions,Server,,legacy online records remain unknown while physical missing check-ins remain unrecorded,backend/src/tests/sessionIntegrationParity.test.js,Pass
+TC-462,Lesson sessions,Server,,an escalated refund remains an open financial hold and cannot be duplicated by the parent,backend/src/tests/sessionIntegrationParity.test.js,Pass
+TC-463,Lesson sessions,Server,,anonymous CSRF bootstrap uses an HttpOnly seed and discloses no login credential,backend/src/tests/sessions.test.js,Pass
+TC-464,Lesson sessions,Server,,"PARENT signs in, reloads its session and retains its role permissions",backend/src/tests/sessions.test.js,Pass
+TC-465,Lesson sessions,Server,,"TUTOR signs in, reloads its session and retains its role permissions",backend/src/tests/sessions.test.js,Pass
+TC-466,Lesson sessions,Server,,"ADMIN signs in, reloads its session and retains its role permissions",backend/src/tests/sessions.test.js,Pass
+TC-467,Lesson sessions,Server,,Remember Me persists for seven days while ordinary sessions expire after twelve hours,backend/src/tests/sessions.test.js,Pass
+TC-468,Lesson sessions,Server,,"production cookies are host-bound, Secure and HttpOnly without requiring new environment secrets",backend/src/tests/sessions.test.js,Pass
+TC-469,Lesson sessions,Server,,missing CSRF cannot reach /auth/login,backend/src/tests/sessions.test.js,Pass
+TC-470,Lesson sessions,Server,,missing CSRF cannot reach /auth/register,backend/src/tests/sessions.test.js,Pass
+TC-471,Lesson sessions,Server,,missing CSRF cannot reach /auth/google,backend/src/tests/sessions.test.js,Pass
+TC-472,Lesson sessions,Server,,missing CSRF cannot reach /auth/verify-otp,backend/src/tests/sessions.test.js,Pass
+TC-473,Lesson sessions,Server,,missing CSRF cannot reach /auth/logout,backend/src/tests/sessions.test.js,Pass
+TC-474,Lesson sessions,Server,,missing or malformed CSRF rejects an authenticated profile change,backend/src/tests/sessions.test.js,Pass
+TC-475,Lesson sessions,Server,,missing or malformed CSRF rejects an authenticated profile change,backend/src/tests/sessions.test.js,Pass
+TC-476,Lesson sessions,Server,,missing or malformed CSRF rejects an authenticated profile change,backend/src/tests/sessions.test.js,Pass
+TC-477,Lesson sessions,Server,,CSRF is bound to its anonymous browser and to the authenticated session,backend/src/tests/sessions.test.js,Pass
+TC-478,Lesson sessions,Server,,"a foreign request is rejected even with correct CSRF: {""Origin"":""https://evil.example""}",backend/src/tests/sessions.test.js,Pass
+TC-479,Lesson sessions,Server,,"a foreign request is rejected even with correct CSRF: {""Origin"":""null""}",backend/src/tests/sessions.test.js,Pass
+TC-480,Lesson sessions,Server,,"a foreign request is rejected even with correct CSRF: {""Referer"":""https://evil.example/form""}",backend/src/tests/sessions.test.js,Pass
+TC-481,Lesson sessions,Server,,"a foreign request is rejected even with correct CSRF: {""Sec-Fetch-Site"":""cross-site""}",backend/src/tests/sessions.test.js,Pass
+TC-482,Lesson sessions,Server,,"server logout deletes its session, clears its cookie and rejects replay; another session survives",backend/src/tests/sessions.test.js,Pass
+TC-483,Lesson sessions,Server,,successful authentication rotates the cookie and revokes the previous browser session,backend/src/tests/sessions.test.js,Pass
+TC-484,Lesson sessions,Server,,expired sessions and password changes invalidate cookies on the server,backend/src/tests/sessions.test.js,Pass
+TC-485,Lesson sessions,Server,,"legacy JWT/Bearer, invented IDs and ambiguous cookies cannot authenticate",backend/src/tests/sessions.test.js,Pass
+TC-486,Lesson sessions,Server,,unauthenticated checks never clear a newer concurrently issued browser cookie,backend/src/tests/sessions.test.js,Pass
+TC-487,Lesson sessions,Server,,only the signed Billplz callback is exempt from browser CSRF checks,backend/src/tests/sessions.test.js,Pass
+TC-488,Lesson sessions,Server,,expiry cleanup keeps active sessions and removes only expired rows,backend/src/tests/sessions.test.js,Pass
+TC-489,Lesson sessions,Page,,"physical check-in needs an in-range GPS reading and a photo, and reads GPS again at submit",frontend/src/tests/LessonSession.test.jsx,Pass
+TC-490,Lesson sessions,Page,,both report fields are required after checkout,frontend/src/tests/LessonSession.test.jsx,Pass
+TC-491,Lesson sessions,Page,,"an owned UUID session loads, retains the public link, and submits homework with the report",frontend/src/tests/LessonSession.test.jsx,Pass
+TC-492,Lesson sessions,Page,,an online check-in conflict can refresh the current attendance without replaying the action,frontend/src/tests/LessonSession.test.jsx,Pass
+TC-493,Lesson sessions,Page,,a legacy area point cannot collect GPS or photos; refreshing uses the newly confirmed entrance,frontend/src/tests/LessonSession.test.jsx,Pass
+TC-494,Lesson sessions,Page,,a legacy check-in keeps its historical record and can check out and report without retroactive venue confirmation,frontend/src/tests/LessonSession.test.jsx,Pass
+TC-495,Earnings and withdrawals,Server,,"completed lessons use the historical fee; current rate, refunds and pending reports are separate",backend/src/tests/earnings.test.js,Pass
+TC-496,Earnings and withdrawals,Server,,"two simultaneous withdrawals reserve only once, even when both individually fit",backend/src/tests/earnings.test.js,Pass
+TC-497,Earnings and withdrawals,Server,,bank edits preserve the payout destination; rejection releases the hold and notifies once,backend/src/tests/earnings.test.js,Pass
+TC-498,Earnings and withdrawals,Server,,only tutors access earnings and withdrawal destinations are scoped to the tutor,backend/src/tests/earnings.test.js,Pass
+TC-499,Earnings and withdrawals,Server,balances,a tutor with no custom rate uses the platform base rate,backend/src/tests/earningsRules.test.js,Pass
+TC-500,Earnings and withdrawals,Server,balances,"a new tutor starts at zero with no bank, transactions or withdrawals",backend/src/tests/earningsRules.test.js,Pass
+TC-501,Earnings and withdrawals,Server,balances,a paid lesson that was later cancelled earns nothing and shows as cancelled,backend/src/tests/earningsRules.test.js,Pass
+TC-502,Earnings and withdrawals,Server,balances,a lesson with a refund still under review is not available yet,backend/src/tests/earningsRules.test.js,Pass
+TC-503,Earnings and withdrawals,Server,balances,an unpaid payment is not listed at all,backend/src/tests/earningsRules.test.js,Pass
+TC-504,Earnings and withdrawals,Server,bank account,"refuses account numbers that are too short, too long or not digits",backend/src/tests/earningsRules.test.js,Pass
+TC-505,Earnings and withdrawals,Server,bank account,refuses an empty bank name or account holder,backend/src/tests/earningsRules.test.js,Pass
+TC-506,Earnings and withdrawals,Server,bank account,refuses unknown extra fields,backend/src/tests/earningsRules.test.js,Pass
+TC-507,Earnings and withdrawals,Server,bank account,removing the account leaves no bank to withdraw to,backend/src/tests/earningsRules.test.js,Pass
+TC-508,Earnings and withdrawals,Server,bank account,a tutor with a password cannot ask for an email code,backend/src/tests/earningsRules.test.js,Pass
+TC-509,Earnings and withdrawals,Server,bank account,a Google sign-in tutor confirms bank changes with an emailed code,backend/src/tests/earningsRules.test.js,Pass
+TC-510,Earnings and withdrawals,Server,withdrawal checks,refuses a withdrawal from a balance that changed since the page loaded,backend/src/tests/earningsRules.test.js,Pass
+TC-511,Earnings and withdrawals,Server,withdrawal checks,"refuses zero, negative and badly written amounts",backend/src/tests/earningsRules.test.js,Pass
+TC-512,Earnings and withdrawals,Server,withdrawal checks,refuses a withdrawal to an old bank account after it was replaced,backend/src/tests/earningsRules.test.js,Pass
+TC-513,Earnings and withdrawals,Server,withdrawal checks,the full balance can be withdrawn and nothing is left after,backend/src/tests/earningsRules.test.js,Pass
+TC-514,Earnings and withdrawals,Page,,a small withdrawal uses the displayed balance version and refreshes the hold and history,frontend/src/tests/Earnings.test.jsx,Pass
+TC-515,Earnings and withdrawals,Page,,bank details are masked and replacement asks for confirmation,frontend/src/tests/Earnings.test.jsx,Pass
+TC-516,Earnings and withdrawals,Page,,a bank conflict refreshes the destination and requires a fresh confirmation form,frontend/src/tests/Earnings.test.jsx,Pass
+TC-517,Earnings and withdrawals,Page,,shows the four balance cards with the tutor and base commission rates,frontend/src/tests/EarningsHistory.test.jsx,Pass
+TC-518,Earnings and withdrawals,Page,,a new tutor sees empty states and cannot request a withdrawal without a bank,frontend/src/tests/EarningsHistory.test.jsx,Pass
+TC-519,Earnings and withdrawals,Page,,the withdraw button stays off until an amount is typed,frontend/src/tests/EarningsHistory.test.jsx,Pass
+TC-520,Earnings and withdrawals,Page,,a refused withdrawal shows the reason and reloads the balance,frontend/src/tests/EarningsHistory.test.jsx,Pass
+TC-521,Earnings and withdrawals,Page,,a lesson with a refund shows the refund and the original commission,frontend/src/tests/EarningsHistory.test.jsx,Pass
+TC-522,Earnings and withdrawals,Page,,a lesson without a refund hides the refund lines,frontend/src/tests/EarningsHistory.test.jsx,Pass
+TC-523,Earnings and withdrawals,Page,,This month hides payments from earlier months,frontend/src/tests/EarningsHistory.test.jsx,Pass
+TC-524,Earnings and withdrawals,Page,,Export CSV downloads the shown payments,frontend/src/tests/EarningsHistory.test.jsx,Pass
+TC-525,Earnings and withdrawals,Page,,withdrawal history shows each status and the rejection reason,frontend/src/tests/EarningsHistory.test.jsx,Pass
+TC-526,Earnings and withdrawals,Page,,removing the bank account sends no details and confirms,frontend/src/tests/EarningsHistory.test.jsx,Pass
+TC-527,Earnings and withdrawals,Page,,a wrong password keeps the form open with the error,frontend/src/tests/EarningsHistory.test.jsx,Pass
+TC-528,Earnings and withdrawals,Page,,a Google sign-in tutor asks for an email code instead of a password,frontend/src/tests/EarningsHistory.test.jsx,Pass
+TC-529,Earnings and withdrawals,Page,,a failed page load can be retried,frontend/src/tests/EarningsHistory.test.jsx,Pass
