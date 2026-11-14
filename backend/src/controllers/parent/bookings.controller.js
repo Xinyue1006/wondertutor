@@ -15,6 +15,21 @@ import { assertCanAccept, newPayBy } from '../../services/paymentWindow.js'
 import { escalateBooking } from '../../services/tutorBooking.service.js'
 import { canEditLessonLocation, hasConfirmedLessonLocation, lessonLocationSchema } from '../../services/lessonLocation.service.js'
 
+export async function confirmAttendance(req, res) {
+  const { answer, note } = z.object({
+    answer: z.enum(['YES', 'NO', 'UNSURE']), note: z.string().trim().max(1000).optional(),
+  }).strict().parse(req.body)
+  const b = await ownBooking(req)
+  const review = b.complaints[0]
+  if (review?.attendanceOutcome === 'MORE_INFO' && !note) throw new AppError(400, 'Please reply to the admin question.')
+  const { count } = await prisma.complaint.updateMany({
+    where: { bookingId: b.id, category: 'Missed check-in', parentAnswer: null, attendanceOutcome: review?.attendanceOutcome ?? null, status: { in: ['OPEN', 'IN_PROGRESS'] } },
+    data: { parentAnswer: answer, parentNote: note || null },
+  })
+  if (!count) throw new AppError(409, 'This review is closed or already has a response.')
+  res.json({ booking: toBookingDto(await reload(b.id)) })
+}
+
 export async function negotiate(req, res) {
   const b = await ownBooking(req)
   const data = z.discriminatedUnion('action', [
@@ -283,12 +298,14 @@ export async function requestRefund(req, res) {
   // so a lesson can never stay booked while its refund is being processed
   if (b.status === 'CONFIRMED' && b.startAt > new Date())
     throw new AppError(400, 'This lesson has not started yet. To get your money back, cancel the booking instead.')
-  const alreadyAsked = () => new AppError(409, 'A refund request for this lesson is already being handled')
+  const alreadyAsked = () => new AppError(409, 'A refund request already exists for this lesson. See its status in the booking details.')
+  if (b.complaints.some(c => c.attendanceRefundId)) throw alreadyAsked()
   if (b.payment.refunds.some((r) => ['PENDING', 'APPROVED', 'ESCALATED'].includes(r.status))) throw alreadyAsked()
 
   const disputing = attendanceDispute && b.status === 'COMPLETED'
   await prisma.$transaction(async (tx) => {
     if (await lockPaymentAndCountOpenRefunds(tx, b.payment.id)) throw alreadyAsked()
+    if (await tx.complaint.count({ where: { bookingId: b.id, attendanceRefundId: { not: null } } })) throw alreadyAsked()
     // An administrator may have completed a refund, or the lesson may have
     // changed, after the form was loaded. Validate the locked state again.
     const payment = await tx.payment.findUnique({ where: { id: b.payment.id }, select: { status: true } })

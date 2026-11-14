@@ -214,3 +214,20 @@ test('stale detail records cannot start a refund or change a physical venue outs
   expect(api.post).not.toHaveBeenCalled()
   expect(api.put).not.toHaveBeenCalled()
 })
+
+test('parent can answer a missed attendance request from the booking notification link', async () => {
+  const b = booking(1, { attendanceReview: { status: 'OPEN' } })
+  open([b], '/parent/bookings?booking=' + b.publicId)
+  fireEvent.click(await screen.findByLabelText('The lesson did not take place'))
+  fireEvent.change(screen.getByLabelText('Optional note'), { target: { value: 'We waited.' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Send response to admin' }))
+  await waitFor(() => expect(api.post).toHaveBeenCalledWith('/parent/bookings/' + b.publicId + '/attendance-response', { answer: 'NO', note: 'We waited.' }))
+})
+
+test.each([['PENDING', 'Pending Admin review'], ['REJECTED', 'Not approved'], ['APPROVED', 'Refund on hold while admin reviews the attendance evidence.', 'ON_HOLD']])('parent sees the linked attendance refund without a second request button: %s', (status, label, attendanceRefundState) => {
+  const b = booking(1, { startAt: '2026-11-12T09:00:00Z', endAt: '2026-11-12T10:00:00Z', attendanceReview: { attendanceRefundId: 9 },
+    payment: { status: 'PAID', refunds: [{ id: 9, amount: 80, reason: 'Lesson did not take place.', status, attendanceRefundState }] } })
+  render(<MemoryRouter><LessonDetails booking={b} now={Date.parse(serverTime)} onClose={() => {}} /></MemoryRouter>)
+  expect(screen.getByText(label)).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Request a refund' })).toBeNull()
+})

@@ -1,3 +1,4 @@
+import { attendanceLabels, refundHoldLabels } from '../../lib/attendanceReview'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import api, { errorMessage } from '../../api/client'
@@ -32,6 +33,8 @@ function SessionForm({ session: s, setSession }) {
   const [error, setError] = useState('')
   const [needsRefresh, setNeedsRefresh] = useState(false)
   const [now, setNow] = useState(() => Date.parse(s.serverTime))
+  const [proof, setProof] = useState(null)
+  const [reason, setReason] = useState('')
   const [content, setContent] = useState('')
   const [progress, setProgress] = useState('')
   const [plan, setPlan] = useState('')
@@ -55,7 +58,7 @@ function SessionForm({ session: s, setSession }) {
   const within = distance != null && distance <= s.radius
   const entry = active && locationReady && started && !ended && !attendance?.checkInAt
   const exit = active && ended && attendance?.checkInAt && !attendance.checkOutAt
-  const reportReady = active && attendance?.checkOutAt && !s.report
+  const reportReady = active && (attendance?.checkOutAt || s.review?.attendanceApproved) && !s.report
   const path = '/tutor/bookings/' + recordRef(s) + '/session'
 
   function updateSession(data) {
@@ -98,6 +101,22 @@ function SessionForm({ session: s, setSession }) {
     if (!['image/jpeg', 'image/png'].includes(file.type) || file.size > 5 * 1024 * 1024) throw new Error('Choose a JPG or PNG photo up to 5 MB.')
     try { setPhoto(await uploadImage(file, 'attendance', s.id)) } catch (e) { throw new Error(uploadError(e)) }
   }
+  const reconsider = active && s.review?.status === 'DISMISSED'
+  const replyRequested = active && s.review?.tutorReplyPending
+  const proofField = <label className="block font-semibold">Supporting photo or screenshot (optional)
+    <input type="file" accept="image/jpeg,image/png" className="input mt-1 w-full text-base" disabled={busy} onChange={e => {
+      const file = e.target.files?.[0]
+      e.target.value = ''
+      if (!file) return
+      setProof(null)
+      run(async () => {
+        if (!['image/jpeg', 'image/png'].includes(file.type) || file.size > 5 * 1024 * 1024) throw new Error('Choose a JPG or PNG up to 5 MB.')
+        const receipt = await uploadImage(file, 'attendance', s.id)
+        if (s.review && !reconsider && !replyRequested) await send({ action: 'attach-proof', photo: receipt })
+        else setProof(receipt)
+      })
+    }} />
+  </label>
   return <div className="min-w-0 space-y-4">
     <Link to={'/tutor/bookings?booking=' + recordRef(s)} className="btn-outline min-h-11">Back to my bookings</Link>
     <TutorPageHeader title={s.subject + ' · ' + s.student} subtitle={fmtDate(s.startAt) + ' · ' + fmtTimeRange(s.startAt, s.endAt) + ' (Malaysia time) · ' + (physical ? locationReady ? s.address : awaitingVenue ? 'Physical lesson · exact address awaiting confirmation' : 'Physical lesson · exact address not recorded' : 'Online lesson')} />
@@ -115,7 +134,45 @@ function SessionForm({ session: s, setSession }) {
     <div className="grid min-w-0 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
       <div className="min-w-0 space-y-4">
         <SectionCard title="Check in" icon="calendar">
-          {attendance?.checkInAt ? <p>Checked in at {fmtTime(attendance.checkInAt)}.</p> : <div className="space-y-3">
+          {attendance?.checkInAt ? <p>Checked in at {fmtTime(attendance.checkInAt)}.</p> : s.review ? <div role="status" className="space-y-2 break-words">
+            <p>Missed check-in review · {{ OPEN: 'Submitted', IN_PROGRESS: 'Under review', RESOLVED: 'Resolved', DISMISSED: 'Dismissed' }[s.review.status]}</p>
+            {s.review.attendanceRefund?.attendanceRefundState ? <p>{refundHoldLabels[s.review.attendanceRefund.attendanceRefundState]}</p> : s.review.attendanceRefund && <p>Refund review: {{ PENDING: 'Awaiting admin decision', ESCALATED: 'Escalated', APPROVED: 'Approved', REJECTED: 'Declined' }[s.review.attendanceRefund.status]}</p>}
+            {s.review.attendanceApproved && <p>Attendance confirmed by admin. {s.report ? 'Report submitted.' : 'You can submit your lesson report below.'}</p>}
+            {s.review.evidenceUrl && <a className="btn-outline" href={s.review.evidenceUrl} target="_blank" rel="noreferrer">View supporting proof</a>}
+            {s.review.attendanceOutcome && !s.review.attendanceApproved && <p>{attendanceLabels[s.review.attendanceOutcome]}</p>}
+            {['OPEN', 'IN_PROGRESS'].includes(s.review.status) && !replyRequested && proofField}
+            {!!s.review.reviewHistory?.length && <details><summary>Review history</summary>
+              <ul>{s.review.reviewHistory.map((entry, i) => <li key={i}>{attendanceLabels[entry.action]} · {entry.message}</li>)}</ul>
+            </details>}
+            {(reconsider || replyRequested) && <form className="space-y-2" onSubmit={e => {
+              e.preventDefault()
+              run(async () => {
+                await send({ action: reconsider ? 'reconsider' : 'review-reply', reason: reason.trim(), ...(proof && { photo: proof }) })
+                setReason('')
+                setProof(null)
+              })
+            }}>
+              <label className="block">{reconsider ? 'Describe your new evidence' : 'Reply to the admin question'}
+                <textarea required maxLength={1000} value={reason} className="input w-full" onChange={e => setReason(e.target.value)} />
+              </label>
+              {proofField}
+              {proof && <p>Proof ready to submit.</p>}
+              <button disabled={busy || !reason.trim()} className="btn-primary min-h-11">{reconsider ? 'Request reconsideration' : 'Send reply to admin'}</button>
+            </form>}
+            <p>Your explanation: {s.review.description}</p>
+            {s.review.adminResponse && <p>Admin response: {s.review.adminResponse}</p>}
+          </div> : ended && s.status === 'CONFIRMED' ? <form className="space-y-3" onSubmit={e => {
+            e.preventDefault()
+            run(() => send({ action: 'request-review', reason: reason.trim(), ...(proof && { photo: proof }) }))
+          }}>
+            <p>The lesson ended before you checked in. You can ask an admin to review what happened.</p>
+            <label className="block font-semibold">Why did you miss check-in?
+              <textarea required maxLength={1000} className="input mt-1 min-h-20 w-full text-base" value={reason} onChange={e => setReason(e.target.value)} />
+            </label>
+            {proofField}
+            {proof && <p role="status">Proof ready to submit.</p>}
+            <button className="btn-primary min-h-11" disabled={!reason.trim() || busy || !active}>Request admin review</button>
+          </form> : <div className="space-y-3">
             {physical ? <>
               <p>Check in within <b>{s.radius} metres</b> of the lesson address and add a photo for the attendance record.</p>
               <button disabled={!entry || busy} className="btn-outline min-h-11" onClick={() => run(async () => {

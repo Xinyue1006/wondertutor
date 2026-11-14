@@ -93,3 +93,26 @@ test.each([
   expect((await prisma.booking.findUniqueOrThrow({ where: { id: lesson.id } })).status).toBe(finalStatus)
   expect((await prisma.payment.findUniqueOrThrow({ where: { id: paid.id } })).status).toBe(action === 'approve' ? 'REFUNDED' : 'PAID')
 })
+
+test('Alya’s cancelled lesson shows the same refund stage in tutor bookings and earnings', async () => {
+  const family = await makeParent({ child: { name: 'Alya Lim (Demo)' } })
+  const b = await makeBooking({ tutor: tutor.tutor, child: family.child, parent: family.parent, date: nextDate(MONDAY), status: 'CANCELLED' })
+  const payment = await prisma.payment.create({ data: { bookingId: b.id, status: 'PAID', amount: 50, commissionRate: 12, commissionAmount: 6, paidAt: new Date() } })
+  const refund = await prisma.refund.create({ data: { paymentId: payment.id, amount: 50, type: 'ADMIN_REVIEW', reason: 'Cancelled lesson' } })
+  const path = '/admin/refunds/' + refund.id + '/decision'
+  const verify = async (stage, status, refunded) => {
+    const client = api(tutor.token)
+    const lesson = (await client.get('/tutor/bookings')).bookings.find(row => row.id === b.id)
+    const entry = (await client.get('/tutor/earnings')).transactions.find(row => row.bookingId === b.id)
+    expect(lesson).toMatchObject({ status: 'CANCELLED', child: { name: 'Alya Lim (Demo)' }, payment: { status, refunds: [{ id: refund.id, amount: 50, stage }] } })
+    expect(entry.payment).toEqual(lesson.payment)
+    expect(entry.bookingStatus).toBe('CANCELLED')
+    expect(Number(entry.net)).toBe(0)
+    expect(Number(entry.refunded)).toBe(refunded)
+  }
+  await verify('PENDING', 'PAID', 0)
+  expect((await admin.post(path, { action: 'approve', amount: 50, reason: 'Cancelled lesson', basis: 'Mutual agreement' })).status).toBe(204)
+  await verify('APPROVED', 'PAID', 0)
+  expect((await admin.post(path, { action: 'issued', reference: 'alyaa-' + refund.id })).status).toBe(204)
+  await verify('TRANSFERRED', 'REFUNDED', 50)
+})

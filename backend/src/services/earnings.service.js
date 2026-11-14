@@ -1,3 +1,4 @@
+import { tutorRefunds, tutorPaymentStatus } from './tutorRefundStatus.js'
 import { Prisma } from '@prisma/client'
 import { createHash } from 'node:crypto'
 import { prisma } from '../config/prisma.js'
@@ -15,7 +16,7 @@ async function ledger(db, tutorId) {
   const payments = await db.payment.findMany({
     where: { booking: { tutorId }, status: { in: ['PAID', 'PARTIALLY_REFUNDED', 'REFUNDED'] } },
     include: { booking: { select: { id: true, publicId: true, subject: true, status: true, startAt: true, child: { select: { name: true } } } },
-      refunds: { select: { amount: true, status: true, issuedAt: true, reviewNote: true } } }, orderBy: [{ paidAt: 'desc' }, { id: 'desc' }],
+      refunds: tutorRefunds }, orderBy: [{ paidAt: 'desc' }, { id: 'desc' }],
   })
   const withdrawals = await db.withdrawal.findMany({ where: { tutorId }, include: { bankAccount: true }, orderBy: { id: 'desc' } })
   let earned = zero, pending = zero, held = zero, paidOut = zero
@@ -46,7 +47,7 @@ async function ledger(db, tutorId) {
       if (b.status === 'COMPLETED') { state = 'Earned'; earned = earned.plus(net) }
       if (b.status === 'CONFIRMED') { state = 'Report due'; pending = pending.plus(net) }
     }
-    return { id: p.id, bookingId: b.id, bookingRef: b.publicId || b.id, bookingStatus: b.status, date: p.paidAt || p.createdAt, subject: b.subject, student: b.child.name,
+    return { id: p.id, bookingId: b.id, bookingRef: b.publicId || b.id, bookingStatus: b.status, payment: tutorPaymentStatus(p), date: p.paidAt || p.createdAt, subject: b.subject, student: b.child.name,
       fee: p.amount, originalCommission: p.commissionAmount, commission, originalShare,
       tutorRefundShare: originalShare.minus(retainedShare), platformRefundShare: p.commissionAmount.minus(commission),
       refunded: p.status === 'REFUNDED' ? p.amount : refunded, rate: p.commissionRate, net, state }

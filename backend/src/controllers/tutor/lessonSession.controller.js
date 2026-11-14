@@ -5,6 +5,9 @@ const coords = z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(
 const photo = z.object({ url: z.url().max(191), signature: z.string().regex(/^[a-f0-9]{40}$/), version: z.number().int().positive() }).strict()
 const requiredText = z.string().trim().min(1, 'Complete both report fields.').max(5000)
 const action = z.discriminatedUnion('action', [
+  z.object({ action: z.enum(['review-reply', 'reconsider']), reason: z.string().trim().min(1).max(1000), photo: photo.optional() }).strict(),
+  z.object({ action: z.literal('attach-proof'), photo }).strict(),
+  z.object({ action: z.literal('request-review'), photo: photo.optional(), reason: z.string().trim().min(1, 'Explain why you missed check-in.').max(1000) }).strict(),
   z.object({ action: z.literal('check-in'), coords: coords.optional(), photo: photo.optional() }).strict(),
   z.object({ action: z.literal('check-out') }).strict(),
   z.object({ action: z.literal('report'), content: requiredText, progressNote: requiredText, homework: z.string().trim().max(5000).optional(), recommendations: z.string().trim().max(5000).optional() }).strict(),

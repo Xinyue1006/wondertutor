@@ -1,3 +1,4 @@
+import { refundHoldLabels } from '../lib/attendanceReview'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import api, { errorMessage } from '../api/client'
@@ -36,10 +37,10 @@ export default function LessonDetails({ booking: b, onClose, footer, onChanged, 
   const refunds = b.payment?.refunds || []
   // Only once the lesson has started or finished; before that, Cancel is the way to get the money back
   const started = new Date(b.startAt).getTime() <= now
-  const canAsk = b.payment?.status === 'PAID' && (b.status === 'COMPLETED' || (b.status === 'CONFIRMED' && started)) && !refunds.some((r) => ['PENDING', 'APPROVED'].includes(r.status))
+  const canAsk = b.payment?.status === 'PAID' && (b.status === 'COMPLETED' || (b.status === 'CONFIRMED' && started)) && !b.attendanceReview?.attendanceRefundId && !refunds.some((r) => ['PENDING', 'APPROVED', 'ESCALATED'].includes(r.status))
   // The meeting link is typed by the tutor, so only a normal web address is made clickable
   const safeLink = /^https?:\/\//i.test(b.meetingLink || '')
-  const REFUND_LABEL = { PENDING: 'Pending Admin review', APPROVED: 'Approved', REJECTED: 'Not approved' }
+  const REFUND_LABEL = { PENDING: 'Pending Admin review', ESCALATED: 'Escalated for review', APPROVED: 'Approved', REJECTED: 'Not approved' }
 
   async function sendRefund() {
     if (actionsDisabled || busy) return
@@ -131,7 +132,7 @@ export default function LessonDetails({ booking: b, onClose, footer, onChanged, 
           <div className="mb-1 font-bold text-navy">Refund</div>
           {refunds.map((r) => (
             <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 text-slate-600">
-              <span>{money(r.amount)} · {r.reason}</span><span className="pill bg-white text-sky-700">{REFUND_LABEL[r.status]}</span>
+              <span>{money(r.amount)} · {r.reason}</span><span className="pill bg-white text-sky-700">{refundHoldLabels[r.attendanceRefundState] || REFUND_LABEL[r.status]}</span>
             </div>))}
         </div>
       )}

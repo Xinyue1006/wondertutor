@@ -1,3 +1,4 @@
+import { attendanceLabels } from '../../lib/attendanceReview'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import api, { errorMessage } from '../../api/client'
@@ -253,6 +254,7 @@ export default function MyBookings() {
           <p className="text-sm text-amber-900">Refresh this booking to check its latest status before taking another action. Your previous action will not be resent.</p>
           <button type="button" disabled={refreshing} onClick={load} className="btn-outline min-h-11 w-full px-3 text-sm">{refreshing ? 'Refreshing…' : 'Refresh bookings'}</button>
         </> : <fieldset disabled={acting} aria-label="Booking actions" className="min-w-0 space-y-3 disabled:opacity-60">
+          {currentDetail.attendanceReview && <AttendanceResponse booking={currentDetail} act={act} busy={acting || needsRefresh} />}
           <BookingDetailActions key={recordRef(currentDetail)} b={currentDetail} now={now} {...handlers} />
         </fieldset>}
       </div>} />
@@ -379,6 +381,33 @@ function LocationModal({ booking, now, onClose, onUpdate, onRefresh }) {
 }
 
 const Btn = ({ kind = 'outline', children, ...rest }) => <button type="button" className={(kind === 'primary' ? 'btn-primary' : kind === 'danger' ? 'btn-danger' : 'btn-outline') + ' min-h-11 w-full'} {...rest}>{children}</button>
+
+function AttendanceResponse({ booking, act, busy }) {
+  const [answer, setAnswer] = useState('')
+  const [note, setNote] = useState('')
+  const review = booking.attendanceReview
+  const labels = { YES: 'The lesson took place', NO: 'The lesson did not take place', UNSURE: 'I’m unsure' }
+  const open = ['OPEN', 'IN_PROGRESS'].includes(review.status)
+  return <section className="space-y-2 rounded-xl border p-3">
+    <h3 className="font-bold">Missed check-in review</h3>
+    {review.attendanceOutcome && !review.attendanceApproved && <p>{attendanceLabels[review.attendanceOutcome]}</p>}
+    {review.attendanceApproved && <p>Attendance confirmed by admin.</p>}
+    {review.adminResponse && <p>Admin response: {review.adminResponse}</p>}
+    {review.parentAnswer ? <p>Your response: {labels[review.parentAnswer]}{review.parentNote && ' · ' + review.parentNote}</p> : open &&
+      <form className="space-y-2" onSubmit={e => {
+        e.preventDefault()
+        act('/parent/bookings/' + recordRef(booking) + '/attendance-response', { answer, note })
+      }}>
+        <fieldset disabled={busy}><legend>Did this lesson take place?</legend>
+          {Object.entries(labels).map(([value, label]) => <label key={value} className="flex min-h-11 items-center gap-2">
+            <input type="radio" name="attendance-answer" value={value} checked={answer === value} onChange={() => setAnswer(value)} />{label}
+          </label>)}
+        </fieldset>
+        <label className="block">{review.attendanceOutcome === 'MORE_INFO' ? 'Reply to the admin question' : 'Optional note'}<textarea className="input w-full" maxLength={1000} required={review.attendanceOutcome === 'MORE_INFO'} value={note} onChange={e => setNote(e.target.value)} /></label>
+        <button className="btn-primary min-h-11" disabled={!answer || busy}>Send response to admin</button>
+      </form>}
+  </section>
+}
 
 function BookingDetailActions({ b, now, onCancel, onReview, onReschedule, act }) {
   const future = Date.parse(b.startAt) > now

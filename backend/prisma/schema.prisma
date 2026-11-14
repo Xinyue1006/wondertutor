@@ -443,6 +443,7 @@ model Payment {
 
 model Refund {
   id           Int           @id @default(autoincrement())
+  attendanceCases Complaint[]
   paymentId    Int
   payment      Payment       @relation(fields: [paymentId], references: [id])
   amount       Decimal       @db.Decimal(10, 2)
@@ -520,6 +521,14 @@ model Complaint {
   category      String
   description   String          @db.Text
   evidenceUrl   String?
+  parentAnswer  String?
+  parentNote    String?         @db.Text
+  attendanceRefundId Int?
+  attendanceRefund Refund? @relation(fields: [attendanceRefundId], references: [id], onDelete: SetNull)
+  attendanceOutcome String?
+  tutorReplyPending Boolean    @default(false)
+  reviewHistory AttendanceReviewEntry[]
+  attendanceApproved Boolean    @default(false)
   status        ComplaintStatus @default(OPEN)
   adminResponse String?         @db.Text
   handledById   Int?
@@ -528,6 +537,18 @@ model Complaint {
   updatedAt     DateTime        @updatedAt
 
   @@unique([filedById, reviewId])
+}
+
+model AttendanceReviewEntry {
+  id          Int       @id @default(autoincrement())
+  complaintId Int
+  complaint   Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  action      String
+  message     String    @db.Text
+  evidenceUrl String?
+  createdAt   DateTime  @default(now())
+
+  @@index([complaintId])
 }
 
 // A formal warning an Admin gives to a user (before any deactivation). The user is also notified in-app.

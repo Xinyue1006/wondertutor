@@ -1,3 +1,4 @@
+import { attendanceLabels, refundHoldLabels } from '../../lib/attendanceReview'
 import { useState } from 'react'
 import api from '../../api/client'
 import { PageTitle, SectionCard } from '../../components/ui/Common'
@@ -23,8 +24,9 @@ function Transactions() {
 function RefundItem({r,done}) {
   const [action,setAction] = useState(r.status === 'APPROVED' ? 'issued' : 'approve')
   return <details className="rounded-xl border border-brand-100 p-3"><summary className="cursor-pointer py-2 font-semibold">#{r.bookingId} · {r.parent} · {money(r.amount)} · {r.status}</summary>
+    {r.attendanceOutcome && <p>Attendance review: {attendanceLabels[r.attendanceOutcome]}</p>}
     <p className="my-2">Reason: {r.reason} · Paid: {money(r.paid)}</p>{r.decision && <p>{r.decision}</p>}
-    <DecisionForm label={action === 'issued' ? 'Record completed transfer' : 'Save refund decision'} done={done} submit={f => api.post('/admin/refunds/' + r.id + '/decision',
+    {r.attendanceRefundState === 'ON_HOLD' ? <p role="status">{refundHoldLabels.ON_HOLD}</p> : <DecisionForm label={action === 'issued' ? 'Record completed transfer' : 'Save refund decision'} done={done} submit={f => api.post('/admin/refunds/' + r.id + '/decision',
       action === 'issued' ? { action, reference: f.reference } : action === 'reject' ? { action, reason: f.reason } : { action, amount: Number(f.amount), basis: f.basis, reason: f.reason })}>
       {r.status === 'APPROVED' ? <label>Reference from the completed bank or gateway refund<input name="reference" required maxLength={100} className="input text-base" /></label> : <>
         <label>Decision<select className="input text-base" value={action} onChange={e => setAction(e.target.value)}><option value="approve">Approve refund</option><option value="reject">Reject refund</option></select></label>
@@ -32,7 +34,7 @@ function RefundItem({r,done}) {
           <label>Eligibility<select className="input text-base" name="basis" required defaultValue=""><option disabled value="">Choose a basis</option><option>Mutual agreement</option><option>Refund policy condition</option></select></label></>}
         <Note label="Record the evidence and reason" maxLength={150} />
       </>}
-    </DecisionForm></details>
+    </DecisionForm>}</details>
 }
 function Refunds() {
   const source = useRecords('/admin/refunds')

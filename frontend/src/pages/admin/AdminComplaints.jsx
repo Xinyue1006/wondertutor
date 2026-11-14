@@ -1,3 +1,4 @@
+import { attendanceLabels, refundHoldLabels } from '../../lib/attendanceReview'
 import { useCallback, useEffect, useState } from 'react'
 import api, { errorMessage } from '../../api/client'
 import Icon from '../../components/ui/Icon'
@@ -30,7 +31,7 @@ export default function AdminComplaints() {
 
   return (
     <div>
-      <PageTitle title="Complaints & Reports" subtitle="Review complaints from parents and respond to them." />
+      <PageTitle title="Complaints & Reports" subtitle="Review complaints and missed check-in requests." />
       <ComplaintsReport refreshKey={reportVersion} />
       <div className="card mb-4 flex flex-wrap gap-2 p-3">
         {TABS.map(([v, l]) => (
@@ -75,15 +76,18 @@ function ReviewModal({ complaint: c, onClose, onDone, onReviewChanged }) {
   }, [c])
   useEffect(() => { setResponse(c?.adminResponse || ''); setReview(c?.review || null); setError(''); setInv(null); loadInvestigation() }, [c, loadInvestigation])
   if (!c) return null
+  const attendance = c.category === 'Missed check-in'
+  const evidence = inv?.attendanceReview
   const closed = ['RESOLVED', 'DISMISSED'].includes(c.status)
 
-  async function act(status) {
+  async function act(status, outcome) {
     setError('')
     // The parent reads this response, so a closed complaint always says what was done or why
+    if (outcome === 'MORE_INFO' && !response.trim()) return setError('Write your question for the tutor and parent.')
     if (status !== 'IN_PROGRESS' && response.trim().length < 3) return setError('Write a response to the parent before resolving or dismissing.')
     setBusy(true)
     try {
-      await api.patch(`/admin/complaints/${recordRef(c)}`, { status, adminResponse: response || undefined })
+      await api.patch(`/admin/complaints/${recordRef(c)}`, { status, ...(outcome && { outcome }), adminResponse: response || undefined, ...(attendance && evidence && { reviewedAt: evidence.reviewedAt }) })
       onDone()
     } catch (err) {
       setError(errorMessage(err))
@@ -100,18 +104,36 @@ function ReviewModal({ complaint: c, onClose, onDone, onReviewChanged }) {
           <div className="mb-1 text-xs text-slate-500">From {c.filedBy.name} · {fmtShortDate(c.createdAt)}{c.against && ` · Against ${c.against.name}`}</div>
           <p className="text-slate-700">{c.description}</p>
         </div>
+        {attendance && evidence && <section className="space-y-2">
+          <h3 className="font-bold">Attendance evidence</h3>
+          {evidence.attendanceRefundState && <p>{refundHoldLabels[evidence.attendanceRefundState]}</p>}
+          {evidence.outcome && <p>{attendanceLabels[evidence.outcome]}</p>}
+          {evidence.tutorReplyPending && <p>Waiting for the tutor to reply.</p>}
+          {!!evidence.history?.length && <ol className="space-y-2">{evidence.history.map(entry => <li key={entry.id} className="break-words">
+            <strong>{attendanceLabels[entry.action]}</strong> · {fmtShortDate(entry.createdAt)} · {entry.message}
+            {entry.evidenceUrl && <a href={entry.evidenceUrl} target="_blank" rel="noreferrer" className="ml-2 underline">View supporting evidence</a>}
+          </li>)}</ol>}
+          {evidence.proof ? <a className="btn-outline" href={evidence.proof} target="_blank" rel="noreferrer">View tutor proof</a> : <p>No proof attached.</p>}
+          <p>Parent response: {{ YES: 'The lesson took place', NO: 'The lesson did not take place', UNSURE: 'Unsure' }[evidence.parentAnswer] || 'Awaiting response'}</p>
+          {evidence.parentNote && <p className="break-words">{evidence.parentNote}</p>}
+          {!closed && <button className="btn-outline" onClick={loadInvestigation}>Refresh evidence</button>}
+        </section>}
         <Investigation inv={inv} />
         {review && <ReviewModeration review={review} onRefresh={loadInvestigation} onChanged={(updated) => { setReview((previous) => ({ ...previous, ...updated })); onReviewChanged() }} />}
         {c.against && !closed && <WarnUser userId={c.against.id} name={c.against.name} complaintId={c.id} onDone={loadInvestigation} />}
         <ErrorBox>{error}</ErrorBox>
-        <label className="block text-sm font-bold text-navy">Response to the parent {closed ? '' : <span className="font-normal text-slate-500">(required to resolve or dismiss)</span>}
+        <label className="block text-sm font-bold text-navy">{attendance ? 'Response to the tutor and parent' : 'Response to the parent'} {closed ? '' : <span className="font-normal text-slate-500">(required to resolve or dismiss)</span>}
           <textarea rows={4} maxLength={1000} disabled={closed} className="input mt-1.5 resize-none disabled:bg-slate-50" value={response} onChange={(e) => setResponse(e.target.value)} placeholder="Explain what was done or why the complaint is closed." />
         </label>
         {!closed && (
           <div className="flex flex-wrap justify-end gap-2">
             {c.status === 'OPEN' && <button disabled={busy} onClick={() => act('IN_PROGRESS')} className="btn-outline">Mark In Progress</button>}
-            <button disabled={busy} onClick={() => act('DISMISSED')} className="btn-danger">Dismiss</button>
-            <button disabled={busy} onClick={() => act('RESOLVED')} className="btn-primary">Resolve</button>
+            {attendance && <>
+              <button disabled={busy || !evidence} onClick={() => act('IN_PROGRESS', 'MORE_INFO')} className="btn-outline">Ask for more information</button>
+              <button disabled={busy || !evidence?.parentAnswer || evidence.tutorReplyPending} onClick={() => act('DISMISSED', 'NOT_HELD')} className="btn-danger">Mark lesson as not held</button>
+            </>}
+            <button disabled={busy || (attendance && (!evidence?.parentAnswer || evidence.tutorReplyPending))} onClick={() => act('DISMISSED', attendance ? 'UNVERIFIED' : undefined)} className="btn-danger">{attendance ? 'Mark attendance as unverified' : 'Dismiss'}</button>
+            <button disabled={busy || (attendance && (!evidence?.parentAnswer || evidence.tutorReplyPending))} onClick={() => act('RESOLVED')} className="btn-primary">{attendance ? 'Approve attendance' : 'Resolve'}</button>
           </div>
         )}
       </div>

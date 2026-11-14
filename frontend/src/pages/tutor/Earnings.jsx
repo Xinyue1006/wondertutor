@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import api, { errorMessage } from '../../api/client'
+import TutorPaymentStatus from '../../components/TutorPaymentStatus'
 import TutorPageHeader from '../../components/TutorPageHeader'
 import { ErrorBox, LoadError, SectionCard, Spinner } from '../../components/ui/Common'
 import { fmtDate, money } from '../../lib/format'
@@ -169,6 +170,7 @@ export default function Earnings() {
             <p className="text-sm">{fmtDate(r.date)} · Booking #{r.bookingId}</p>
             {r.bookingStatus && <p className="text-sm">Lesson · {r.bookingStatus[0] + r.bookingStatus.slice(1).toLowerCase().replaceAll('_', ' ')}</p>}
             {r.bookingStatus === 'COMPLETED' && <Link className="inline-flex min-h-11 items-center underline" to={'/tutor/bookings/' + (r.bookingRef || r.bookingId) + '/session'}>View lesson report</Link>}
+            <TutorPaymentStatus payment={r.payment} />
             <LessonAmounts row={r} />
           </li>)}</ul>
         </SectionCard>

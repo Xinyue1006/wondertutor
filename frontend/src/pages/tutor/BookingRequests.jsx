@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import api, { errorMessage } from '../../api/client'
+import TutorPaymentStatus from '../../components/TutorPaymentStatus'
 import TutorPageHeader from '../../components/TutorPageHeader'
 import { ErrorBox, LoadError, Spinner, StatusPill } from '../../components/ui/Common'
 import { fmtDate, fmtTime, fmtTimeRange, money } from '../../lib/format'
@@ -78,6 +79,7 @@ function BookingDetails({ b, onUpdate, onReload, openLinkForm }) {
   const button = (action, primary = false) => <button type="button" disabled={busy || needsRefresh} className={(primary ? 'btn-primary' : 'btn-outline') + ' min-h-11'} onClick={() => choose(action)}>{labels[action]}</button>
   return <section className="card min-w-0 space-y-4 break-words p-4 sm:p-6" aria-label="Booking details">
     <StatusPill status={b.status} />
+    <TutorPaymentStatus payment={b.payment} />
     {['CONFIRMED', 'COMPLETED', 'DISPUTED'].includes(b.status) && <div><Link className="btn-primary min-h-11" to={'/tutor/bookings/' + recordRef(b) + '/session'}>{b.status === 'CONFIRMED' ? 'Open session' : 'View session record'}</Link></div>}
     <h2 className="text-xl font-bold text-navy">{b.subject} with {b.child.name}</h2>
     <p>{fmtDate(b.startAt)} · {fmtTimeRange(b.startAt, b.endAt)} (Malaysia time)</p>

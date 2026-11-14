@@ -1,3 +1,4 @@
+import { attendanceRefundState } from './attendanceRefund.js'
 import { childPhotoFields, mediaLink } from './privateMedia.js'
 // Shapes a Booking (with relations) for the Parent Portal.
 import { toTutorCard } from './tutor.service.js'
@@ -9,6 +10,7 @@ export const bookingInclude = {
   child: true,
   payment: { include: { refunds: { orderBy: { createdAt: 'desc' } } } },
   review: true,
+  complaints: { where: { category: 'Missed check-in' }, select: { attendanceRefundId: true, attendanceOutcome: true, parentAnswer: true, parentNote: true, status: true, adminResponse: true, attendanceApproved: true }, take: 1 },
   attendance: true,
   summary: true,
   parent: { select: { userId: true } },
@@ -51,10 +53,11 @@ export function toBookingDto(b) {
     payment: b.payment && {
       id: b.payment.id, publicId: b.payment.publicId, status: b.payment.status, amount: num(b.payment.amount), method: b.payment.method,
       gatewayRef: b.payment.gatewayRef, paidAt: b.payment.paidAt,
-      refunds: (b.payment.refunds || []).map((r) => ({ id: r.id, amount: num(r.amount), type: r.type, status: r.status, reason: r.reason, createdAt: r.createdAt })),
+      refunds: (b.payment.refunds || []).map((r) => ({ id: r.id, amount: num(r.amount), type: r.type, status: r.status, attendanceRefundState: attendanceRefundState(b.complaints?.find(c => c.attendanceRefundId === r.id), { ...r, payment: b.payment }), reason: r.reason, createdAt: r.createdAt })),
     },
     review: b.review && { rating: b.review.rating, comment: b.review.comment, photoUrl: b.review.photoUrl, isHidden: b.review.isHidden, moderationReason: b.review.moderationReason },
     // Attendance + summary are written by the Tutor Portal; parents only read them
+    attendanceReview: b.complaints?.[0] ?? null,
     attendance: b.attendance && {
       checkInAt: b.attendance.checkInAt, checkOutAt: b.attendance.checkOutAt, checkInPhotoUrl: mediaLink(b.attendance.checkInPhotoUrl, 'wondertutor/attendance/' + b.id),
     },

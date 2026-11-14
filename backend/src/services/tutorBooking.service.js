@@ -1,3 +1,4 @@
+import { tutorRefunds, tutorPaymentStatus } from './tutorRefundStatus.js'
 import { prisma } from '../config/prisma.js'
 import { AppError } from '../utils/AppError.js'
 import { publicReference } from '../utils/publicIds.js'
@@ -7,6 +8,7 @@ import { notify, notifyWithEmail } from './notification.service.js'
 import { lessonLocationFields } from './lessonLocation.service.js'
 
 const include = {
+  payment: { select: { status: true, refunds: tutorRefunds } },
   parent: { select: { userId: true, user: { select: { id: true, fullName: true, email: true, createdAt: true } },
     _count: { select: { bookings: { where: { status: 'COMPLETED' } } } } } },
   tutor: { select: { userId: true } },
@@ -24,6 +26,7 @@ export function tutorBooking(b) {
   const r = b.reschedules[0]
   return {
     id: b.id, publicId: b.publicId, subject: b.subject, parentName: b.parent.user.fullName, child: b.child,
+    payment: tutorPaymentStatus(b.payment),
     report: b.status === 'COMPLETED' ? b.summary ?? null : null,
     parentSince: b.parent.user.createdAt, completedLessons: b.parent._count.bookings,
     startAt: b.startAt, endAt: b.endAt, status: b.status, teachingMode: b.teachingMode,

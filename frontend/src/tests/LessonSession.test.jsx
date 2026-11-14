@@ -132,3 +132,44 @@ test('a legacy check-in keeps its historical record and can check out and report
   fireEvent.change(screen.getByLabelText('Student progress'), { target: { value: 'Improved.' } })
   expect(screen.getByRole('button', { name: 'Submit report and complete session' })).toBeEnabled()
 })
+
+test('a tutor can explain a missed check-in and see the submitted review', async () => {
+  const ended = { ...data, serverTime: data.endAt }
+  const reason = 'My phone lost power.'
+  api.post.mockResolvedValue({ data: { ...ended, review: { status: 'OPEN', description: reason } } })
+  show(ended)
+  const submit = await screen.findByRole('button', { name: 'Request admin review' })
+  expect(submit).toBeDisabled()
+  fireEvent.change(screen.getByLabelText('Why did you miss check-in?'), { target: { value: reason } })
+  const receipt = { url: 'private-image', version: 1, signature: 'receipt' }
+  uploadImage.mockResolvedValue(receipt)
+  fireEvent.change(screen.getByLabelText(/Supporting photo/), { target: { files: [new File(['proof'], 'lesson.png', { type: 'image/png' })] } })
+  await screen.findByText('Proof ready to submit.')
+  fireEvent.click(submit)
+  expect(await screen.findByText(/Missed check-in review.*Submitted/)).toBeInTheDocument()
+  expect(api.post).toHaveBeenCalledWith('/tutor/bookings/3/session', { action: 'request-review', reason, photo: receipt })
+  expect(screen.queryByRole('button', { name: 'Request admin review' })).toBeNull()
+})
+
+test('a tutor can provide new written evidence after an unverified decision', async () => {
+  const session = { ...data, serverTime: data.endAt, review: { status: 'DISMISSED', attendanceOutcome: 'UNVERIFIED' } }
+  show(session)
+  expect(await screen.findByText('Attendance could not be verified')).toBeInTheDocument()
+  const reason = 'The parent found our dated worksheet.'
+  api.post.mockResolvedValue({ data: { ...session, review: { status: 'IN_PROGRESS', attendanceOutcome: 'RECONSIDERATION' } } })
+  fireEvent.change(screen.getByLabelText('Describe your new evidence'), { target: { value: reason } })
+  fireEvent.click(screen.getByRole('button', { name: 'Request reconsideration' }))
+  expect(await screen.findByText('Reconsideration requested')).toBeInTheDocument()
+  expect(api.post).toHaveBeenCalledWith('/tutor/bookings/3/session', { action: 'reconsider', reason })
+})
+
+test('tutor sees the refund review and the attendance finding together', async () => {
+  show({ ...data, serverTime: data.endAt, review: { status: 'DISMISSED', attendanceOutcome: 'NOT_HELD', attendanceRefund: { status: 'PENDING' } } })
+  expect(await screen.findByText('Lesson did not take place')).toBeInTheDocument()
+  expect(screen.getByText('Refund review: Awaiting admin decision')).toBeInTheDocument()
+})
+
+test('tutor sees the approved refund is paused during their appeal', async () => {
+  show({ ...data, serverTime: data.endAt, review: { status: 'IN_PROGRESS', attendanceOutcome: 'RECONSIDERATION', attendanceRefund: { status: 'APPROVED', attendanceRefundState: 'ON_HOLD' } } })
+  expect(await screen.findByText(/Refund on hold/)).toBeVisible()
+})

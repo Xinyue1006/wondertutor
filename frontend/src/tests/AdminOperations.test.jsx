@@ -28,3 +28,27 @@ test('the report date controls request the selected period', async () => {
   fireEvent.click(screen.getByText('Apply dates'))
   await waitFor(() => expect(api.get).toHaveBeenCalledWith('/admin/reports?from=2026-11-01&to=2026-11-30', expect.anything()))
 })
+
+test('finance shows the attendance finding alongside an existing refund reason', async () => {
+  const { default: Finance } = await import('../pages/admin/Finance')
+  api.get.mockImplementation(async path => ({ data: { rows: path === '/admin/refunds' ? [
+    { id: 9, bookingId: 17, attendanceOutcome: 'NOT_HELD', parent: 'Parent', amount: 80, paid: 80, status: 'PENDING', reason: 'Parent requested review' },
+  ] : [] } }))
+  render(<Finance />)
+  fireEvent.click(screen.getByRole('button', { name: 'Refunds' }))
+  fireEvent.click(await screen.findByText(/#17/))
+  expect(screen.getByText('Attendance review: Lesson did not take place')).toBeVisible()
+  expect(screen.getByText(/Reason: Parent requested review/)).toBeVisible()
+})
+
+test.each(['PENDING', 'APPROVED'])('finance cannot act on a held %s refund', async status => {
+  const { default: Finance } = await import('../pages/admin/Finance')
+  api.get.mockImplementation(async path => ({ data: { rows: path === '/admin/refunds' ? [
+    { id: 9, bookingId: 17, parent: 'Parent', paid: 80, amount: 80, status, attendanceOutcome: 'MORE_INFO', attendanceRefundState: 'ON_HOLD' },
+  ] : [] } }))
+  render(<Finance />)
+  fireEvent.click(screen.getByRole('button', { name: 'Refunds' }))
+  fireEvent.click(await screen.findByText(/#17/))
+  expect(screen.getByText(/Refund on hold/)).toBeVisible()
+  expect(screen.queryByRole('button', { name: /Save refund decision|Record completed transfer/ })).toBeNull()
+})

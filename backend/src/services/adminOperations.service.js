@@ -1,3 +1,4 @@
+import { attendanceRefundState } from './attendanceRefund.js'
 import { Prisma } from '@prisma/client'
 import { prisma } from '../config/prisma.js'
 import { AppError } from '../utils/AppError.js'
@@ -119,19 +120,22 @@ export async function decideBooking(id, adminId, input) {
 
 export async function refundQueue() {
   const rows = await prisma.refund.findMany({ where: { OR: [{ status: { in: ['PENDING', 'ESCALATED'] } }, { status: 'APPROVED', issuedAt: null }] },
-    include: { payment: { include: { booking: { include: parties } } } }, orderBy: { id: 'asc' } })
+    include: { attendanceCases: { select: { status: true, attendanceOutcome: true }, take: 1 }, payment: { include: { booking: { include: parties } } } }, orderBy: { id: 'asc' } })
   return rows.filter(r => r.status !== 'APPROVED' || r.reviewNote || r.payment.status === 'PAID').map(r => ({ id: r.id, bookingId: r.payment.bookingId, parent: r.payment.booking.parent.user.fullName,
-    reason: r.reason, type: r.type, status: r.status, amount: r.amount, paid: r.payment.amount, decision: r.reviewNote }))
+    attendanceRefundState: attendanceRefundState(r.attendanceCases[0], r), attendanceOutcome: r.attendanceCases[0]?.attendanceOutcome, reason: r.reason, type: r.type, status: r.status, amount: r.amount, paid: r.payment.amount, decision: r.reviewNote }))
 }
 
 export async function decideRefund(id, adminId, input) {
-  const ref = await prisma.refund.findUnique({ where: { id }, select: { paymentId: true, payment: { select: { booking: { select: { tutorId: true } } } } } })
+  const ref = await prisma.refund.findUnique({ where: { id }, select: { paymentId: true, payment: { select: { bookingId: true, booking: { select: { tutorId: true } } } } } })
   if (!ref) throw new AppError(404, 'Refund not found')
   const result = await prisma.$transaction(async tx => {
     await lockTutor(tx, ref.payment.booking.tutorId)
+    // Reconsideration and the final attendance decision lock this booking before updating the case.
+    await tx.$queryRaw`SELECT id FROM Booking WHERE id = ${ref.payment.bookingId} FOR UPDATE`
     await tx.$queryRaw`SELECT id FROM Payment WHERE id = ${ref.paymentId} FOR UPDATE`
-    const r = await tx.refund.findUniqueOrThrow({ where: { id }, include: { payment: { include: { booking: { include: parties }, refunds: true } } } })
+    const r = await tx.refund.findUniqueOrThrow({ where: { id }, include: { attendanceCases: { select: { status: true } }, payment: { include: { booking: { include: parties }, refunds: true } } } })
     const p = r.payment, b = p.booking
+    if (r.attendanceCases.some(c => attendanceRefundState(c, r) === 'ON_HOLD')) throw new AppError(409, 'Refund on hold while admin reviews the attendance evidence.')
     const issue = input.action === 'issued'
     const transferred = x => x.issuedAt || (x.status === 'APPROVED' && !x.reviewNote && ['REFUNDED','PARTIALLY_REFUNDED'].includes(p.status))
     if (transferred(r) || (issue ? r.status !== 'APPROVED' : !['PENDING', 'ESCALATED'].includes(r.status))) throw stale()

@@ -1,3 +1,6 @@
+import { attendanceRefundState } from '../../services/attendanceRefund.js'
+import { MISSED_CHECK_IN } from '../../services/lessonSession.service.js'
+import { publicReference } from '../../utils/publicIds.js'
 import { mediaLink } from '../../services/privateMedia.js'
 import { z } from 'zod'
 import { prisma } from '../../config/prisma.js'
@@ -22,12 +25,28 @@ export async function listComplaints(req, res) {
 const updateSchema = z
   .object({
     status: z.enum(['IN_PROGRESS', 'RESOLVED', 'DISMISSED']),
+    outcome: z.enum(['MORE_INFO', 'UNVERIFIED', 'NOT_HELD']).optional(),
+    reviewedAt: z.iso.datetime().optional(),
     adminResponse: z.string().trim().max(1000).optional(),
   })
   .refine((d) => d.status === 'IN_PROGRESS' || (d.adminResponse && d.adminResponse.length >= 3), {
     message: 'Please write a response before resolving or dismissing',
     path: ['adminResponse'],
   })
+
+// Take the same payment lock as parent refund requests before reading the refund queue.
+async function attendanceRefund(tx, complaint) {
+  if (complaint.attendanceRefundId) return tx.refund.findUniqueOrThrow({ where: { id: complaint.attendanceRefundId } })
+  await tx.$queryRaw`SELECT id FROM Payment WHERE bookingId = ${complaint.bookingId} FOR UPDATE`
+  const payment = await tx.payment.findUnique({ where: { bookingId: complaint.bookingId }, include: { refunds: { orderBy: { id: 'desc' } } } })
+  if (!payment || payment.status !== 'PAID') return null
+  const existing = payment.refunds.find(r => ['PENDING', 'APPROVED', 'ESCALATED'].includes(r.status))
+  const refund = existing ?? await tx.refund.create({ data: {
+    paymentId: payment.id, amount: payment.amount, type: 'ADMIN_REVIEW', reason: 'Admin confirmed the paid lesson did not take place.',
+  } })
+  await tx.complaint.update({ where: { id: complaint.id }, data: { attendanceRefundId: refund.id } })
+  return refund
+}
 
 // PATCH /admin/complaints/:id: OPEN -> IN_PROGRESS -> RESOLVED / DISMISSED. The parent is notified.
 export async function updateComplaint(req, res) {
@@ -36,16 +55,56 @@ export async function updateComplaint(req, res) {
   if (!existing) throw new AppError(404, 'Complaint not found')
   if (['RESOLVED', 'DISMISSED'].includes(existing.status)) throw new AppError(400, 'This complaint is already closed')
 
+  const decidingAttendance = existing.category === MISSED_CHECK_IN && data.status !== 'IN_PROGRESS'
+  const asking = data.outcome === 'MORE_INFO'
+  if (data.outcome && (existing.category !== MISSED_CHECK_IN || data.status !== (asking ? 'IN_PROGRESS' : 'DISMISSED'))) throw new AppError(400, 'Choose a matching attendance decision.')
+  if (asking && !data.adminResponse?.trim()) throw new AppError(400, 'Enter the question for the tutor and parent.')
+  if (decidingAttendance && existing.tutorReplyPending) throw new AppError(409, 'Waiting for the tutor to reply.')
+  if (decidingAttendance && !existing.parentAnswer) throw new AppError(409, 'Waiting for the parent to respond.')
+  if ((decidingAttendance || asking) && data.reviewedAt !== existing.updatedAt.toISOString()) throw new AppError(409, 'Reopen the review to see the latest evidence and parent response.')
+  const outcome = data.outcome ?? (data.status === 'DISMISSED' ? 'UNVERIFIED' : data.status === 'RESOLVED' ? 'CONFIRMED' : null)
   const updated = await prisma.$transaction(async (tx) => {
+    if (existing.category === MISSED_CHECK_IN && existing.bookingId) {
+      await tx.$queryRaw`SELECT id FROM Booking WHERE id = ${existing.bookingId} FOR UPDATE`
+    }
     const { count } = await tx.complaint.updateMany({
       where: { id: existing.id, status: existing.status, updatedAt: existing.updatedAt },
-      data: { status: data.status, adminResponse: data.adminResponse ?? existing.adminResponse, handledById: req.user.id },
+      data: { ...((asking || decidingAttendance) && { attendanceOutcome: outcome }),
+        ...(asking && { tutorReplyPending: true, parentAnswer: null, parentNote: null }), ...(decidingAttendance && { attendanceApproved: data.status === 'RESOLVED' }), status: data.status, adminResponse: data.adminResponse ?? existing.adminResponse, handledById: req.user.id },
     })
     if (!count) throw new AppError(409, 'This complaint has just been updated. Please refresh and try again.')
+    if (existing.category === MISSED_CHECK_IN && existing.bookingId) {
+      if (decidingAttendance && existing.attendanceRefundId && outcome !== 'NOT_HELD') {
+        const prior = await tx.refund.findUniqueOrThrow({ where: { id: existing.attendanceRefundId }, include: { payment: { select: { status: true } } } })
+        if (prior.status === 'APPROVED' && attendanceRefundState(existing, prior) === 'ON_HOLD') {
+          await tx.refund.update({ where: { id: prior.id }, data: { status: 'PENDING', reviewedById: null, reviewedAt: null, reviewNote: null } })
+          await tx.attendanceReviewEntry.create({ data: { complaintId: existing.id, action: 'REFUND_REVIEW', message: 'Fresh finance decision required. Previous approval: RM ' + prior.amount.toFixed(2) + '. ' + (prior.reviewNote || '') } })
+        }
+      }
+      const refund = outcome === 'NOT_HELD' ? await attendanceRefund(tx, existing) : null
+      if (asking || decidingAttendance) {
+        await tx.attendanceReviewEntry.create({ data: { complaintId: existing.id, action: outcome,
+          message: data.adminResponse, evidenceUrl: existing.evidenceUrl } })
+        if (asking && existing.parentAnswer) await tx.attendanceReviewEntry.create({ data: {
+          complaintId: existing.id, action: 'PREVIOUS_PARENT_RESPONSE', message: [existing.parentAnswer, existing.parentNote].filter(Boolean).join(' — '),
+        } })
+      }
+      const lesson = await tx.booking.findUniqueOrThrow({ where: { id: existing.bookingId }, select: { id: true, publicId: true, subject: true, parent: { select: { userId: true } } } })
+      const ref = publicReference(lesson)
+      const decisionLabel = {
+        MORE_INFO: 'Admin asked for more information', UNVERIFIED: 'Attendance could not be verified',
+        NOT_HELD: 'Lesson did not take place', CONFIRMED: 'Attendance confirmed by admin',
+      }[outcome] || 'Review in progress'
+      const update = { type: 'ATTENDANCE_REVIEW', title: 'Missed check-in review', message: lesson.subject + ' · ' + decisionLabel + (data.adminResponse ? '. ' + data.adminResponse : '') + (refund ? '. Refund review: ' + refund.status.toLowerCase() + '.' : '') }
+      await tx.notification.createMany({ data: [
+        { ...update, userId: existing.filedById, link: '/tutor/bookings/' + ref + '/session' },
+        { ...update, userId: lesson.parent.userId, link: '/parent/bookings?booking=' + ref },
+      ] })
+    }
     return tx.complaint.findUnique({ where: { id: existing.id }, include: complaintInclude })
   })
   const label = { IN_PROGRESS: 'is being reviewed', RESOLVED: 'has been resolved', DISMISSED: 'was reviewed and closed' }[data.status]
-  await notify(existing.filedById, {
+  if (existing.category !== MISSED_CHECK_IN) await notify(existing.filedById, {
     type: 'COMPLAINT_UPDATE',
     title: 'Complaint update',
     message: `Your complaint (${existing.category}) ${label}.`,
@@ -144,12 +203,14 @@ export async function getComplaint(req, res) {
     where: { id: Number(req.params.id) },
     include: {
       ...complaintInclude,
+      reviewHistory: { orderBy: { id: 'asc' } },
       booking: { include: { child: { select: { name: true } }, payment: { include: { refunds: true } }, attendance: true, summary: true } },
     },
   })
   if (!c) throw new AppError(404, 'Complaint not found')
 
   const b = c.booking
+  const linkedRefund = b?.payment?.refunds.find(r => r.id === c.attendanceRefundId)
   const [others, warnings] = c.againstUserId
     ? await Promise.all([
         prisma.complaint.findMany({
@@ -165,6 +226,13 @@ export async function getComplaint(req, res) {
   res.json({
     complaint: toComplaintDto(c),
     investigation: {
+      attendanceReview: c.category === MISSED_CHECK_IN ? {
+        attendanceRefundState: attendanceRefundState(c, linkedRefund && { ...linkedRefund, payment: b.payment }),
+        outcome: c.attendanceOutcome, tutorReplyPending: c.tutorReplyPending,
+        history: c.reviewHistory.map(entry => ({ ...entry, evidenceUrl: mediaLink(entry.evidenceUrl, 'wondertutor/attendance/' + c.bookingId) })),
+        proof: mediaLink(c.evidenceUrl, 'wondertutor/attendance/' + c.bookingId),
+        parentAnswer: c.parentAnswer, parentNote: c.parentNote, approved: c.attendanceApproved, reviewedAt: c.updatedAt,
+      } : null,
       booking: b && {
         id: b.id, publicId: b.publicId, subject: b.subject, child: b.child.name, status: b.status, startAt: b.startAt, endAt: b.endAt,
         teachingMode: b.teachingMode, agreedPrice: b.agreedPrice == null ? null : Number(b.agreedPrice), cancelReason: b.cancelReason,
