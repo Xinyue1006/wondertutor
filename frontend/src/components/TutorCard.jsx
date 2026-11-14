@@ -18,7 +18,7 @@ export default function TutorCard({ tutor, match, query = '', saved = false, onT
   const shown = more ? reasons : reasons.slice(0, 3)
 
   return (
-    <article className="card flex flex-col gap-3 p-4 transition hover:shadow-[0_10px_34px_rgba(26,109,255,0.14)]">
+    <article className="parent-hover-lift card flex flex-col gap-3 p-4 transition hover:shadow-[0_10px_34px_rgba(26,109,255,0.14)]">
       {(match || tutor.recommended) && (
         <div className="flex items-center gap-2">
           {match ? (

@@ -13,6 +13,7 @@ import { gradeLabel } from '../../lib/education'
 import { childSubjects } from '../../lib/subjects'
 import { recordRef } from '../../lib/recordRef'
 import { DAY_SHORT, hhmmLabel } from '../../lib/format'
+import { ParentHeaderDecor } from '../../components/ParentPageEffects'
 
 const ACTIVITY_ICON = {
   BOOKING_CONFIRMED: ['calendar', 'bg-emerald-100 text-emerald-600'],
@@ -45,15 +46,15 @@ export default function ParentDashboard() {
   return (
     <div>
       <div className="relative mb-6 flex items-start justify-between">
-        <div>
-          <h1 className="text-4xl font-extrabold tracking-tight text-navy">
-            {greeting()}, {user.fullName}! <span className="inline-block origin-[70%_70%] animate-[wave_2s_ease-in-out_1]">👋</span>
+        <div className="parent-dashboard-copy">
+          <h1 className="text-3xl font-extrabold tracking-tight text-navy sm:text-4xl">
+            {greeting()}, {user.fullName}! <span className="parent-dashboard-wave inline-block origin-[70%_70%] animate-[wave_2s_ease-in-out_1]">👋</span>
           </h1>
           <p className="mt-1 text-lg text-slate-500">Let's find the right learning support for your child.</p>
         </div>
-        <div className="pointer-events-none hidden items-center gap-4 pr-4 lg:flex">
-          <Icon name="book" className="h-14 w-14 text-brand-200" strokeWidth={1.25} />
-          <div className="font-hand text-2xl leading-6 text-brand-200 [transform:rotate(-8deg)]">
+        <div className="parent-dashboard-art flex items-center gap-4 lg:pr-4">
+          <ParentHeaderDecor />
+          <div className="hidden font-hand text-2xl leading-6 text-brand-200 [transform:rotate(-8deg)] xl:block">
             Small<br />Steps<br />Brighter<br />Futures
           </div>
         </div>
@@ -103,7 +104,7 @@ export default function ParentDashboard() {
                   <Link to={`/parent/children?edit=${recordRef(c)}`} className="btn-outline mt-3 w-full">View Profile <Icon name="arrow-right" className="h-4 w-4" /></Link>
                 </div>
               ))}
-              <Link to="/parent/children?add=1" className="flex flex-col items-center justify-center rounded-xl border border-dashed border-brand-200 bg-brand-50/60 p-4 text-center transition hover:bg-brand-50">
+              <Link to="/parent/children?add=1" className="parent-hover-lift flex flex-col items-center justify-center rounded-xl border border-dashed border-brand-200 bg-brand-50/60 p-4 text-center transition hover:bg-brand-50">
                 <span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-100 text-brand-500"><Icon name="plus" className="h-6 w-6" /></span>
                 <span className="mt-1 font-bold text-navy">Add Child</span>
                 <span className="text-xs text-slate-500">Add another child to find suitable tutors for their learning needs.</span>
@@ -148,7 +149,7 @@ export default function ParentDashboard() {
                 ['clock', counts.pending, 'Pending', 'bg-accent-50', 'bg-accent-100 text-accent-600', 'pending'],
                 ['check', counts.completed, 'Completed', 'bg-ok-50', 'bg-ok text-white', 'completed'],
               ].map(([icon, n, label, bg, tone, tab]) => (
-                <button key={label} onClick={() => navigate(`/parent/bookings?tab=${tab}`)} className={`flex items-center gap-3 rounded-xl p-3 text-left ${bg} transition hover:shadow-md`}>
+                <button key={label} onClick={() => navigate(`/parent/bookings?tab=${tab}`)} className={`parent-hover-lift flex items-center gap-3 rounded-xl p-3 text-left ${bg} transition hover:shadow-md`}>
                   <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${tone}`}><Icon name={icon} className="h-6 w-6" /></span>
                   <span className="flex-1"><span className="block text-3xl font-extrabold leading-8 text-navy">{n}</span><span className="text-sm text-slate-600">{label}</span></span>
                   <Icon name="right" className="h-4 w-4 text-slate-400" />

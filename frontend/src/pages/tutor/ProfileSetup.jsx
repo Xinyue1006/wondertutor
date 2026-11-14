@@ -205,7 +205,7 @@ function AccountProfileSetup() {
             {SETUP_STEPS.map((s, i) => (
               <li key={s.id} className="shrink-0 lg:w-full">
                 <button type="button" onClick={() => goTo(s.id)} aria-current={step === s.id ? 'step' : undefined}
-                  className={`flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-semibold ${step === s.id ? 'bg-brand-50 text-brand-700' : 'text-navy hover:bg-brand-25'}`}>
+                  className={`relative flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-semibold ${step === s.id ? 'bg-brand-50 text-brand-700' : 'text-navy hover:bg-brand-25'}`}>
                   <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs ${done(s.id) ? 'bg-ok text-white' : step === s.id ? 'bg-brand-500 text-white' : 'bg-slate-100 text-slate-600'}`}>
                     {done(s.id) ? <Icon name="check" className="h-3.5 w-3.5" strokeWidth={3} /> : i + 1}
                   </span>

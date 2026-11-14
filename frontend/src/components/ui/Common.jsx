@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import Icon from './Icon'
+import { ParentHeaderDecor } from '../ParentPageEffects'
 
 // ───────────── small display pieces ─────────────
 
@@ -85,13 +86,16 @@ export function LoadError({ message, onRetry }) {
 export function PageTitle({ title, subtitle, icon, right, sparkle = true }) {
   return (
     <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-      <div className="flex items-start gap-3">
-        {icon && <Icon name={icon} className="mt-1 h-9 w-9 text-navy" strokeWidth={1.75} />}
-        <div>
-          <h1 className="text-3xl font-bold text-navy md:text-[2rem]">
-            {title}
-            {sparkle && <Icon name="sparkle" fill className="mb-3 ml-1.5 inline h-5 w-5 text-accent" />}
-          </h1>
+      <div className="page-title-copy flex min-w-0 items-start gap-3">
+        {icon && <Icon name={icon} className="mt-1 h-9 w-9 shrink-0 text-navy" strokeWidth={1.75} />}
+        <div className="min-w-0">
+          <div className="page-title-heading">
+            <h1 className="text-3xl font-bold text-navy md:text-[2rem]">
+              {title}
+              {sparkle && <Icon name="sparkle" fill className="page-title-sparkle mb-3 ml-1.5 hidden h-5 w-5 text-accent sm:inline" />}
+            </h1>
+            <ParentHeaderDecor />
+          </div>
           {subtitle && <p className="mt-1 text-slate-600">{subtitle}</p>}
         </div>
       </div>

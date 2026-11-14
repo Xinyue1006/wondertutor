@@ -13,6 +13,7 @@ import { bookingMode } from '../../lib/availability'
 import { childSubjects } from '../../lib/subjects'
 import { checkRinggit } from '../../lib/validation'
 import { matchesRecordRef, recordRef } from '../../lib/recordRef'
+import { ParentHeaderDecor } from '../../components/ParentPageEffects'
 
 const TABS = [['about', 'About', 'user'], ['teaching', 'Teaching Information', 'book'], ['availability', 'Availability', 'calendar'], ['reviews', 'Reviews', 'star']]
 
@@ -86,9 +87,12 @@ export default function TutorProfile({ publicView = false }) {
 
   return (
     <div className={publicView ? 'py-6' : undefined}>
-      <button onClick={goBack} className="mb-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-brand-600 hover:underline">
-        <Icon name="arrow-left" className="h-4 w-4" /> Back to Find Tutors
-      </button>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <button onClick={goBack} className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-brand-600 hover:underline">
+          <Icon name="arrow-left" className="h-4 w-4" /> Back to Find Tutors
+        </button>
+        <ParentHeaderDecor compact />
+      </div>
 
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
         <div className="min-w-0 space-y-4">

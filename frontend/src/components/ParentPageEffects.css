@@ -1,0 +1,62 @@
+.parent-page-effects { min-width: 0; }
+
+/* Decorations occupy their own header space, never a form or a click target. */
+.parent-header-art { position: relative; width: 112px; height: 52px; flex: 0 0 auto; color: #9fc3f3; pointer-events: none; user-select: none; }
+.parent-header-art > svg { position: absolute; }
+.parent-decor-trail { inset: 0; width: 100%; height: 100%; opacity: .55; }
+.parent-decor-book { left: 33px; top: 4px; width: 44px; height: 44px; transform: rotate(-9deg); }
+.parent-decor-cap { left: 3px; top: 1px; width: 27px; height: 27px; transform: rotate(9deg); opacity: .8; }
+.parent-decor-pencil { right: 0; bottom: 2px; width: 23px; height: 23px; transform: rotate(-13deg); opacity: .75; }
+.parent-page-effects .page-title-copy { flex: 1 1 20rem; min-width: 0; }
+.parent-page-effects .page-title-copy > div { flex: 1; min-width: 0; }
+.parent-page-effects .page-title-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.parent-page-effects .page-title-heading h1 { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.parent-page-effects .page-title-sparkle { display: none; }
+.parent-dashboard-copy { min-width: 0; flex: 1; }
+.parent-dashboard-art { pointer-events: none; flex-shrink: 0; }
+
+.parent-header-art--compact { width: 52px; height: 40px; }
+.parent-header-art--compact .parent-decor-book { left: 11px; top: 7px; width: 28px; height: 28px; }
+.parent-header-art--compact .parent-decor-cap { left: 0; top: 0; width: 16px; height: 16px; }
+.parent-header-art--compact .parent-decor-pencil { width: 13px; height: 13px; }
+
+/* A very light fade keeps content visible and controls immediately usable.
+   Surface containers never transform, so fixed dialogs and sticky booking
+   panels keep their existing positioning and stacking behaviour. */
+@keyframes parent-surface-enter { from { opacity: .92; } to { opacity: 1; } }
+@media (prefers-reduced-motion: no-preference) {
+  .parent-page-effects .card:not([aria-busy="true"]):not(.opacity-60):not(:focus-within) {
+    animation: parent-surface-enter 280ms ease-out;
+  }
+  .parent-page-effects .card .card { animation: none; }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .parent-page-effects .card { transition: border-color 180ms ease-out, box-shadow 180ms ease-out; }
+  .parent-page-effects .card:hover { border-color: #bcd6ff; box-shadow: 0 9px 28px rgb(26 109 255 / 11%); }
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .parent-page-effects .parent-hover-lift { transition: transform 180ms ease-out, border-color 180ms ease-out, box-shadow 180ms ease-out; }
+  .parent-page-effects .parent-hover-lift:hover:not(:focus-within) { transform: translateY(-2px); }
+}
+
+@media (max-width: 639px) {
+  .parent-header-art { width: 44px; height: 42px; }
+  .parent-decor-book { left: 9px; top: 9px; width: 29px; height: 29px; }
+  .parent-decor-cap { left: 0; top: 0; width: 17px; height: 17px; }
+  .parent-decor-pencil { width: 13px; height: 13px; }
+  .parent-decor-trail { opacity: .35; }
+  .parent-page-effects .page-title-copy { flex-basis: 100%; }
+  .parent-page-effects .page-title-heading { gap: .5rem; }
+}
+@media (max-width: 639px) and (prefers-reduced-motion: no-preference) {
+  .parent-page-effects .card:not([aria-busy="true"]):not(.opacity-60):not(:focus-within) { animation-duration: 180ms; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .parent-page-effects .card, .parent-page-effects .parent-hover-lift, .parent-page-effects .parent-dashboard-wave { animation: none !important; transition: none !important; }
+  .parent-page-effects .parent-hover-lift { transform: none !important; }
+}
+@media print {
+  .parent-header-art { display: none !important; }
+  .parent-page-effects .card, .parent-page-effects .parent-hover-lift { animation: none !important; transition: none !important; transform: none !important; }
+}

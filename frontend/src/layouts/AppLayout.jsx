@@ -10,6 +10,7 @@ import { timeAgo } from '../lib/format'
 import { MatchingProvider } from '../assistant/MatchingContext'
 import AssistantWidget from '../assistant/AssistantWidget'
 import TutorStatusBanner from '../components/TutorStatusBanner'
+import ParentPageEffects from '../components/ParentPageEffects'
 
 // Top nav items per role (matches the UI_v1 mockups)
 const NAV = {
@@ -90,7 +91,7 @@ export default function AppLayout() {
       </header>
       <main className="mx-auto w-full max-w-[81.25rem] flex-1 px-3 pb-16 pt-6 md:px-6">
         {user.role === 'TUTOR' && <TutorStatusBanner />}
-        <Outlet />
+        {isParent ? <ParentPageEffects><Outlet /></ParentPageEffects> : <Outlet />}
       </main>
       <AppFooter items={items} />
       {isParent && <AssistantWidget />}
